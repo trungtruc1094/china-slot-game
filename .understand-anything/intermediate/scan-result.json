@@ -1,0 +1,153 @@
+{
+  "name": "china-slot-game",
+  "description": "Browser-based Chinese-themed slot machine game built with Phaser, plus server-side implementation examples for RNG, sessions, spin APIs, and database schema.",
+  "languages": [
+    "javascript",
+    "markdown",
+    "txt",
+    "html",
+    "sql",
+    "json"
+  ],
+  "frameworks": [
+    "Phaser",
+    "Express"
+  ],
+  "files": [
+    {
+      "path": "fonts/OFL.txt",
+      "language": "txt",
+      "sizeLines": 93,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "fonts/README.txt",
+      "language": "txt",
+      "sizeLines": 75,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "index.html",
+      "language": "html",
+      "sizeLines": 34,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "js/mkutils.js",
+      "language": "javascript",
+      "sizeLines": 683,
+      "fileCategory": "code"
+    },
+    {
+      "path": "js/popups.js",
+      "language": "javascript",
+      "sizeLines": 67,
+      "fileCategory": "code"
+    },
+    {
+      "path": "js/slot_classes.js",
+      "language": "javascript",
+      "sizeLines": 1730,
+      "fileCategory": "code"
+    },
+    {
+      "path": "js/slotConfig3x5.js",
+      "language": "javascript",
+      "sizeLines": 1333,
+      "fileCategory": "code"
+    },
+    {
+      "path": "js/slotGame.js",
+      "language": "javascript",
+      "sizeLines": 710,
+      "fileCategory": "code"
+    },
+    {
+      "path": "js/state_machine.js",
+      "language": "javascript",
+      "sizeLines": 1229,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server_examples/client_integration.js",
+      "language": "javascript",
+      "sizeLines": 241,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server_examples/database_schema.sql",
+      "language": "sql",
+      "sizeLines": 162,
+      "fileCategory": "data"
+    },
+    {
+      "path": "server_examples/IMPLEMENTATION_CHECKLIST.md",
+      "language": "markdown",
+      "sizeLines": 196,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "server_examples/package.json",
+      "language": "json",
+      "sizeLines": 34,
+      "fileCategory": "config"
+    },
+    {
+      "path": "server_examples/README.md",
+      "language": "markdown",
+      "sizeLines": 127,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "server_examples/SERVER_IMPLEMENTATION_PLAN.md",
+      "language": "markdown",
+      "sizeLines": 663,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "server_examples/server.js",
+      "language": "javascript",
+      "sizeLines": 351,
+      "fileCategory": "code"
+    }
+  ],
+  "totalFiles": 16,
+  "filteredByIgnore": 16,
+  "estimatedComplexity": "small",
+  "stats": {
+    "filesScanned": 16,
+    "byCategory": {
+      "docs": 5,
+      "markup": 1,
+      "code": 8,
+      "data": 1,
+      "config": 1
+    },
+    "byLanguage": {
+      "txt": 2,
+      "html": 1,
+      "javascript": 8,
+      "sql": 1,
+      "markdown": 3,
+      "json": 1
+    }
+  },
+  "importMap": {
+    "fonts/OFL.txt": [],
+    "fonts/README.txt": [],
+    "index.html": [],
+    "js/mkutils.js": [],
+    "js/popups.js": [],
+    "js/slot_classes.js": [],
+    "js/slotConfig3x5.js": [],
+    "js/slotGame.js": [],
+    "js/state_machine.js": [],
+    "server_examples/client_integration.js": [],
+    "server_examples/database_schema.sql": [],
+    "server_examples/IMPLEMENTATION_CHECKLIST.md": [],
+    "server_examples/package.json": [],
+    "server_examples/README.md": [],
+    "server_examples/SERVER_IMPLEMENTATION_PLAN.md": [],
+    "server_examples/server.js": []
+  }
+}

@@ -1,0 +1,2072 @@
+{
+  "version": "1.0.0",
+  "kind": "codebase",
+  "project": {
+    "name": "china-slot-game",
+    "languages": [
+      "javascript",
+      "markdown",
+      "txt",
+      "html",
+      "sql",
+      "json"
+    ],
+    "frameworks": [
+      "Phaser",
+      "Express"
+    ],
+    "description": "Browser-based Chinese-themed slot machine game built with Phaser, plus server-side implementation examples for RNG, sessions, spin APIs, and database schema.",
+    "analyzedAt": "2026-06-01T10:28:23.957Z",
+    "gitCommitHash": "56c1db052dbba4c070fe9297dd57760696080cfd"
+  },
+  "nodes": [
+    {
+      "id": "document:server_examples/IMPLEMENTATION_CHECKLIST.md",
+      "type": "document",
+      "name": "IMPLEMENTATION_CHECKLIST.md",
+      "filePath": "server_examples/IMPLEMENTATION_CHECKLIST.md",
+      "lineRange": [
+        1,
+        196
+      ],
+      "summary": "Phase-by-phase checklist for server setup, authentication, game logic, APIs, database integration, testing, deployment, and monitoring.",
+      "tags": [
+        "documentation",
+        "reference",
+        "licensing"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:server_examples/README.md",
+      "type": "document",
+      "name": "README.md",
+      "filePath": "server_examples/README.md",
+      "lineRange": [
+        1,
+        127
+      ],
+      "summary": "Explains the server example files, setup steps, API test commands, and production hardening work that remains.",
+      "tags": [
+        "documentation",
+        "reference",
+        "licensing"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:server_examples/SERVER_IMPLEMENTATION_PLAN.md",
+      "type": "document",
+      "name": "SERVER_IMPLEMENTATION_PLAN.md",
+      "filePath": "server_examples/SERVER_IMPLEMENTATION_PLAN.md",
+      "lineRange": [
+        1,
+        663
+      ],
+      "summary": "Detailed implementation plan for moving the slot game to server-authoritative RNG, persistence, security, monitoring, and deployment.",
+      "tags": [
+        "documentation",
+        "reference",
+        "licensing"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "schema:server_examples/database_schema.sql",
+      "type": "schema",
+      "name": "database_schema.sql",
+      "filePath": "server_examples/database_schema.sql",
+      "lineRange": [
+        1,
+        162
+      ],
+      "summary": "PostgreSQL schema for players, sessions, spins, balance transactions, RTP tracking, indexes, and reporting views.",
+      "tags": [
+        "database",
+        "schema-definition",
+        "audit-trail"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:server_examples/package.json",
+      "type": "config",
+      "name": "package.json",
+      "filePath": "server_examples/package.json",
+      "lineRange": [
+        1,
+        34
+      ],
+      "summary": "Declares the example server runtime, development scripts, and dependencies for Express, JWT, PostgreSQL, security, and testing.",
+      "tags": [
+        "configuration",
+        "dependencies",
+        "server"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:fonts/OFL.txt",
+      "type": "document",
+      "name": "OFL.txt",
+      "filePath": "fonts/OFL.txt",
+      "lineRange": [
+        1,
+        93
+      ],
+      "summary": "Contains the SIL Open Font License governing the bundled Vollkorn font assets.",
+      "tags": [
+        "documentation",
+        "reference",
+        "licensing"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:fonts/README.txt",
+      "type": "document",
+      "name": "README.txt",
+      "filePath": "fonts/README.txt",
+      "lineRange": [
+        1,
+        75
+      ],
+      "summary": "Documents the bundled Vollkorn font family, font files, and source metadata used by the bitmap font assets.",
+      "tags": [
+        "documentation",
+        "reference",
+        "licensing"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:index.html",
+      "type": "file",
+      "name": "index.html",
+      "filePath": "index.html",
+      "lineRange": [
+        1,
+        34
+      ],
+      "summary": "Bootstraps the browser game, centers the canvas, loads Phaser, and includes the slot game scripts in dependency order.",
+      "tags": [
+        "entry-point",
+        "markup",
+        "script-loader"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:js/mkutils.js",
+      "type": "file",
+      "name": "mkutils.js",
+      "filePath": "js/mkutils.js",
+      "lineRange": [
+        1,
+        683
+      ],
+      "summary": "Provides reusable gameplay utilities for tween sequencing, events, buttons, sound, popup display, and state-machine support.",
+      "tags": [
+        "utility",
+        "ui-controls",
+        "events",
+        "tweening"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:js/mkutils.js:SimpleTweener",
+      "type": "class",
+      "name": "SimpleTweener",
+      "filePath": "js/mkutils.js",
+      "lineRange": [
+        4,
+        28
+      ],
+      "summary": "SimpleTweener encapsulates 3 methods for slot game behavior and UI coordination.",
+      "tags": [
+        "class",
+        "game-logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:js/mkutils.js:SimpleTweenFloat",
+      "type": "class",
+      "name": "SimpleTweenFloat",
+      "filePath": "js/mkutils.js",
+      "lineRange": [
+        32,
+        77
+      ],
+      "summary": "SimpleTweenFloat encapsulates 3 methods for slot game behavior and UI coordination.",
+      "tags": [
+        "class",
+        "game-logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:js/mkutils.js:SimpleWaitWhile",
+      "type": "class",
+      "name": "SimpleWaitWhile",
+      "filePath": "js/mkutils.js",
+      "lineRange": [
+        79,
+        97
+      ],
+      "summary": "SimpleWaitWhile encapsulates 2 methods for slot game behavior and UI coordination.",
+      "tags": [
+        "class",
+        "game-logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:js/mkutils.js:SequenceTweener",
+      "type": "class",
+      "name": "SequenceTweener",
+      "filePath": "js/mkutils.js",
+      "lineRange": [
+        100,
+        126
+      ],
+      "summary": "SequenceTweener encapsulates 3 methods for slot game behavior and UI coordination.",
+      "tags": [
+        "class",
+        "game-logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:js/mkutils.js:ComboCounter",
+      "type": "class",
+      "name": "ComboCounter",
+      "filePath": "js/mkutils.js",
+      "lineRange": [
+        129,
+        180
+      ],
+      "summary": "ComboCounter encapsulates 4 methods for slot game behavior and UI coordination.",
+      "tags": [
+        "class",
+        "game-logic"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:js/mkutils.js:Coroutiner",
+      "type": "class",
+      "name": "Coroutiner",
+      "filePath": "js/mkutils.js",
+      "lineRange": [
+        182,
+        211
+      ],
+      "summary": "Coroutiner encapsulates 4 methods for slot game behavior and UI coordination.",
+      "tags": [
+        "class",
+        "game-logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:js/mkutils.js:ParallelActions",
+      "type": "class",
+      "name": "ParallelActions",
+      "filePath": "js/mkutils.js",
+      "lineRange": [
+        213,
+        242
+      ],
+      "summary": "ParallelActions encapsulates 3 methods for slot game behavior and UI coordination.",
+      "tags": [
+        "class",
+        "game-logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:js/mkutils.js:SequencedActions",
+      "type": "class",
+      "name": "SequencedActions",
+      "filePath": "js/mkutils.js",
+      "lineRange": [
+        245,
+        284
+      ],
+      "summary": "SequencedActions encapsulates 5 methods for slot game behavior and UI coordination.",
+      "tags": [
+        "class",
+        "game-logic"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:js/mkutils.js:SequenceActionWrapper",
+      "type": "class",
+      "name": "SequenceActionWrapper",
+      "filePath": "js/mkutils.js",
+      "lineRange": [
+        286,
+        300
+      ],
+      "summary": "SequenceActionWrapper encapsulates 2 methods for slot game behavior and UI coordination.",
+      "tags": [
+        "class",
+        "game-logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:js/mkutils.js:MKEvent",
+      "type": "class",
+      "name": "MKEvent",
+      "filePath": "js/mkutils.js",
+      "lineRange": [
+        312,
+        337
+      ],
+      "summary": "MKEvent encapsulates 4 methods for slot game behavior and UI coordination.",
+      "tags": [
+        "class",
+        "game-logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:js/mkutils.js:SceneButton",
+      "type": "class",
+      "name": "SceneButton",
+      "filePath": "js/mkutils.js",
+      "lineRange": [
+        339,
+        436
+      ],
+      "summary": "SceneButton encapsulates 11 methods for slot game behavior and UI coordination.",
+      "tags": [
+        "class",
+        "game-logic"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:js/mkutils.js:StateMachine",
+      "type": "class",
+      "name": "StateMachine",
+      "filePath": "js/mkutils.js",
+      "lineRange": [
+        438,
+        455
+      ],
+      "summary": "StateMachine encapsulates 2 methods for slot game behavior and UI coordination.",
+      "tags": [
+        "class",
+        "game-logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:js/mkutils.js:SoundController",
+      "type": "class",
+      "name": "SoundController",
+      "filePath": "js/mkutils.js",
+      "lineRange": [
+        457,
+        543
+      ],
+      "summary": "SoundController encapsulates 10 methods for slot game behavior and UI coordination.",
+      "tags": [
+        "controller",
+        "ui-orchestration"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:js/mkutils.js:GuiController",
+      "type": "class",
+      "name": "GuiController",
+      "filePath": "js/mkutils.js",
+      "lineRange": [
+        545,
+        644
+      ],
+      "summary": "GuiController encapsulates 7 methods for slot game behavior and UI coordination.",
+      "tags": [
+        "controller",
+        "ui-orchestration"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:js/mkutils.js:PopUpController",
+      "type": "class",
+      "name": "PopUpController",
+      "filePath": "js/mkutils.js",
+      "lineRange": [
+        646,
+        681
+      ],
+      "summary": "PopUpController encapsulates 5 methods for slot game behavior and UI coordination.",
+      "tags": [
+        "controller",
+        "ui-orchestration"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:js/popups.js",
+      "type": "file",
+      "name": "popups.js",
+      "filePath": "js/popups.js",
+      "lineRange": [
+        1,
+        67
+      ],
+      "summary": "Builds yes/no/cancel and acknowledgement popup handlers on top of the shared popup controller utilities.",
+      "tags": [
+        "ui",
+        "popup",
+        "event-handler"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:js/popups.js:createGameMessagePUHandlerYNC",
+      "type": "function",
+      "name": "createGameMessagePUHandlerYNC",
+      "filePath": "js/popups.js",
+      "lineRange": [
+        4,
+        41
+      ],
+      "summary": "createGameMessagePUHandlerYNC implements a significant gameplay routine in popups.js.",
+      "tags": [
+        "function",
+        "game-flow"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:js/popups.js:createGameMessagePUHandler",
+      "type": "function",
+      "name": "createGameMessagePUHandler",
+      "filePath": "js/popups.js",
+      "lineRange": [
+        44,
+        67
+      ],
+      "summary": "createGameMessagePUHandler implements a significant gameplay routine in popups.js.",
+      "tags": [
+        "function",
+        "game-flow"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:js/slot_classes.js",
+      "type": "file",
+      "name": "slot_classes.js",
+      "filePath": "js/slot_classes.js",
+      "lineRange": [
+        1,
+        1731
+      ],
+      "summary": "Defines the core slot-machine domain objects: reels, symbols, paylines, win calculation support, balance/player state, and UI controls.",
+      "tags": [
+        "domain-model",
+        "reels",
+        "paylines",
+        "win-calculation"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:js/slot_classes.js:Lamp",
+      "type": "class",
+      "name": "Lamp",
+      "filePath": "js/slot_classes.js",
+      "lineRange": [
+        1,
+        23
+      ],
+      "summary": "Lamp encapsulates 4 methods for slot game behavior and UI coordination.",
+      "tags": [
+        "class",
+        "game-logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:js/slot_classes.js:TimeCoder",
+      "type": "class",
+      "name": "TimeCoder",
+      "filePath": "js/slot_classes.js",
+      "lineRange": [
+        25,
+        87
+      ],
+      "summary": "TimeCoder encapsulates 5 methods for slot game behavior and UI coordination.",
+      "tags": [
+        "class",
+        "game-logic"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:js/slot_classes.js:LineButton",
+      "type": "class",
+      "name": "LineButton",
+      "filePath": "js/slot_classes.js",
+      "lineRange": [
+        89,
+        163
+      ],
+      "summary": "LineButton encapsulates 10 methods for slot game behavior and UI coordination.",
+      "tags": [
+        "class",
+        "game-logic"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:js/slot_classes.js:SlotSymbol",
+      "type": "class",
+      "name": "SlotSymbol",
+      "filePath": "js/slot_classes.js",
+      "lineRange": [
+        165,
+        234
+      ],
+      "summary": "SlotSymbol encapsulates 6 methods for slot game behavior and UI coordination.",
+      "tags": [
+        "class",
+        "game-logic"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:js/slot_classes.js:Reel",
+      "type": "class",
+      "name": "Reel",
+      "filePath": "js/slot_classes.js",
+      "lineRange": [
+        236,
+        511
+      ],
+      "summary": "Reel encapsulates 18 methods for slot game behavior and UI coordination.",
+      "tags": [
+        "class",
+        "game-logic"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:js/slot_classes.js:LineBehavior",
+      "type": "class",
+      "name": "LineBehavior",
+      "filePath": "js/slot_classes.js",
+      "lineRange": [
+        513,
+        711
+      ],
+      "summary": "LineBehavior encapsulates 14 methods for slot game behavior and UI coordination.",
+      "tags": [
+        "class",
+        "game-logic"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:js/slot_classes.js:LinesController",
+      "type": "class",
+      "name": "LinesController",
+      "filePath": "js/slot_classes.js",
+      "lineRange": [
+        713,
+        806
+      ],
+      "summary": "LinesController encapsulates 8 methods for slot game behavior and UI coordination.",
+      "tags": [
+        "controller",
+        "ui-orchestration"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:js/slot_classes.js:WinController",
+      "type": "class",
+      "name": "WinController",
+      "filePath": "js/slot_classes.js",
+      "lineRange": [
+        808,
+        1055
+      ],
+      "summary": "WinController encapsulates 12 methods for slot game behavior and UI coordination.",
+      "tags": [
+        "controller",
+        "ui-orchestration"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:js/slot_classes.js:PayLine",
+      "type": "class",
+      "name": "PayLine",
+      "filePath": "js/slot_classes.js",
+      "lineRange": [
+        1057,
+        1152
+      ],
+      "summary": "PayLine encapsulates 5 methods for slot game behavior and UI coordination.",
+      "tags": [
+        "class",
+        "game-logic"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:js/slot_classes.js:WinData",
+      "type": "class",
+      "name": "WinData",
+      "filePath": "js/slot_classes.js",
+      "lineRange": [
+        1154,
+        1175
+      ],
+      "summary": "WinData encapsulates 3 methods for slot game behavior and UI coordination.",
+      "tags": [
+        "class",
+        "game-logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:js/slot_classes.js:SlotPlayer",
+      "type": "class",
+      "name": "SlotPlayer",
+      "filePath": "js/slot_classes.js",
+      "lineRange": [
+        1177,
+        1315
+      ],
+      "summary": "SlotPlayer encapsulates 17 methods for slot game behavior and UI coordination.",
+      "tags": [
+        "class",
+        "game-logic"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:js/slot_classes.js:SlotControls",
+      "type": "class",
+      "name": "SlotControls",
+      "filePath": "js/slot_classes.js",
+      "lineRange": [
+        1317,
+        1731
+      ],
+      "summary": "SlotControls encapsulates 48 methods for slot game behavior and UI coordination.",
+      "tags": [
+        "class",
+        "game-logic"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:js/slotConfig3x5.js",
+      "type": "file",
+      "name": "slotConfig3x5.js",
+      "filePath": "js/slotConfig3x5.js",
+      "lineRange": [
+        1,
+        1334
+      ],
+      "summary": "Configures the 3x5 Chinese-themed slot layout, symbols, paylines, jackpot, reels, controls, graphics, and coin animation behavior.",
+      "tags": [
+        "configuration",
+        "slot-rules",
+        "assets",
+        "paytable"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:js/slotConfig3x5.js:AnimatedCoinParticle",
+      "type": "class",
+      "name": "AnimatedCoinParticle",
+      "filePath": "js/slotConfig3x5.js",
+      "lineRange": [
+        1306,
+        1334
+      ],
+      "summary": "AnimatedCoinParticle encapsulates 2 methods for slot game behavior and UI coordination.",
+      "tags": [
+        "class",
+        "game-logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:js/slotGame.js",
+      "type": "file",
+      "name": "slotGame.js",
+      "filePath": "js/slotGame.js",
+      "lineRange": [
+        1,
+        711
+      ],
+      "summary": "Creates the Phaser scene, preloads assets, wires game controllers and state transitions, and runs spin, win, free-spin, and jackpot flows.",
+      "tags": [
+        "entry-point",
+        "phaser-scene",
+        "game-loop",
+        "state-orchestration"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:js/slotGame.js:SlotGame",
+      "type": "class",
+      "name": "SlotGame",
+      "filePath": "js/slotGame.js",
+      "lineRange": [
+        31,
+        664
+      ],
+      "summary": "SlotGame encapsulates 21 methods for slot game behavior and UI coordination.",
+      "tags": [
+        "class",
+        "game-logic"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:js/slotGame.js:spinReels",
+      "type": "function",
+      "name": "spinReels",
+      "filePath": "js/slotGame.js",
+      "lineRange": [
+        678,
+        691
+      ],
+      "summary": "spinReels implements a significant gameplay routine in slotGame.js.",
+      "tags": [
+        "function",
+        "game-flow"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:js/slotGame.js:createFullPaytable",
+      "type": "function",
+      "name": "createFullPaytable",
+      "filePath": "js/slotGame.js",
+      "lineRange": [
+        693,
+        703
+      ],
+      "summary": "createFullPaytable implements a significant gameplay routine in slotGame.js.",
+      "tags": [
+        "function",
+        "game-flow"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:js/state_machine.js",
+      "type": "file",
+      "name": "state_machine.js",
+      "filePath": "js/state_machine.js",
+      "lineRange": [
+        1,
+        1229
+      ],
+      "summary": "Implements the slot game state classes that coordinate pre-spin, spin, auto-spin, idle, win, lose, free-spin, and button behavior.",
+      "tags": [
+        "state-machine",
+        "spin-flow",
+        "event-handler"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:js/state_machine.js:PreSpinState",
+      "type": "class",
+      "name": "PreSpinState",
+      "filePath": "js/state_machine.js",
+      "lineRange": [
+        2,
+        122
+      ],
+      "summary": "PreSpinState encapsulates 11 methods for slot game behavior and UI coordination.",
+      "tags": [
+        "state-machine",
+        "game-state"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:js/state_machine.js:SpinState",
+      "type": "class",
+      "name": "SpinState",
+      "filePath": "js/state_machine.js",
+      "lineRange": [
+        124,
+        173
+      ],
+      "summary": "SpinState encapsulates 6 methods for slot game behavior and UI coordination.",
+      "tags": [
+        "state-machine",
+        "game-state"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:js/state_machine.js:AutoSpinState",
+      "type": "class",
+      "name": "AutoSpinState",
+      "filePath": "js/state_machine.js",
+      "lineRange": [
+        175,
+        268
+      ],
+      "summary": "AutoSpinState encapsulates 11 methods for slot game behavior and UI coordination.",
+      "tags": [
+        "state-machine",
+        "game-state"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:js/state_machine.js:NormalSpinState",
+      "type": "class",
+      "name": "NormalSpinState",
+      "filePath": "js/state_machine.js",
+      "lineRange": [
+        270,
+        371
+      ],
+      "summary": "NormalSpinState encapsulates 12 methods for slot game behavior and UI coordination.",
+      "tags": [
+        "state-machine",
+        "game-state"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:js/state_machine.js:IddleState",
+      "type": "class",
+      "name": "IddleState",
+      "filePath": "js/state_machine.js",
+      "lineRange": [
+        373,
+        465
+      ],
+      "summary": "IddleState encapsulates 11 methods for slot game behavior and UI coordination.",
+      "tags": [
+        "state-machine",
+        "game-state"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:js/state_machine.js:FreeSpinState",
+      "type": "class",
+      "name": "FreeSpinState",
+      "filePath": "js/state_machine.js",
+      "lineRange": [
+        467,
+        561
+      ],
+      "summary": "FreeSpinState encapsulates 11 methods for slot game behavior and UI coordination.",
+      "tags": [
+        "state-machine",
+        "game-state"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:js/state_machine.js:EndLessSpinState",
+      "type": "class",
+      "name": "EndLessSpinState",
+      "filePath": "js/state_machine.js",
+      "lineRange": [
+        564,
+        655
+      ],
+      "summary": "EndLessSpinState encapsulates 11 methods for slot game behavior and UI coordination.",
+      "tags": [
+        "state-machine",
+        "game-state"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:js/state_machine.js:CascadeSpinState",
+      "type": "class",
+      "name": "CascadeSpinState",
+      "filePath": "js/state_machine.js",
+      "lineRange": [
+        658,
+        742
+      ],
+      "summary": "CascadeSpinState encapsulates 11 methods for slot game behavior and UI coordination.",
+      "tags": [
+        "state-machine",
+        "game-state"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:js/state_machine.js:WinState",
+      "type": "class",
+      "name": "WinState",
+      "filePath": "js/state_machine.js",
+      "lineRange": [
+        744,
+        846
+      ],
+      "summary": "WinState encapsulates 11 methods for slot game behavior and UI coordination.",
+      "tags": [
+        "state-machine",
+        "game-state"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:js/state_machine.js:LoseState",
+      "type": "class",
+      "name": "LoseState",
+      "filePath": "js/state_machine.js",
+      "lineRange": [
+        848,
+        980
+      ],
+      "summary": "LoseState encapsulates 12 methods for slot game behavior and UI coordination.",
+      "tags": [
+        "state-machine",
+        "game-state"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:js/state_machine.js:FreeInputWinState",
+      "type": "class",
+      "name": "FreeInputWinState",
+      "filePath": "js/state_machine.js",
+      "lineRange": [
+        982,
+        1105
+      ],
+      "summary": "FreeInputWinState encapsulates 12 methods for slot game behavior and UI coordination.",
+      "tags": [
+        "state-machine",
+        "game-state"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:js/state_machine.js:SpinButton",
+      "type": "class",
+      "name": "SpinButton",
+      "filePath": "js/state_machine.js",
+      "lineRange": [
+        1107,
+        1229
+      ],
+      "summary": "SpinButton encapsulates 12 methods for slot game behavior and UI coordination.",
+      "tags": [
+        "class",
+        "game-logic"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:server_examples/client_integration.js",
+      "type": "file",
+      "name": "client_integration.js",
+      "filePath": "server_examples/client_integration.js",
+      "lineRange": [
+        1,
+        241
+      ],
+      "summary": "Shows how the browser client can initialize sessions, send spin requests, retrieve balance, and integrate server outcomes into SlotGame.",
+      "tags": [
+        "client-api",
+        "integration-example",
+        "fetch"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:server_examples/client_integration.js:ServerClient",
+      "type": "class",
+      "name": "ServerClient",
+      "filePath": "server_examples/client_integration.js",
+      "lineRange": [
+        4,
+        84
+      ],
+      "summary": "ServerClient encapsulates 4 methods for server-side slot behavior.",
+      "tags": [
+        "class",
+        "game-logic"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:server_examples/server.js",
+      "type": "file",
+      "name": "server.js",
+      "filePath": "server_examples/server.js",
+      "lineRange": [
+        1,
+        351
+      ],
+      "summary": "Example Express server with JWT session initialization, authenticated spin handling, server-side RNG, simplified win calculation, and balance endpoints.",
+      "tags": [
+        "api-handler",
+        "server-rng",
+        "sessions",
+        "express"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:server_examples/server.js:ServerRNG",
+      "type": "class",
+      "name": "ServerRNG",
+      "filePath": "server_examples/server.js",
+      "lineRange": [
+        25,
+        45
+      ],
+      "summary": "ServerRNG encapsulates 3 methods for server-side slot behavior.",
+      "tags": [
+        "server-logic",
+        "game-rules"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:server_examples/server.js:WinCalculator",
+      "type": "class",
+      "name": "WinCalculator",
+      "filePath": "server_examples/server.js",
+      "lineRange": [
+        47,
+        139
+      ],
+      "summary": "WinCalculator encapsulates 6 methods for server-side slot behavior.",
+      "tags": [
+        "server-logic",
+        "game-rules"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:server_examples/server.js:authenticateToken",
+      "type": "function",
+      "name": "authenticateToken",
+      "filePath": "server_examples/server.js",
+      "lineRange": [
+        162,
+        177
+      ],
+      "summary": "authenticateToken implements a significant server/API routine in server.js.",
+      "tags": [
+        "function",
+        "game-flow"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:server_examples/database_schema.sql:players",
+      "type": "table",
+      "name": "players",
+      "filePath": "server_examples/database_schema.sql",
+      "summary": "Database table players stores persistent slot server data.",
+      "tags": [
+        "database",
+        "table",
+        "persistence"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:server_examples/database_schema.sql:game_sessions",
+      "type": "table",
+      "name": "game_sessions",
+      "filePath": "server_examples/database_schema.sql",
+      "summary": "Database table game_sessions stores persistent slot server data.",
+      "tags": [
+        "database",
+        "table",
+        "persistence"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:server_examples/database_schema.sql:spins",
+      "type": "table",
+      "name": "spins",
+      "filePath": "server_examples/database_schema.sql",
+      "summary": "Database table spins stores persistent slot server data.",
+      "tags": [
+        "database",
+        "table",
+        "persistence"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:server_examples/database_schema.sql:balance_transactions",
+      "type": "table",
+      "name": "balance_transactions",
+      "filePath": "server_examples/database_schema.sql",
+      "summary": "Database table balance_transactions stores persistent slot server data.",
+      "tags": [
+        "database",
+        "table",
+        "persistence"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:server_examples/database_schema.sql:game_config",
+      "type": "table",
+      "name": "game_config",
+      "filePath": "server_examples/database_schema.sql",
+      "summary": "Database table game_config stores persistent slot server data.",
+      "tags": [
+        "database",
+        "table",
+        "persistence"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:server_examples/database_schema.sql:rtp_tracking",
+      "type": "table",
+      "name": "rtp_tracking",
+      "filePath": "server_examples/database_schema.sql",
+      "summary": "Database table rtp_tracking stores persistent slot server data.",
+      "tags": [
+        "database",
+        "table",
+        "persistence"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:server_examples/database_schema.sql:v_current_rtp",
+      "type": "table",
+      "name": "v_current_rtp",
+      "filePath": "server_examples/database_schema.sql",
+      "summary": "Reporting view v_current_rtp summarizes slot server operational or RTP data.",
+      "tags": [
+        "database",
+        "view",
+        "reporting"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:server_examples/database_schema.sql:v_player_stats",
+      "type": "table",
+      "name": "v_player_stats",
+      "filePath": "server_examples/database_schema.sql",
+      "summary": "Reporting view v_player_stats summarizes slot server operational or RTP data.",
+      "tags": [
+        "database",
+        "view",
+        "reporting"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "endpoint:server_examples/server.js:POST-/api/game/session/init",
+      "type": "endpoint",
+      "name": "POST /api/game/session/init",
+      "filePath": "server_examples/server.js",
+      "summary": "Express endpoint POST /api/game/session/init handles slot server API traffic.",
+      "tags": [
+        "api-endpoint",
+        "express",
+        "server"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "endpoint:server_examples/server.js:POST-/api/game/spin",
+      "type": "endpoint",
+      "name": "POST /api/game/spin",
+      "filePath": "server_examples/server.js",
+      "summary": "Express endpoint POST /api/game/spin handles slot server API traffic.",
+      "tags": [
+        "api-endpoint",
+        "express",
+        "server"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "endpoint:server_examples/server.js:GET-/api/game/balance",
+      "type": "endpoint",
+      "name": "GET /api/game/balance",
+      "filePath": "server_examples/server.js",
+      "summary": "Express endpoint GET /api/game/balance handles slot server API traffic.",
+      "tags": [
+        "api-endpoint",
+        "express",
+        "server"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "endpoint:server_examples/server.js:GET-/api/game/history",
+      "type": "endpoint",
+      "name": "GET /api/game/history",
+      "filePath": "server_examples/server.js",
+      "summary": "Express endpoint GET /api/game/history handles slot server API traffic.",
+      "tags": [
+        "api-endpoint",
+        "express",
+        "server"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "endpoint:server_examples/server.js:GET-/api/health",
+      "type": "endpoint",
+      "name": "GET /api/health",
+      "filePath": "server_examples/server.js",
+      "summary": "Express endpoint GET /api/health handles slot server API traffic.",
+      "tags": [
+        "api-endpoint",
+        "express",
+        "server"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "endpoint:server_examples/server.js:GET-/api/admin/rtp",
+      "type": "endpoint",
+      "name": "GET /api/admin/rtp",
+      "filePath": "server_examples/server.js",
+      "summary": "Express endpoint GET /api/admin/rtp handles slot server API traffic.",
+      "tags": [
+        "api-endpoint",
+        "express",
+        "server"
+      ],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/mkutils.js",
+      "target": "class:js/mkutils.js:SimpleTweener",
+      "type": "contains",
+      "description": "mkutils.js defines SimpleTweener."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/mkutils.js",
+      "target": "class:js/mkutils.js:SimpleTweenFloat",
+      "type": "contains",
+      "description": "mkutils.js defines SimpleTweenFloat."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/mkutils.js",
+      "target": "class:js/mkutils.js:SimpleWaitWhile",
+      "type": "contains",
+      "description": "mkutils.js defines SimpleWaitWhile."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/mkutils.js",
+      "target": "class:js/mkutils.js:SequenceTweener",
+      "type": "contains",
+      "description": "mkutils.js defines SequenceTweener."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/mkutils.js",
+      "target": "class:js/mkutils.js:ComboCounter",
+      "type": "contains",
+      "description": "mkutils.js defines ComboCounter."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/mkutils.js",
+      "target": "class:js/mkutils.js:Coroutiner",
+      "type": "contains",
+      "description": "mkutils.js defines Coroutiner."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/mkutils.js",
+      "target": "class:js/mkutils.js:ParallelActions",
+      "type": "contains",
+      "description": "mkutils.js defines ParallelActions."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/mkutils.js",
+      "target": "class:js/mkutils.js:SequencedActions",
+      "type": "contains",
+      "description": "mkutils.js defines SequencedActions."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/mkutils.js",
+      "target": "class:js/mkutils.js:SequenceActionWrapper",
+      "type": "contains",
+      "description": "mkutils.js defines SequenceActionWrapper."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/mkutils.js",
+      "target": "class:js/mkutils.js:MKEvent",
+      "type": "contains",
+      "description": "mkutils.js defines MKEvent."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/mkutils.js",
+      "target": "class:js/mkutils.js:SceneButton",
+      "type": "contains",
+      "description": "mkutils.js defines SceneButton."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/mkutils.js",
+      "target": "class:js/mkutils.js:StateMachine",
+      "type": "contains",
+      "description": "mkutils.js defines StateMachine."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/mkutils.js",
+      "target": "class:js/mkutils.js:SoundController",
+      "type": "contains",
+      "description": "mkutils.js defines SoundController."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/mkutils.js",
+      "target": "class:js/mkutils.js:GuiController",
+      "type": "contains",
+      "description": "mkutils.js defines GuiController."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/mkutils.js",
+      "target": "class:js/mkutils.js:PopUpController",
+      "type": "contains",
+      "description": "mkutils.js defines PopUpController."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/popups.js",
+      "target": "function:js/popups.js:createGameMessagePUHandlerYNC",
+      "type": "contains",
+      "description": "popups.js contains createGameMessagePUHandlerYNC."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/popups.js",
+      "target": "function:js/popups.js:createGameMessagePUHandler",
+      "type": "contains",
+      "description": "popups.js contains createGameMessagePUHandler."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/slot_classes.js",
+      "target": "class:js/slot_classes.js:Lamp",
+      "type": "contains",
+      "description": "slot_classes.js defines Lamp."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/slot_classes.js",
+      "target": "class:js/slot_classes.js:TimeCoder",
+      "type": "contains",
+      "description": "slot_classes.js defines TimeCoder."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/slot_classes.js",
+      "target": "class:js/slot_classes.js:LineButton",
+      "type": "contains",
+      "description": "slot_classes.js defines LineButton."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/slot_classes.js",
+      "target": "class:js/slot_classes.js:SlotSymbol",
+      "type": "contains",
+      "description": "slot_classes.js defines SlotSymbol."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/slot_classes.js",
+      "target": "class:js/slot_classes.js:Reel",
+      "type": "contains",
+      "description": "slot_classes.js defines Reel."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/slot_classes.js",
+      "target": "class:js/slot_classes.js:LineBehavior",
+      "type": "contains",
+      "description": "slot_classes.js defines LineBehavior."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/slot_classes.js",
+      "target": "class:js/slot_classes.js:LinesController",
+      "type": "contains",
+      "description": "slot_classes.js defines LinesController."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/slot_classes.js",
+      "target": "class:js/slot_classes.js:WinController",
+      "type": "contains",
+      "description": "slot_classes.js defines WinController."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/slot_classes.js",
+      "target": "class:js/slot_classes.js:PayLine",
+      "type": "contains",
+      "description": "slot_classes.js defines PayLine."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/slot_classes.js",
+      "target": "class:js/slot_classes.js:WinData",
+      "type": "contains",
+      "description": "slot_classes.js defines WinData."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/slot_classes.js",
+      "target": "class:js/slot_classes.js:SlotPlayer",
+      "type": "contains",
+      "description": "slot_classes.js defines SlotPlayer."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/slot_classes.js",
+      "target": "class:js/slot_classes.js:SlotControls",
+      "type": "contains",
+      "description": "slot_classes.js defines SlotControls."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/slotConfig3x5.js",
+      "target": "class:js/slotConfig3x5.js:AnimatedCoinParticle",
+      "type": "contains",
+      "description": "slotConfig3x5.js defines AnimatedCoinParticle."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/slotGame.js",
+      "target": "class:js/slotGame.js:SlotGame",
+      "type": "contains",
+      "description": "slotGame.js defines SlotGame."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/slotGame.js",
+      "target": "function:js/slotGame.js:spinReels",
+      "type": "contains",
+      "description": "slotGame.js contains spinReels."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/slotGame.js",
+      "target": "function:js/slotGame.js:createFullPaytable",
+      "type": "contains",
+      "description": "slotGame.js contains createFullPaytable."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/state_machine.js",
+      "target": "class:js/state_machine.js:PreSpinState",
+      "type": "contains",
+      "description": "state_machine.js defines PreSpinState."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/state_machine.js",
+      "target": "class:js/state_machine.js:SpinState",
+      "type": "contains",
+      "description": "state_machine.js defines SpinState."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/state_machine.js",
+      "target": "class:js/state_machine.js:AutoSpinState",
+      "type": "contains",
+      "description": "state_machine.js defines AutoSpinState."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/state_machine.js",
+      "target": "class:js/state_machine.js:NormalSpinState",
+      "type": "contains",
+      "description": "state_machine.js defines NormalSpinState."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/state_machine.js",
+      "target": "class:js/state_machine.js:IddleState",
+      "type": "contains",
+      "description": "state_machine.js defines IddleState."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/state_machine.js",
+      "target": "class:js/state_machine.js:FreeSpinState",
+      "type": "contains",
+      "description": "state_machine.js defines FreeSpinState."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/state_machine.js",
+      "target": "class:js/state_machine.js:EndLessSpinState",
+      "type": "contains",
+      "description": "state_machine.js defines EndLessSpinState."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/state_machine.js",
+      "target": "class:js/state_machine.js:CascadeSpinState",
+      "type": "contains",
+      "description": "state_machine.js defines CascadeSpinState."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/state_machine.js",
+      "target": "class:js/state_machine.js:WinState",
+      "type": "contains",
+      "description": "state_machine.js defines WinState."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/state_machine.js",
+      "target": "class:js/state_machine.js:LoseState",
+      "type": "contains",
+      "description": "state_machine.js defines LoseState."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/state_machine.js",
+      "target": "class:js/state_machine.js:FreeInputWinState",
+      "type": "contains",
+      "description": "state_machine.js defines FreeInputWinState."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:js/state_machine.js",
+      "target": "class:js/state_machine.js:SpinButton",
+      "type": "contains",
+      "description": "state_machine.js defines SpinButton."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:server_examples/client_integration.js",
+      "target": "class:server_examples/client_integration.js:ServerClient",
+      "type": "contains",
+      "description": "client_integration.js defines ServerClient."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:server_examples/server.js",
+      "target": "class:server_examples/server.js:ServerRNG",
+      "type": "contains",
+      "description": "server.js defines ServerRNG."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:server_examples/server.js",
+      "target": "class:server_examples/server.js:WinCalculator",
+      "type": "contains",
+      "description": "server.js defines WinCalculator."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "file:server_examples/server.js",
+      "target": "function:server_examples/server.js:authenticateToken",
+      "type": "contains",
+      "description": "server.js contains authenticateToken."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.9,
+      "source": "schema:server_examples/database_schema.sql",
+      "target": "table:server_examples/database_schema.sql:players",
+      "type": "defines_schema",
+      "description": "Schema defines players."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.9,
+      "source": "schema:server_examples/database_schema.sql",
+      "target": "table:server_examples/database_schema.sql:game_sessions",
+      "type": "defines_schema",
+      "description": "Schema defines game_sessions."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.9,
+      "source": "schema:server_examples/database_schema.sql",
+      "target": "table:server_examples/database_schema.sql:spins",
+      "type": "defines_schema",
+      "description": "Schema defines spins."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.9,
+      "source": "schema:server_examples/database_schema.sql",
+      "target": "table:server_examples/database_schema.sql:balance_transactions",
+      "type": "defines_schema",
+      "description": "Schema defines balance_transactions."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.9,
+      "source": "schema:server_examples/database_schema.sql",
+      "target": "table:server_examples/database_schema.sql:game_config",
+      "type": "defines_schema",
+      "description": "Schema defines game_config."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.9,
+      "source": "schema:server_examples/database_schema.sql",
+      "target": "table:server_examples/database_schema.sql:rtp_tracking",
+      "type": "defines_schema",
+      "description": "Schema defines rtp_tracking."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.8,
+      "source": "schema:server_examples/database_schema.sql",
+      "target": "table:server_examples/database_schema.sql:v_current_rtp",
+      "type": "defines_schema",
+      "description": "Schema defines view v_current_rtp."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.8,
+      "source": "schema:server_examples/database_schema.sql",
+      "target": "table:server_examples/database_schema.sql:v_player_stats",
+      "type": "defines_schema",
+      "description": "Schema defines view v_player_stats."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.9,
+      "source": "file:server_examples/server.js",
+      "target": "endpoint:server_examples/server.js:POST-/api/game/session/init",
+      "type": "routes",
+      "description": "server.js registers POST /api/game/session/init."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.9,
+      "source": "file:server_examples/server.js",
+      "target": "endpoint:server_examples/server.js:POST-/api/game/spin",
+      "type": "routes",
+      "description": "server.js registers POST /api/game/spin."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.9,
+      "source": "file:server_examples/server.js",
+      "target": "endpoint:server_examples/server.js:GET-/api/game/balance",
+      "type": "routes",
+      "description": "server.js registers GET /api/game/balance."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.9,
+      "source": "file:server_examples/server.js",
+      "target": "endpoint:server_examples/server.js:GET-/api/game/history",
+      "type": "routes",
+      "description": "server.js registers GET /api/game/history."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.9,
+      "source": "file:server_examples/server.js",
+      "target": "endpoint:server_examples/server.js:GET-/api/health",
+      "type": "routes",
+      "description": "server.js registers GET /api/health."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.9,
+      "source": "file:server_examples/server.js",
+      "target": "endpoint:server_examples/server.js:GET-/api/admin/rtp",
+      "type": "routes",
+      "description": "server.js registers GET /api/admin/rtp."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.8,
+      "source": "file:index.html",
+      "target": "file:js/slotConfig3x5.js",
+      "type": "depends_on",
+      "description": "index.html loads this browser script."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.8,
+      "source": "file:index.html",
+      "target": "file:js/mkutils.js",
+      "type": "depends_on",
+      "description": "index.html loads this browser script."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.8,
+      "source": "file:index.html",
+      "target": "file:js/popups.js",
+      "type": "depends_on",
+      "description": "index.html loads this browser script."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.8,
+      "source": "file:index.html",
+      "target": "file:js/state_machine.js",
+      "type": "depends_on",
+      "description": "index.html loads this browser script."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.8,
+      "source": "file:index.html",
+      "target": "file:js/slot_classes.js",
+      "type": "depends_on",
+      "description": "index.html loads this browser script."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.8,
+      "source": "file:index.html",
+      "target": "file:js/slotGame.js",
+      "type": "depends_on",
+      "description": "index.html loads this browser script."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.9,
+      "source": "file:js/slotGame.js",
+      "target": "file:js/slotConfig3x5.js",
+      "type": "depends_on",
+      "description": "SlotGame reads the slotConfig3x5 object for rules, assets, controls, and reels."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.9,
+      "source": "file:js/slotGame.js",
+      "target": "file:js/slot_classes.js",
+      "type": "depends_on",
+      "description": "SlotGame instantiates reels, controls, player, win, and payline classes."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.9,
+      "source": "file:js/slotGame.js",
+      "target": "file:js/state_machine.js",
+      "type": "depends_on",
+      "description": "SlotGame creates state objects and changes states after spin outcomes."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.8,
+      "source": "file:js/slotGame.js",
+      "target": "file:js/mkutils.js",
+      "type": "depends_on",
+      "description": "SlotGame uses shared event, audio, popup, and coroutine utilities."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.7,
+      "source": "file:js/popups.js",
+      "target": "file:js/mkutils.js",
+      "type": "depends_on",
+      "description": "Popup handlers use popup controller utilities from mkutils."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.7,
+      "source": "file:js/slot_classes.js",
+      "target": "file:js/mkutils.js",
+      "type": "depends_on",
+      "description": "Slot domain classes use shared event and tween helper abstractions."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.8,
+      "source": "file:js/state_machine.js",
+      "target": "file:js/slot_classes.js",
+      "type": "depends_on",
+      "description": "State classes drive slot controls, reels, and win handling objects."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.8,
+      "source": "file:server_examples/client_integration.js",
+      "target": "file:server_examples/server.js",
+      "type": "related",
+      "description": "Client integration example targets the Express API shape in server.js."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.7,
+      "source": "file:server_examples/server.js",
+      "target": "schema:server_examples/database_schema.sql",
+      "type": "depends_on",
+      "description": "The example server is intended to replace memory maps with the provided PostgreSQL schema."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.8,
+      "source": "config:server_examples/package.json",
+      "target": "file:server_examples/server.js",
+      "type": "configures",
+      "description": "package.json defines scripts and dependencies for the example Express server."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.7,
+      "source": "document:server_examples/README.md",
+      "target": "file:server_examples/server.js",
+      "type": "documents",
+      "description": "Server documentation describes the server implementation path."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.6,
+      "source": "document:server_examples/README.md",
+      "target": "file:server_examples/client_integration.js",
+      "type": "documents",
+      "description": "Server documentation describes client/server integration work."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.7,
+      "source": "document:server_examples/SERVER_IMPLEMENTATION_PLAN.md",
+      "target": "file:server_examples/server.js",
+      "type": "documents",
+      "description": "Server documentation describes the server implementation path."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.6,
+      "source": "document:server_examples/SERVER_IMPLEMENTATION_PLAN.md",
+      "target": "file:server_examples/client_integration.js",
+      "type": "documents",
+      "description": "Server documentation describes client/server integration work."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.7,
+      "source": "document:server_examples/IMPLEMENTATION_CHECKLIST.md",
+      "target": "file:server_examples/server.js",
+      "type": "documents",
+      "description": "Server documentation describes the server implementation path."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.6,
+      "source": "document:server_examples/IMPLEMENTATION_CHECKLIST.md",
+      "target": "file:server_examples/client_integration.js",
+      "type": "documents",
+      "description": "Server documentation describes client/server integration work."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.6,
+      "source": "document:fonts/README.txt",
+      "target": "document:fonts/OFL.txt",
+      "type": "related",
+      "description": "Font README and license document the bundled Vollkorn font assets."
+    }
+  ],
+  "layers": [
+    {
+      "id": "layer:browser-shell",
+      "name": "Browser Shell",
+      "description": "HTML entry point and browser script loading surface.",
+      "nodeIds": [
+        "file:index.html"
+      ]
+    },
+    {
+      "id": "layer:game-runtime",
+      "name": "Game Runtime",
+      "description": "Phaser scene, state machine, slot domain model, utilities, and gameplay configuration.",
+      "nodeIds": [
+        "file:js/mkutils.js",
+        "file:js/popups.js",
+        "file:js/slot_classes.js",
+        "file:js/slotConfig3x5.js",
+        "file:js/slotGame.js",
+        "file:js/state_machine.js"
+      ]
+    },
+    {
+      "id": "layer:server-examples",
+      "name": "Server Examples",
+      "description": "Example Express API, client integration, server package config, and database schema artifacts.",
+      "nodeIds": [
+        "schema:server_examples/database_schema.sql",
+        "config:server_examples/package.json",
+        "file:server_examples/client_integration.js",
+        "file:server_examples/server.js",
+        "table:server_examples/database_schema.sql:players",
+        "table:server_examples/database_schema.sql:game_sessions",
+        "table:server_examples/database_schema.sql:spins",
+        "table:server_examples/database_schema.sql:balance_transactions",
+        "table:server_examples/database_schema.sql:game_config",
+        "table:server_examples/database_schema.sql:rtp_tracking",
+        "table:server_examples/database_schema.sql:v_current_rtp",
+        "table:server_examples/database_schema.sql:v_player_stats",
+        "endpoint:server_examples/server.js:POST-/api/game/session/init",
+        "endpoint:server_examples/server.js:POST-/api/game/spin",
+        "endpoint:server_examples/server.js:GET-/api/game/balance",
+        "endpoint:server_examples/server.js:GET-/api/game/history",
+        "endpoint:server_examples/server.js:GET-/api/health",
+        "endpoint:server_examples/server.js:GET-/api/admin/rtp"
+      ]
+    },
+    {
+      "id": "layer:server-docs",
+      "name": "Server Documentation",
+      "description": "Implementation plan, checklist, and README for server-authoritative slot game work.",
+      "nodeIds": [
+        "document:server_examples/IMPLEMENTATION_CHECKLIST.md",
+        "document:server_examples/README.md",
+        "document:server_examples/SERVER_IMPLEMENTATION_PLAN.md"
+      ]
+    },
+    {
+      "id": "layer:asset-licenses",
+      "name": "Asset Licenses",
+      "description": "Bundled font documentation and licensing materials.",
+      "nodeIds": [
+        "document:fonts/OFL.txt",
+        "document:fonts/README.txt"
+      ]
+    }
+  ],
+  "tour": [
+    {
+      "order": 1,
+      "title": "Start at the Browser Entry Point",
+      "description": "Open the page shell first to see how Phaser and the slot scripts are loaded into the browser.",
+      "nodeIds": [
+        "file:index.html"
+      ]
+    },
+    {
+      "order": 2,
+      "title": "Understand Runtime Composition",
+      "description": "Follow SlotGame to see asset preload, controller setup, state-machine wiring, spin execution, and win/free-spin transitions.",
+      "nodeIds": [
+        "file:js/slotGame.js",
+        "file:js/state_machine.js"
+      ]
+    },
+    {
+      "order": 3,
+      "title": "Inspect Slot Rules and Models",
+      "description": "Review configuration and domain classes to understand reels, symbols, paylines, bets, jackpot, player balance, and win handling.",
+      "nodeIds": [
+        "file:js/slotConfig3x5.js",
+        "file:js/slot_classes.js"
+      ]
+    },
+    {
+      "order": 4,
+      "title": "Review Shared UI Utilities",
+      "description": "Look at event, tween, sound, popup, and button helpers that the game code relies on for repeated UI workflows.",
+      "nodeIds": [
+        "file:js/mkutils.js",
+        "file:js/popups.js"
+      ]
+    },
+    {
+      "order": 5,
+      "title": "Map the Server-Authoritative Path",
+      "description": "Use the server examples and schema to understand the intended move from client-side randomness to API-backed sessions, spins, balances, and audit logging.",
+      "nodeIds": [
+        "file:server_examples/server.js",
+        "file:server_examples/client_integration.js",
+        "schema:server_examples/database_schema.sql",
+        "document:server_examples/README.md"
+      ]
+    }
+  ]
+}

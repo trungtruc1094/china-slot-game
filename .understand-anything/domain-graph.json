@@ -1,0 +1,1900 @@
+{
+  "version": "1.0.0",
+  "kind": "codebase",
+  "project": {
+    "name": "china-slot-game",
+    "languages": [
+      "javascript",
+      "markdown",
+      "txt",
+      "html",
+      "sql",
+      "json"
+    ],
+    "frameworks": [
+      "Phaser",
+      "Express"
+    ],
+    "description": "Domain flow graph for a Chinese-themed slot game covering client gameplay, slot economy, player feedback, and server-authoritative persistence examples.",
+    "analyzedAt": "2026-06-01T10:38:34.622Z",
+    "gitCommitHash": "56c1db052dbba4c070fe9297dd57760696080cfd"
+  },
+  "nodes": [
+    {
+      "id": "domain:gameplay-session",
+      "type": "domain",
+      "name": "Gameplay Session",
+      "summary": "Handles the browser-side slot session from page load through scene setup, state transitions, spin execution, and outcome resolution. This domain is the player-facing runtime loop where reels spin, wins are detected, free spins start, and autoplay continues or stops.",
+      "tags": [
+        "gameplay",
+        "phaser",
+        "spin-loop",
+        "session"
+      ],
+      "complexity": "complex",
+      "domainMeta": {
+        "entities": [
+          "SlotGame",
+          "StateMachine",
+          "Reel",
+          "SlotSymbol",
+          "WinController",
+          "SlotControls"
+        ],
+        "businessRules": [
+          "A spin can only proceed when at least one line is selected and the player has enough balance for the total bet.",
+          "Spin flow branches into normal spin, auto spin, free spin, and manual-stop modes through state classes.",
+          "Win, lose, jackpot, and free-spin results are emitted through events after reel motion and win calculation complete."
+        ],
+        "crossDomainInteractions": [
+          "Consumes slot rules and economy configuration.",
+          "Updates UI feedback and player controls.",
+          "Can be replaced by server-provided outcomes through the integration example."
+        ]
+      }
+    },
+    {
+      "id": "domain:slot-rules-and-economy",
+      "type": "domain",
+      "name": "Slot Rules and Economy",
+      "summary": "Defines the 3x5 slot machine rules, including symbols, reels, paylines, line bets, balance changes, jackpot progression, free spins, scatter behavior, and win totals. This domain holds the business configuration that determines how a spin pays out.",
+      "tags": [
+        "slot-rules",
+        "paytable",
+        "balance",
+        "jackpot"
+      ],
+      "complexity": "complex",
+      "domainMeta": {
+        "entities": [
+          "PayLine",
+          "WinData",
+          "SlotPlayer",
+          "SlotControls",
+          "slotConfig3x5",
+          "jackpot",
+          "scatter",
+          "wild"
+        ],
+        "businessRules": [
+          "Wild symbols substitute for line wins except where configuration disables first-position wild use.",
+          "Line wins and scatter wins can be multiplied by line bet depending on configured multiplier flags.",
+          "Free spins are awarded by configured payline or scatter rules and may trigger a free-games mode."
+        ],
+        "crossDomainInteractions": [
+          "Supplies rules to the gameplay session.",
+          "Feeds player-facing win and balance displays.",
+          "Should align with server RNG and database persistence when server authority is enabled."
+        ]
+      }
+    },
+    {
+      "id": "domain:player-interface-and-feedback",
+      "type": "domain",
+      "name": "Player Interface and Feedback",
+      "summary": "Manages the player control surface and feedback loops: spin buttons, bet buttons, menu buttons, rules/info popups, sound, coin animations, win messages, and line visibility. This domain turns game state and outcomes into visible and audible player responses.",
+      "tags": [
+        "ui-controls",
+        "feedback",
+        "popups",
+        "audio"
+      ],
+      "complexity": "moderate",
+      "domainMeta": {
+        "entities": [
+          "SceneButton",
+          "SpinButton",
+          "GuiController",
+          "PopUpController",
+          "SoundController",
+          "AnimatedCoinParticle"
+        ],
+        "businessRules": [
+          "Controls are disabled while spin or win animations are in progress to prevent invalid duplicate actions.",
+          "Auto spin and free spin state determine whether spin controls remain active after an outcome.",
+          "Rules, info, settings, and result messages are shown through reusable popup handlers."
+        ],
+        "crossDomainInteractions": [
+          "Reflects gameplay state transitions.",
+          "Displays slot economy values such as balance, total bet, jackpot, and win amount."
+        ]
+      }
+    },
+    {
+      "id": "domain:server-authority-and-persistence",
+      "type": "domain",
+      "name": "Server Authority and Persistence",
+      "summary": "Models the intended server-side version of the slot game: authenticated sessions, server-side RNG, spin result calculation, balance checks, spin history, RTP monitoring, and database persistence. The current implementation is an example scaffold, but the business flow is explicit in the server and schema files.",
+      "tags": [
+        "server-rng",
+        "sessions",
+        "persistence",
+        "rtp"
+      ],
+      "complexity": "complex",
+      "domainMeta": {
+        "entities": [
+          "ServerClient",
+          "ServerRNG",
+          "WinCalculator",
+          "players",
+          "game_sessions",
+          "spins",
+          "balance_transactions",
+          "rtp_tracking"
+        ],
+        "businessRules": [
+          "Spin requests require a valid session token before bet validation and outcome generation.",
+          "The server generates reel positions from a seed and calculates win results before returning balance and outcome data.",
+          "Persistent tables are designed to audit player balances, spin transactions, sessions, configuration, and RTP reporting."
+        ],
+        "crossDomainInteractions": [
+          "Can become the authoritative source for gameplay outcomes.",
+          "Persists slot economy transactions and exposes data to client integration."
+        ]
+      }
+    },
+    {
+      "id": "flow:load-browser-game",
+      "type": "flow",
+      "name": "Load Browser Game",
+      "summary": "Loads the page, Phaser runtime, and game scripts before creating the SlotGame scene.",
+      "tags": [
+        "entry-point",
+        "bootstrap"
+      ],
+      "complexity": "simple",
+      "domainMeta": {
+        "entryPoint": "Page load",
+        "entryType": "event"
+      }
+    },
+    {
+      "id": "step:load-browser-game:load-html-shell",
+      "type": "step",
+      "name": "Load HTML Shell",
+      "summary": "The browser opens index.html, applies the background/canvas layout, and includes the game scripts in dependency order.",
+      "tags": [
+        "html",
+        "bootstrap"
+      ],
+      "complexity": "simple",
+      "filePath": "index.html",
+      "lineRange": [
+        1,
+        34
+      ]
+    },
+    {
+      "id": "step:load-browser-game:create-phaser-game",
+      "type": "step",
+      "name": "Create Phaser Game",
+      "summary": "window.onload creates the Phaser game with WebGL rendering, fixed 1920x1080 dimensions, and the SlotGame scene.",
+      "tags": [
+        "phaser",
+        "game-config"
+      ],
+      "complexity": "moderate",
+      "filePath": "js/slotGame.js",
+      "lineRange": [
+        1,
+        28
+      ]
+    },
+    {
+      "id": "step:load-browser-game:load-scene-configuration",
+      "type": "step",
+      "name": "Load Scene Configuration",
+      "summary": "SlotGame selects slotConfig3x5 as the active business and presentation configuration for the scene.",
+      "tags": [
+        "configuration"
+      ],
+      "complexity": "moderate",
+      "filePath": "js/slotGame.js",
+      "lineRange": [
+        36,
+        40
+      ]
+    },
+    {
+      "id": "flow:initialize-slot-scene",
+      "type": "flow",
+      "name": "Initialize Slot Scene",
+      "summary": "Preloads game assets and constructs the objects needed to run a slot session.",
+      "tags": [
+        "scene-setup",
+        "assets",
+        "controllers"
+      ],
+      "complexity": "complex",
+      "domainMeta": {
+        "entryPoint": "SlotGame.create",
+        "entryType": "event"
+      }
+    },
+    {
+      "id": "step:initialize-slot-scene:preload-assets",
+      "type": "step",
+      "name": "Preload Assets",
+      "summary": "Images, symbol sheets, audio clips, and bitmap fonts are loaded from configuration before gameplay starts.",
+      "tags": [
+        "assets",
+        "preload"
+      ],
+      "complexity": "moderate",
+      "filePath": "js/slotGame.js",
+      "lineRange": [
+        43,
+        112
+      ]
+    },
+    {
+      "id": "step:initialize-slot-scene:create-pay-tables",
+      "type": "step",
+      "name": "Create Pay Tables",
+      "summary": "Configured paylines are converted into PayLine objects and expanded into a full paytable for wild-aware matching.",
+      "tags": [
+        "paytable",
+        "rules"
+      ],
+      "complexity": "moderate",
+      "filePath": "js/slotGame.js",
+      "lineRange": [
+        145,
+        149
+      ]
+    },
+    {
+      "id": "step:initialize-slot-scene:create-runtime-controllers",
+      "type": "step",
+      "name": "Create Runtime Controllers",
+      "summary": "The scene creates the player, reels, sound controller, GUI controller, slot controls, and win controller.",
+      "tags": [
+        "controllers",
+        "runtime"
+      ],
+      "complexity": "moderate",
+      "filePath": "js/slotGame.js",
+      "lineRange": [
+        163,
+        170
+      ]
+    },
+    {
+      "id": "step:initialize-slot-scene:wire-state-machine",
+      "type": "step",
+      "name": "Wire State Machine",
+      "summary": "The scene creates idle, spin, win, lose, pre-spin, and free-input states and initializes the state machine.",
+      "tags": [
+        "state-machine"
+      ],
+      "complexity": "moderate",
+      "filePath": "js/slotGame.js",
+      "lineRange": [
+        184,
+        193
+      ]
+    },
+    {
+      "id": "step:initialize-slot-scene:connect-win-outcome-event",
+      "type": "step",
+      "name": "Connect Win Outcome Event",
+      "summary": "endWinCalcEvent moves the game into win or lose state after outcome calculation completes.",
+      "tags": [
+        "event",
+        "outcome"
+      ],
+      "complexity": "moderate",
+      "filePath": "js/slotGame.js",
+      "lineRange": [
+        193,
+        202
+      ]
+    },
+    {
+      "id": "flow:run-client-spin",
+      "type": "flow",
+      "name": "Run Client Spin",
+      "summary": "Executes a client-side spin by spinning reels, evaluating results, awarding wins/free spins, and selecting the next state.",
+      "tags": [
+        "spin",
+        "outcome",
+        "client-rng"
+      ],
+      "complexity": "complex",
+      "domainMeta": {
+        "entryPoint": "Spin button click",
+        "entryType": "event"
+      }
+    },
+    {
+      "id": "step:run-client-spin:validate-pre-spin-conditions",
+      "type": "step",
+      "name": "Validate Pre Spin Conditions",
+      "summary": "PreSpinState blocks spins when no line is selected or the player lacks enough coins for the total bet.",
+      "tags": [
+        "validation",
+        "bet"
+      ],
+      "complexity": "moderate",
+      "filePath": "js/state_machine.js",
+      "lineRange": [
+        33,
+        55
+      ]
+    },
+    {
+      "id": "step:run-client-spin:apply-bet-or-free-spin",
+      "type": "step",
+      "name": "Apply Bet or Free Spin",
+      "summary": "Spin substates apply a paid bet, auto-spin bet, free spin, or manual-stop spin before starting reel motion.",
+      "tags": [
+        "bet",
+        "free-spin"
+      ],
+      "complexity": "moderate",
+      "filePath": "js/state_machine.js",
+      "lineRange": [
+        204,
+        304
+      ]
+    },
+    {
+      "id": "step:run-client-spin:spin-reels",
+      "type": "step",
+      "name": "Spin Reels",
+      "summary": "SlotGame schedules the reel spin sequence and spinReels chooses target reel positions before each reel animates.",
+      "tags": [
+        "reels",
+        "animation"
+      ],
+      "complexity": "moderate",
+      "filePath": "js/slotGame.js",
+      "lineRange": [
+        242,
+        270
+      ]
+    },
+    {
+      "id": "step:run-client-spin:calculate-line-and-scatter-wins",
+      "type": "step",
+      "name": "Calculate Line and Scatter Wins",
+      "summary": "WinController checks line, scatter, and jackpot outcomes, then SlotGame applies configured bet multipliers.",
+      "tags": [
+        "win-calculation",
+        "scatter"
+      ],
+      "complexity": "moderate",
+      "filePath": "js/slotGame.js",
+      "lineRange": [
+        271,
+        305
+      ]
+    },
+    {
+      "id": "step:run-client-spin:emit-outcome-state",
+      "type": "step",
+      "name": "Emit Outcome State",
+      "summary": "SlotGame emits endWinCalcEvent so the state machine enters win or lose handling.",
+      "tags": [
+        "state-transition",
+        "outcome"
+      ],
+      "complexity": "moderate",
+      "filePath": "js/slotGame.js",
+      "lineRange": [
+        305,
+        306
+      ]
+    },
+    {
+      "id": "step:run-client-spin:continue-auto-or-free-spin",
+      "type": "step",
+      "name": "Continue Auto or Free Spin",
+      "summary": "Completion callbacks decide whether autoplay or free-spin play should continue into another spin.",
+      "tags": [
+        "autoplay",
+        "free-spin"
+      ],
+      "complexity": "moderate",
+      "filePath": "js/slotGame.js",
+      "lineRange": [
+        459,
+        539
+      ]
+    },
+    {
+      "id": "flow:configure-slot-math",
+      "type": "flow",
+      "name": "Configure Slot Math",
+      "summary": "Defines symbols, reels, paylines, wilds, scatters, jackpot, and payout behavior for the 3x5 game.",
+      "tags": [
+        "configuration",
+        "slot-math"
+      ],
+      "complexity": "complex",
+      "domainMeta": {
+        "entryPoint": "slotConfig3x5",
+        "entryType": "manual"
+      }
+    },
+    {
+      "id": "step:configure-slot-math:set-core-rule-flags",
+      "type": "step",
+      "name": "Set Core Rule Flags",
+      "summary": "Configuration establishes spin timing, symbol size, wild/scatter names, selected lines, default coins, and bet multiplier behavior.",
+      "tags": [
+        "rules",
+        "configuration"
+      ],
+      "complexity": "moderate",
+      "filePath": "js/slotConfig3x5.js",
+      "lineRange": [
+        1,
+        31
+      ]
+    },
+    {
+      "id": "step:configure-slot-math:define-visual-and-symbol-assets",
+      "type": "step",
+      "name": "Define Visual and Symbol Assets",
+      "summary": "Sprite, symbol, blurred-symbol, sheet, and font entries map business symbols to display assets.",
+      "tags": [
+        "symbols",
+        "assets"
+      ],
+      "complexity": "moderate",
+      "filePath": "js/slotConfig3x5.js",
+      "lineRange": [
+        33,
+        190
+      ]
+    },
+    {
+      "id": "step:configure-slot-math:define-reels",
+      "type": "step",
+      "name": "Define Reels",
+      "summary": "Configured reel strips determine which symbols can land on each reel during a spin.",
+      "tags": [
+        "reels",
+        "rng-input"
+      ],
+      "complexity": "moderate",
+      "filePath": "js/slotConfig3x5.js",
+      "lineRange": [
+        192,
+        357
+      ]
+    },
+    {
+      "id": "step:configure-slot-math:define-paylines-and-rewards",
+      "type": "step",
+      "name": "Define Paylines and Rewards",
+      "summary": "Payline definitions map symbol sequences to coin payouts and free-spin awards.",
+      "tags": [
+        "paylines",
+        "payouts"
+      ],
+      "complexity": "moderate",
+      "filePath": "js/slotConfig3x5.js",
+      "lineRange": [
+        538,
+        683
+      ]
+    },
+    {
+      "id": "step:configure-slot-math:expand-wild-aware-paytable",
+      "type": "step",
+      "name": "Expand Wild-Aware Paytable",
+      "summary": "createFullPaytable generates additional payable combinations when wild substitution is enabled.",
+      "tags": [
+        "wild",
+        "paytable"
+      ],
+      "complexity": "moderate",
+      "filePath": "js/slotGame.js",
+      "lineRange": [
+        693,
+        703
+      ]
+    },
+    {
+      "id": "flow:manage-bet-and-balance",
+      "type": "flow",
+      "name": "Manage Bet and Balance",
+      "summary": "Controls line selection, total bet, balance deductions, jackpot increments, and displayed economy values.",
+      "tags": [
+        "balance",
+        "betting",
+        "jackpot"
+      ],
+      "complexity": "complex",
+      "domainMeta": {
+        "entryPoint": "Bet controls",
+        "entryType": "event"
+      }
+    },
+    {
+      "id": "step:manage-bet-and-balance:create-bet-controls",
+      "type": "step",
+      "name": "Create Bet Controls",
+      "summary": "slotConfig3x5 creates plus, minus, max bet, auto spin, spin, and menu buttons plus balance, total bet, jackpot, and win labels.",
+      "tags": [
+        "controls",
+        "bet-ui"
+      ],
+      "complexity": "moderate",
+      "filePath": "js/slotConfig3x5.js",
+      "lineRange": [
+        744,
+        915
+      ]
+    },
+    {
+      "id": "step:manage-bet-and-balance:initialize-slot-controls",
+      "type": "step",
+      "name": "Initialize Slot Controls",
+      "summary": "SlotControls stores player balance, selected lines, line bet limits, jackpot amount, and control state.",
+      "tags": [
+        "slot-controls",
+        "state"
+      ],
+      "complexity": "moderate",
+      "filePath": "js/slot_classes.js",
+      "lineRange": [
+        1317,
+        1397
+      ]
+    },
+    {
+      "id": "step:manage-bet-and-balance:validate-bet-affordability",
+      "type": "step",
+      "name": "Validate Bet Affordability",
+      "summary": "PreSpinState compares total bet against player coins before allowing a paid spin.",
+      "tags": [
+        "validation",
+        "balance"
+      ],
+      "complexity": "moderate",
+      "filePath": "js/state_machine.js",
+      "lineRange": [
+        44,
+        55
+      ]
+    },
+    {
+      "id": "step:manage-bet-and-balance:apply-wagers",
+      "type": "step",
+      "name": "Apply Wagers",
+      "summary": "Spin states call applyBet or applyFreeSpin to deduct paid wagers or consume free spins.",
+      "tags": [
+        "transaction",
+        "free-spin"
+      ],
+      "complexity": "moderate",
+      "filePath": "js/state_machine.js",
+      "lineRange": [
+        204,
+        304
+      ]
+    },
+    {
+      "id": "step:manage-bet-and-balance:update-jackpot-and-win-amounts",
+      "type": "step",
+      "name": "Update Jackpot and Win Amounts",
+      "summary": "SlotGame increments jackpot before a spin and later applies line, scatter, jackpot, and free-spin awards.",
+      "tags": [
+        "jackpot",
+        "win"
+      ],
+      "complexity": "moderate",
+      "filePath": "js/slotGame.js",
+      "lineRange": [
+        259,
+        418
+      ]
+    },
+    {
+      "id": "flow:resolve-awards-and-free-games",
+      "type": "flow",
+      "name": "Resolve Awards and Free Games",
+      "summary": "Turns evaluated symbols into player-facing awards, jackpot resets, free spins, and win/lose transitions.",
+      "tags": [
+        "awards",
+        "free-games",
+        "jackpot"
+      ],
+      "complexity": "complex",
+      "domainMeta": {
+        "entryPoint": "WinController result",
+        "entryType": "event"
+      }
+    },
+    {
+      "id": "step:resolve-awards-and-free-games:collect-winning-lines",
+      "type": "step",
+      "name": "Collect Winning Lines",
+      "summary": "WinController evaluates line behavior and tracks line, scatter, and jackpot win data.",
+      "tags": [
+        "win-controller",
+        "line-win"
+      ],
+      "complexity": "moderate",
+      "filePath": "js/slot_classes.js",
+      "lineRange": [
+        808,
+        1055
+      ]
+    },
+    {
+      "id": "step:resolve-awards-and-free-games:apply-line-bet-multipliers",
+      "type": "step",
+      "name": "Apply Line Bet Multipliers",
+      "summary": "SlotGame multiplies line and scatter coin awards by line bet when configured.",
+      "tags": [
+        "multiplier",
+        "payout"
+      ],
+      "complexity": "moderate",
+      "filePath": "js/slotGame.js",
+      "lineRange": [
+        287,
+        299
+      ]
+    },
+    {
+      "id": "step:resolve-awards-and-free-games:award-jackpot",
+      "type": "step",
+      "name": "Award Jackpot",
+      "summary": "Jackpot wins emit jackpot events and can reset the jackpot amount after payout.",
+      "tags": [
+        "jackpot",
+        "award"
+      ],
+      "complexity": "moderate",
+      "filePath": "js/slotGame.js",
+      "lineRange": [
+        360,
+        380
+      ]
+    },
+    {
+      "id": "step:resolve-awards-and-free-games:award-free-spins",
+      "type": "step",
+      "name": "Award Free Spins",
+      "summary": "Free-spin wins add spins to SlotControls and can start free-games mode automatically.",
+      "tags": [
+        "free-spin",
+        "award"
+      ],
+      "complexity": "moderate",
+      "filePath": "js/slotGame.js",
+      "lineRange": [
+        385,
+        425
+      ]
+    },
+    {
+      "id": "step:resolve-awards-and-free-games:show-win-or-lose-state",
+      "type": "step",
+      "name": "Show Win or Lose State",
+      "summary": "WinState and LoseState display outcome behavior and prepare control state for the next spin.",
+      "tags": [
+        "state-machine",
+        "outcome"
+      ],
+      "complexity": "moderate",
+      "filePath": "js/state_machine.js",
+      "lineRange": [
+        744,
+        1105
+      ]
+    },
+    {
+      "id": "flow:handle-player-controls",
+      "type": "flow",
+      "name": "Handle Player Controls",
+      "summary": "Creates and coordinates clickable controls for spins, bet changes, autoplay, menu, settings, rules, and info.",
+      "tags": [
+        "controls",
+        "input"
+      ],
+      "complexity": "moderate",
+      "domainMeta": {
+        "entryPoint": "Pointer events",
+        "entryType": "event"
+      }
+    },
+    {
+      "id": "step:handle-player-controls:create-buttons",
+      "type": "step",
+      "name": "Create Buttons",
+      "summary": "SceneButton and SpinButton wrap Phaser sprites with pointer handlers and pressed/hover state.",
+      "tags": [
+        "buttons",
+        "pointer"
+      ],
+      "complexity": "moderate",
+      "filePath": "js/mkutils.js",
+      "lineRange": [
+        339,
+        436
+      ]
+    },
+    {
+      "id": "step:handle-player-controls:bind-slot-buttons",
+      "type": "step",
+      "name": "Bind Slot Buttons",
+      "summary": "slotConfig3x5 connects bet, max-bet, auto-spin, spin, menu, rules, settings, and info buttons to SlotControls or scene handlers.",
+      "tags": [
+        "binding",
+        "ui"
+      ],
+      "complexity": "moderate",
+      "filePath": "js/slotConfig3x5.js",
+      "lineRange": [
+        744,
+        848
+      ]
+    },
+    {
+      "id": "step:handle-player-controls:enable-and-disable-controls",
+      "type": "step",
+      "name": "Enable and Disable Controls",
+      "summary": "State classes set control activity during idle, pre-spin, spin, win, lose, auto-spin, and free-spin periods.",
+      "tags": [
+        "state-machine",
+        "locking"
+      ],
+      "complexity": "moderate",
+      "filePath": "js/state_machine.js",
+      "lineRange": [
+        33,
+        1088
+      ]
+    },
+    {
+      "id": "step:handle-player-controls:expose-menu-actions",
+      "type": "step",
+      "name": "Expose Menu Actions",
+      "summary": "Menu, settings, rules, and info actions toggle buttons or show informational popups.",
+      "tags": [
+        "menu",
+        "rules"
+      ],
+      "complexity": "moderate",
+      "filePath": "js/slotConfig3x5.js",
+      "lineRange": [
+        791,
+        848
+      ]
+    },
+    {
+      "id": "flow:present-outcome-feedback",
+      "type": "flow",
+      "name": "Present Outcome Feedback",
+      "summary": "Shows player-visible feedback for wins, free spins, lines, coins, sounds, messages, and popup dialogs.",
+      "tags": [
+        "feedback",
+        "animations",
+        "audio"
+      ],
+      "complexity": "moderate",
+      "domainMeta": {
+        "entryPoint": "Win/lose events",
+        "entryType": "event"
+      }
+    },
+    {
+      "id": "step:present-outcome-feedback:play-background-and-effects",
+      "type": "step",
+      "name": "Play Background and Effects",
+      "summary": "SoundController and SlotGame load and play background, spin, button, lose, win, and coin sounds.",
+      "tags": [
+        "audio",
+        "sound"
+      ],
+      "complexity": "moderate",
+      "filePath": "js/slotGame.js",
+      "lineRange": [
+        89,
+        178
+      ]
+    },
+    {
+      "id": "step:present-outcome-feedback:show-winning-symbols-and-lines",
+      "type": "step",
+      "name": "Show Winning Symbols and Lines",
+      "summary": "WinController animates winning symbols and highlights line behavior after outcomes.",
+      "tags": [
+        "win-display",
+        "symbols"
+      ],
+      "complexity": "moderate",
+      "filePath": "js/slot_classes.js",
+      "lineRange": [
+        908,
+        1045
+      ]
+    },
+    {
+      "id": "step:present-outcome-feedback:show-coin-and-free-spin-messages",
+      "type": "step",
+      "name": "Show Coin and Free Spin Messages",
+      "summary": "SlotGame can display win coin and free-spin messages using popup helpers.",
+      "tags": [
+        "messages",
+        "free-spin"
+      ],
+      "complexity": "moderate",
+      "filePath": "js/slotGame.js",
+      "lineRange": [
+        587,
+        603
+      ]
+    },
+    {
+      "id": "step:present-outcome-feedback:render-popups",
+      "type": "step",
+      "name": "Render Popups",
+      "summary": "Popup helpers build yes/no/cancel and single-action dialogs through GuiController and PopUpController.",
+      "tags": [
+        "popup",
+        "dialog"
+      ],
+      "complexity": "moderate",
+      "filePath": "js/popups.js",
+      "lineRange": [
+        4,
+        67
+      ]
+    },
+    {
+      "id": "step:present-outcome-feedback:animate-coin-particles",
+      "type": "step",
+      "name": "Animate Coin Particles",
+      "summary": "AnimatedCoinParticle and Phaser particles provide celebratory coin visuals for winning states.",
+      "tags": [
+        "animation",
+        "coins"
+      ],
+      "complexity": "moderate",
+      "filePath": "js/slotConfig3x5.js",
+      "lineRange": [
+        1306,
+        1334
+      ]
+    },
+    {
+      "id": "flow:initialize-server-session",
+      "type": "flow",
+      "name": "Initialize Server Session",
+      "summary": "Creates a server-side session token and starting balance for a player.",
+      "tags": [
+        "api",
+        "session",
+        "jwt"
+      ],
+      "complexity": "moderate",
+      "domainMeta": {
+        "entryPoint": "POST /api/game/session/init",
+        "entryType": "http"
+      }
+    },
+    {
+      "id": "step:initialize-server-session:client-requests-session",
+      "type": "step",
+      "name": "Client Requests Session",
+      "summary": "ServerClient.initSession posts playerId and initialBalance to the session initialization endpoint.",
+      "tags": [
+        "client-api",
+        "session"
+      ],
+      "complexity": "moderate",
+      "filePath": "server_examples/client_integration.js",
+      "lineRange": [
+        10,
+        34
+      ]
+    },
+    {
+      "id": "step:initialize-server-session:validate-player-identifier",
+      "type": "step",
+      "name": "Validate Player Identifier",
+      "summary": "The Express handler rejects session initialization when playerId is missing.",
+      "tags": [
+        "validation"
+      ],
+      "complexity": "moderate",
+      "filePath": "server_examples/server.js",
+      "lineRange": [
+        182,
+        190
+      ]
+    },
+    {
+      "id": "step:initialize-server-session:issue-jwt-token",
+      "type": "step",
+      "name": "Issue JWT Token",
+      "summary": "The server signs a JWT session token carrying the playerId.",
+      "tags": [
+        "jwt",
+        "auth"
+      ],
+      "complexity": "moderate",
+      "filePath": "server_examples/server.js",
+      "lineRange": [
+        192,
+        193
+      ]
+    },
+    {
+      "id": "step:initialize-server-session:store-session-and-player-balance",
+      "type": "step",
+      "name": "Store Session and Player Balance",
+      "summary": "The example stores session and player balance in memory, with schema support for persistent sessions and players.",
+      "tags": [
+        "session-store",
+        "balance"
+      ],
+      "complexity": "moderate",
+      "filePath": "server_examples/server.js",
+      "lineRange": [
+        194,
+        201
+      ]
+    },
+    {
+      "id": "flow:process-server-spin",
+      "type": "flow",
+      "name": "Process Server Spin",
+      "summary": "Authenticates a spin request, validates the bet, generates reel positions, calculates winnings, updates balance, and returns the result.",
+      "tags": [
+        "api",
+        "server-rng",
+        "spin"
+      ],
+      "complexity": "complex",
+      "domainMeta": {
+        "entryPoint": "POST /api/game/spin",
+        "entryType": "http"
+      }
+    },
+    {
+      "id": "step:process-server-spin:send-spin-request",
+      "type": "step",
+      "name": "Send Spin Request",
+      "summary": "ServerClient.placeSpin sends betAmount, lineBet, linesCount, and bearer token to the spin endpoint.",
+      "tags": [
+        "client-api",
+        "spin"
+      ],
+      "complexity": "moderate",
+      "filePath": "server_examples/client_integration.js",
+      "lineRange": [
+        36,
+        62
+      ]
+    },
+    {
+      "id": "step:process-server-spin:authenticate-token",
+      "type": "step",
+      "name": "Authenticate Token",
+      "summary": "authenticateToken extracts the bearer token and verifies it before protected endpoints run.",
+      "tags": [
+        "auth",
+        "jwt"
+      ],
+      "complexity": "moderate",
+      "filePath": "server_examples/server.js",
+      "lineRange": [
+        162,
+        177
+      ]
+    },
+    {
+      "id": "step:process-server-spin:load-session-and-validate-bet",
+      "type": "step",
+      "name": "Load Session and Validate Bet",
+      "summary": "The spin handler locates the session, checks total bet math, and ensures balance is sufficient.",
+      "tags": [
+        "validation",
+        "balance"
+      ],
+      "complexity": "moderate",
+      "filePath": "server_examples/server.js",
+      "lineRange": [
+        208,
+        232
+      ]
+    },
+    {
+      "id": "step:process-server-spin:generate-reel-positions",
+      "type": "step",
+      "name": "Generate Reel Positions",
+      "summary": "ServerRNG creates a seed and maps it deterministically to reel positions using SHA-256.",
+      "tags": [
+        "rng",
+        "reels"
+      ],
+      "complexity": "moderate",
+      "filePath": "server_examples/server.js",
+      "lineRange": [
+        25,
+        45
+      ]
+    },
+    {
+      "id": "step:process-server-spin:calculate-server-win",
+      "type": "step",
+      "name": "Calculate Server Win",
+      "summary": "WinCalculator reads visible symbols, evaluates paylines, and adds scatter wins to produce win details.",
+      "tags": [
+        "win-calculation",
+        "server"
+      ],
+      "complexity": "moderate",
+      "filePath": "server_examples/server.js",
+      "lineRange": [
+        47,
+        139
+      ]
+    },
+    {
+      "id": "step:process-server-spin:update-balance-and-history",
+      "type": "step",
+      "name": "Update Balance and History",
+      "summary": "The handler subtracts the bet, adds wins, records spin data in memory, and returns balance and outcome details.",
+      "tags": [
+        "transaction",
+        "history"
+      ],
+      "complexity": "moderate",
+      "filePath": "server_examples/server.js",
+      "lineRange": [
+        240,
+        283
+      ]
+    },
+    {
+      "id": "flow:query-player-and-rtp-data",
+      "type": "flow",
+      "name": "Query Player and RTP Data",
+      "summary": "Exposes read-side API endpoints for balance, spin history, health, and RTP monitoring.",
+      "tags": [
+        "api",
+        "reporting",
+        "monitoring"
+      ],
+      "complexity": "moderate",
+      "domainMeta": {
+        "entryPoint": "GET API endpoints",
+        "entryType": "http"
+      }
+    },
+    {
+      "id": "step:query-player-and-rtp-data:request-balance",
+      "type": "step",
+      "name": "Request Balance",
+      "summary": "ServerClient.getBalance calls the balance endpoint with the session token.",
+      "tags": [
+        "client-api",
+        "balance"
+      ],
+      "complexity": "moderate",
+      "filePath": "server_examples/client_integration.js",
+      "lineRange": [
+        64,
+        83
+      ]
+    },
+    {
+      "id": "step:query-player-and-rtp-data:return-authenticated-balance",
+      "type": "step",
+      "name": "Return Authenticated Balance",
+      "summary": "GET /api/game/balance returns the current in-memory session balance after token authentication.",
+      "tags": [
+        "balance",
+        "auth"
+      ],
+      "complexity": "moderate",
+      "filePath": "server_examples/server.js",
+      "lineRange": [
+        286,
+        298
+      ]
+    },
+    {
+      "id": "step:query-player-and-rtp-data:return-spin-history",
+      "type": "step",
+      "name": "Return Spin History",
+      "summary": "GET /api/game/history filters recent spins for the authenticated player.",
+      "tags": [
+        "history",
+        "audit"
+      ],
+      "complexity": "moderate",
+      "filePath": "server_examples/server.js",
+      "lineRange": [
+        300,
+        318
+      ]
+    },
+    {
+      "id": "step:query-player-and-rtp-data:report-service-health",
+      "type": "step",
+      "name": "Report Service Health",
+      "summary": "GET /api/health returns service status and timestamp for operational checks.",
+      "tags": [
+        "health",
+        "monitoring"
+      ],
+      "complexity": "moderate",
+      "filePath": "server_examples/server.js",
+      "lineRange": [
+        321,
+        325
+      ]
+    },
+    {
+      "id": "step:query-player-and-rtp-data:report-rtp-metrics",
+      "type": "step",
+      "name": "Report RTP Metrics",
+      "summary": "GET /api/admin/rtp calculates total bets, total wins, spin count, and current RTP from recorded spins.",
+      "tags": [
+        "rtp",
+        "admin"
+      ],
+      "complexity": "moderate",
+      "filePath": "server_examples/server.js",
+      "lineRange": [
+        327,
+        342
+      ]
+    },
+    {
+      "id": "flow:persist-slot-audit-data",
+      "type": "flow",
+      "name": "Persist Slot Audit Data",
+      "summary": "Defines the database structures needed to replace memory maps with auditable, queryable slot game records.",
+      "tags": [
+        "database",
+        "audit",
+        "reporting"
+      ],
+      "complexity": "complex",
+      "domainMeta": {
+        "entryPoint": "PostgreSQL schema",
+        "entryType": "manual"
+      }
+    },
+    {
+      "id": "step:persist-slot-audit-data:store-players",
+      "type": "step",
+      "name": "Store Players",
+      "summary": "players keeps player identity, balance, and lifetime totals.",
+      "tags": [
+        "players",
+        "balance"
+      ],
+      "complexity": "moderate",
+      "filePath": "server_examples/database_schema.sql",
+      "lineRange": [
+        5,
+        13
+      ]
+    },
+    {
+      "id": "step:persist-slot-audit-data:store-game-sessions",
+      "type": "step",
+      "name": "Store Game Sessions",
+      "summary": "game_sessions records session tokens, status, balances, and session timestamps.",
+      "tags": [
+        "sessions",
+        "jwt"
+      ],
+      "complexity": "moderate",
+      "filePath": "server_examples/database_schema.sql",
+      "lineRange": [
+        15,
+        29
+      ]
+    },
+    {
+      "id": "step:persist-slot-audit-data:store-spins",
+      "type": "step",
+      "name": "Store Spins",
+      "summary": "spins logs wager, line count, seed, reel positions, win amount, win details, and balance before/after.",
+      "tags": [
+        "spin-log",
+        "audit"
+      ],
+      "complexity": "moderate",
+      "filePath": "server_examples/database_schema.sql",
+      "lineRange": [
+        31,
+        56
+      ]
+    },
+    {
+      "id": "step:persist-slot-audit-data:store-balance-transactions",
+      "type": "step",
+      "name": "Store Balance Transactions",
+      "summary": "balance_transactions provides an audit trail for bets, wins, deposits, withdrawals, bonuses, and adjustments.",
+      "tags": [
+        "transactions",
+        "audit"
+      ],
+      "complexity": "moderate",
+      "filePath": "server_examples/database_schema.sql",
+      "lineRange": [
+        58,
+        73
+      ]
+    },
+    {
+      "id": "step:persist-slot-audit-data:store-game-configuration",
+      "type": "step",
+      "name": "Store Game Configuration",
+      "summary": "game_config versions slot math and active configuration data.",
+      "tags": [
+        "configuration",
+        "versioning"
+      ],
+      "complexity": "moderate",
+      "filePath": "server_examples/database_schema.sql",
+      "lineRange": [
+        75,
+        83
+      ]
+    },
+    {
+      "id": "step:persist-slot-audit-data:track-rtp-and-reporting-views",
+      "type": "step",
+      "name": "Track RTP and Reporting Views",
+      "summary": "rtp_tracking plus current RTP and player stats views support operational reporting and profitability checks.",
+      "tags": [
+        "rtp",
+        "reporting"
+      ],
+      "complexity": "moderate",
+      "filePath": "server_examples/database_schema.sql",
+      "lineRange": [
+        85,
+        158
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "domain:gameplay-session",
+      "target": "flow:load-browser-game",
+      "type": "contains_flow",
+      "description": "Load Browser Game belongs to Gameplay Session."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.3,
+      "source": "flow:load-browser-game",
+      "target": "step:load-browser-game:load-html-shell",
+      "type": "flow_step",
+      "description": "Step 1 of 3 in Load Browser Game."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.7,
+      "source": "flow:load-browser-game",
+      "target": "step:load-browser-game:create-phaser-game",
+      "type": "flow_step",
+      "description": "Step 2 of 3 in Load Browser Game."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "flow:load-browser-game",
+      "target": "step:load-browser-game:load-scene-configuration",
+      "type": "flow_step",
+      "description": "Step 3 of 3 in Load Browser Game."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "domain:gameplay-session",
+      "target": "flow:initialize-slot-scene",
+      "type": "contains_flow",
+      "description": "Initialize Slot Scene belongs to Gameplay Session."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.2,
+      "source": "flow:initialize-slot-scene",
+      "target": "step:initialize-slot-scene:preload-assets",
+      "type": "flow_step",
+      "description": "Step 1 of 5 in Initialize Slot Scene."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.4,
+      "source": "flow:initialize-slot-scene",
+      "target": "step:initialize-slot-scene:create-pay-tables",
+      "type": "flow_step",
+      "description": "Step 2 of 5 in Initialize Slot Scene."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.6,
+      "source": "flow:initialize-slot-scene",
+      "target": "step:initialize-slot-scene:create-runtime-controllers",
+      "type": "flow_step",
+      "description": "Step 3 of 5 in Initialize Slot Scene."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.8,
+      "source": "flow:initialize-slot-scene",
+      "target": "step:initialize-slot-scene:wire-state-machine",
+      "type": "flow_step",
+      "description": "Step 4 of 5 in Initialize Slot Scene."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "flow:initialize-slot-scene",
+      "target": "step:initialize-slot-scene:connect-win-outcome-event",
+      "type": "flow_step",
+      "description": "Step 5 of 5 in Initialize Slot Scene."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "domain:gameplay-session",
+      "target": "flow:run-client-spin",
+      "type": "contains_flow",
+      "description": "Run Client Spin belongs to Gameplay Session."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.2,
+      "source": "flow:run-client-spin",
+      "target": "step:run-client-spin:validate-pre-spin-conditions",
+      "type": "flow_step",
+      "description": "Step 1 of 6 in Run Client Spin."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.3,
+      "source": "flow:run-client-spin",
+      "target": "step:run-client-spin:apply-bet-or-free-spin",
+      "type": "flow_step",
+      "description": "Step 2 of 6 in Run Client Spin."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.5,
+      "source": "flow:run-client-spin",
+      "target": "step:run-client-spin:spin-reels",
+      "type": "flow_step",
+      "description": "Step 3 of 6 in Run Client Spin."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.7,
+      "source": "flow:run-client-spin",
+      "target": "step:run-client-spin:calculate-line-and-scatter-wins",
+      "type": "flow_step",
+      "description": "Step 4 of 6 in Run Client Spin."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.8,
+      "source": "flow:run-client-spin",
+      "target": "step:run-client-spin:emit-outcome-state",
+      "type": "flow_step",
+      "description": "Step 5 of 6 in Run Client Spin."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "flow:run-client-spin",
+      "target": "step:run-client-spin:continue-auto-or-free-spin",
+      "type": "flow_step",
+      "description": "Step 6 of 6 in Run Client Spin."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "domain:slot-rules-and-economy",
+      "target": "flow:configure-slot-math",
+      "type": "contains_flow",
+      "description": "Configure Slot Math belongs to Slot Rules and Economy."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.2,
+      "source": "flow:configure-slot-math",
+      "target": "step:configure-slot-math:set-core-rule-flags",
+      "type": "flow_step",
+      "description": "Step 1 of 5 in Configure Slot Math."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.4,
+      "source": "flow:configure-slot-math",
+      "target": "step:configure-slot-math:define-visual-and-symbol-assets",
+      "type": "flow_step",
+      "description": "Step 2 of 5 in Configure Slot Math."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.6,
+      "source": "flow:configure-slot-math",
+      "target": "step:configure-slot-math:define-reels",
+      "type": "flow_step",
+      "description": "Step 3 of 5 in Configure Slot Math."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.8,
+      "source": "flow:configure-slot-math",
+      "target": "step:configure-slot-math:define-paylines-and-rewards",
+      "type": "flow_step",
+      "description": "Step 4 of 5 in Configure Slot Math."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "flow:configure-slot-math",
+      "target": "step:configure-slot-math:expand-wild-aware-paytable",
+      "type": "flow_step",
+      "description": "Step 5 of 5 in Configure Slot Math."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "domain:slot-rules-and-economy",
+      "target": "flow:manage-bet-and-balance",
+      "type": "contains_flow",
+      "description": "Manage Bet and Balance belongs to Slot Rules and Economy."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.2,
+      "source": "flow:manage-bet-and-balance",
+      "target": "step:manage-bet-and-balance:create-bet-controls",
+      "type": "flow_step",
+      "description": "Step 1 of 5 in Manage Bet and Balance."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.4,
+      "source": "flow:manage-bet-and-balance",
+      "target": "step:manage-bet-and-balance:initialize-slot-controls",
+      "type": "flow_step",
+      "description": "Step 2 of 5 in Manage Bet and Balance."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.6,
+      "source": "flow:manage-bet-and-balance",
+      "target": "step:manage-bet-and-balance:validate-bet-affordability",
+      "type": "flow_step",
+      "description": "Step 3 of 5 in Manage Bet and Balance."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.8,
+      "source": "flow:manage-bet-and-balance",
+      "target": "step:manage-bet-and-balance:apply-wagers",
+      "type": "flow_step",
+      "description": "Step 4 of 5 in Manage Bet and Balance."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "flow:manage-bet-and-balance",
+      "target": "step:manage-bet-and-balance:update-jackpot-and-win-amounts",
+      "type": "flow_step",
+      "description": "Step 5 of 5 in Manage Bet and Balance."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "domain:slot-rules-and-economy",
+      "target": "flow:resolve-awards-and-free-games",
+      "type": "contains_flow",
+      "description": "Resolve Awards and Free Games belongs to Slot Rules and Economy."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.2,
+      "source": "flow:resolve-awards-and-free-games",
+      "target": "step:resolve-awards-and-free-games:collect-winning-lines",
+      "type": "flow_step",
+      "description": "Step 1 of 5 in Resolve Awards and Free Games."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.4,
+      "source": "flow:resolve-awards-and-free-games",
+      "target": "step:resolve-awards-and-free-games:apply-line-bet-multipliers",
+      "type": "flow_step",
+      "description": "Step 2 of 5 in Resolve Awards and Free Games."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.6,
+      "source": "flow:resolve-awards-and-free-games",
+      "target": "step:resolve-awards-and-free-games:award-jackpot",
+      "type": "flow_step",
+      "description": "Step 3 of 5 in Resolve Awards and Free Games."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.8,
+      "source": "flow:resolve-awards-and-free-games",
+      "target": "step:resolve-awards-and-free-games:award-free-spins",
+      "type": "flow_step",
+      "description": "Step 4 of 5 in Resolve Awards and Free Games."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "flow:resolve-awards-and-free-games",
+      "target": "step:resolve-awards-and-free-games:show-win-or-lose-state",
+      "type": "flow_step",
+      "description": "Step 5 of 5 in Resolve Awards and Free Games."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "domain:player-interface-and-feedback",
+      "target": "flow:handle-player-controls",
+      "type": "contains_flow",
+      "description": "Handle Player Controls belongs to Player Interface and Feedback."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.3,
+      "source": "flow:handle-player-controls",
+      "target": "step:handle-player-controls:create-buttons",
+      "type": "flow_step",
+      "description": "Step 1 of 4 in Handle Player Controls."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.5,
+      "source": "flow:handle-player-controls",
+      "target": "step:handle-player-controls:bind-slot-buttons",
+      "type": "flow_step",
+      "description": "Step 2 of 4 in Handle Player Controls."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.8,
+      "source": "flow:handle-player-controls",
+      "target": "step:handle-player-controls:enable-and-disable-controls",
+      "type": "flow_step",
+      "description": "Step 3 of 4 in Handle Player Controls."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "flow:handle-player-controls",
+      "target": "step:handle-player-controls:expose-menu-actions",
+      "type": "flow_step",
+      "description": "Step 4 of 4 in Handle Player Controls."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "domain:player-interface-and-feedback",
+      "target": "flow:present-outcome-feedback",
+      "type": "contains_flow",
+      "description": "Present Outcome Feedback belongs to Player Interface and Feedback."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.2,
+      "source": "flow:present-outcome-feedback",
+      "target": "step:present-outcome-feedback:play-background-and-effects",
+      "type": "flow_step",
+      "description": "Step 1 of 5 in Present Outcome Feedback."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.4,
+      "source": "flow:present-outcome-feedback",
+      "target": "step:present-outcome-feedback:show-winning-symbols-and-lines",
+      "type": "flow_step",
+      "description": "Step 2 of 5 in Present Outcome Feedback."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.6,
+      "source": "flow:present-outcome-feedback",
+      "target": "step:present-outcome-feedback:show-coin-and-free-spin-messages",
+      "type": "flow_step",
+      "description": "Step 3 of 5 in Present Outcome Feedback."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.8,
+      "source": "flow:present-outcome-feedback",
+      "target": "step:present-outcome-feedback:render-popups",
+      "type": "flow_step",
+      "description": "Step 4 of 5 in Present Outcome Feedback."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "flow:present-outcome-feedback",
+      "target": "step:present-outcome-feedback:animate-coin-particles",
+      "type": "flow_step",
+      "description": "Step 5 of 5 in Present Outcome Feedback."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "domain:server-authority-and-persistence",
+      "target": "flow:initialize-server-session",
+      "type": "contains_flow",
+      "description": "Initialize Server Session belongs to Server Authority and Persistence."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.3,
+      "source": "flow:initialize-server-session",
+      "target": "step:initialize-server-session:client-requests-session",
+      "type": "flow_step",
+      "description": "Step 1 of 4 in Initialize Server Session."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.5,
+      "source": "flow:initialize-server-session",
+      "target": "step:initialize-server-session:validate-player-identifier",
+      "type": "flow_step",
+      "description": "Step 2 of 4 in Initialize Server Session."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.8,
+      "source": "flow:initialize-server-session",
+      "target": "step:initialize-server-session:issue-jwt-token",
+      "type": "flow_step",
+      "description": "Step 3 of 4 in Initialize Server Session."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "flow:initialize-server-session",
+      "target": "step:initialize-server-session:store-session-and-player-balance",
+      "type": "flow_step",
+      "description": "Step 4 of 4 in Initialize Server Session."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "domain:server-authority-and-persistence",
+      "target": "flow:process-server-spin",
+      "type": "contains_flow",
+      "description": "Process Server Spin belongs to Server Authority and Persistence."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.2,
+      "source": "flow:process-server-spin",
+      "target": "step:process-server-spin:send-spin-request",
+      "type": "flow_step",
+      "description": "Step 1 of 6 in Process Server Spin."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.3,
+      "source": "flow:process-server-spin",
+      "target": "step:process-server-spin:authenticate-token",
+      "type": "flow_step",
+      "description": "Step 2 of 6 in Process Server Spin."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.5,
+      "source": "flow:process-server-spin",
+      "target": "step:process-server-spin:load-session-and-validate-bet",
+      "type": "flow_step",
+      "description": "Step 3 of 6 in Process Server Spin."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.7,
+      "source": "flow:process-server-spin",
+      "target": "step:process-server-spin:generate-reel-positions",
+      "type": "flow_step",
+      "description": "Step 4 of 6 in Process Server Spin."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.8,
+      "source": "flow:process-server-spin",
+      "target": "step:process-server-spin:calculate-server-win",
+      "type": "flow_step",
+      "description": "Step 5 of 6 in Process Server Spin."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "flow:process-server-spin",
+      "target": "step:process-server-spin:update-balance-and-history",
+      "type": "flow_step",
+      "description": "Step 6 of 6 in Process Server Spin."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "domain:server-authority-and-persistence",
+      "target": "flow:query-player-and-rtp-data",
+      "type": "contains_flow",
+      "description": "Query Player and RTP Data belongs to Server Authority and Persistence."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.2,
+      "source": "flow:query-player-and-rtp-data",
+      "target": "step:query-player-and-rtp-data:request-balance",
+      "type": "flow_step",
+      "description": "Step 1 of 5 in Query Player and RTP Data."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.4,
+      "source": "flow:query-player-and-rtp-data",
+      "target": "step:query-player-and-rtp-data:return-authenticated-balance",
+      "type": "flow_step",
+      "description": "Step 2 of 5 in Query Player and RTP Data."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.6,
+      "source": "flow:query-player-and-rtp-data",
+      "target": "step:query-player-and-rtp-data:return-spin-history",
+      "type": "flow_step",
+      "description": "Step 3 of 5 in Query Player and RTP Data."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.8,
+      "source": "flow:query-player-and-rtp-data",
+      "target": "step:query-player-and-rtp-data:report-service-health",
+      "type": "flow_step",
+      "description": "Step 4 of 5 in Query Player and RTP Data."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "flow:query-player-and-rtp-data",
+      "target": "step:query-player-and-rtp-data:report-rtp-metrics",
+      "type": "flow_step",
+      "description": "Step 5 of 5 in Query Player and RTP Data."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "domain:server-authority-and-persistence",
+      "target": "flow:persist-slot-audit-data",
+      "type": "contains_flow",
+      "description": "Persist Slot Audit Data belongs to Server Authority and Persistence."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.2,
+      "source": "flow:persist-slot-audit-data",
+      "target": "step:persist-slot-audit-data:store-players",
+      "type": "flow_step",
+      "description": "Step 1 of 6 in Persist Slot Audit Data."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.3,
+      "source": "flow:persist-slot-audit-data",
+      "target": "step:persist-slot-audit-data:store-game-sessions",
+      "type": "flow_step",
+      "description": "Step 2 of 6 in Persist Slot Audit Data."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.5,
+      "source": "flow:persist-slot-audit-data",
+      "target": "step:persist-slot-audit-data:store-spins",
+      "type": "flow_step",
+      "description": "Step 3 of 6 in Persist Slot Audit Data."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.7,
+      "source": "flow:persist-slot-audit-data",
+      "target": "step:persist-slot-audit-data:store-balance-transactions",
+      "type": "flow_step",
+      "description": "Step 4 of 6 in Persist Slot Audit Data."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.8,
+      "source": "flow:persist-slot-audit-data",
+      "target": "step:persist-slot-audit-data:store-game-configuration",
+      "type": "flow_step",
+      "description": "Step 5 of 6 in Persist Slot Audit Data."
+    },
+    {
+      "direction": "forward",
+      "weight": 1,
+      "source": "flow:persist-slot-audit-data",
+      "target": "step:persist-slot-audit-data:track-rtp-and-reporting-views",
+      "type": "flow_step",
+      "description": "Step 6 of 6 in Persist Slot Audit Data."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.8,
+      "source": "domain:gameplay-session",
+      "target": "domain:slot-rules-and-economy",
+      "type": "cross_domain",
+      "description": "Gameplay consumes slot rules, paytables, reel strips, bet settings, jackpot state, and free-spin rules to resolve spins."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.7,
+      "source": "domain:slot-rules-and-economy",
+      "target": "domain:player-interface-and-feedback",
+      "type": "cross_domain",
+      "description": "Economy values are displayed through balance, total bet, jackpot, win, line, and free-spin UI elements."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.7,
+      "source": "domain:gameplay-session",
+      "target": "domain:player-interface-and-feedback",
+      "type": "cross_domain",
+      "description": "Gameplay state transitions enable, disable, and update controls and feedback animations."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.6,
+      "source": "domain:server-authority-and-persistence",
+      "target": "domain:gameplay-session",
+      "type": "cross_domain",
+      "description": "The server integration example can provide authoritative reel positions and balances back to the client gameplay loop."
+    },
+    {
+      "direction": "forward",
+      "weight": 0.6,
+      "source": "domain:server-authority-and-persistence",
+      "target": "domain:slot-rules-and-economy",
+      "type": "cross_domain",
+      "description": "Server RNG, win calculation, and database schema must mirror the slot economy rules to preserve fair payouts and auditable balances."
+    }
+  ],
+  "layers": [],
+  "tour": []
+}

@@ -1,0 +1,933 @@
+{
+  "version": "1.0.0",
+  "gitCommitHash": "56c1db052dbba4c070fe9297dd57760696080cfd",
+  "generatedAt": "2026-06-01T10:28:24.223Z",
+  "files": {
+    "index.html": {
+      "filePath": "index.html",
+      "contentHash": "2d600fd016f4e4271d8d13e77213e701eac1137f3970e07ad73b32157c76ff5c",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 35,
+      "hasStructuralAnalysis": false
+    },
+    "js/mkutils.js": {
+      "filePath": "js/mkutils.js",
+      "contentHash": "82951a34919e06c07031d094d84a01b36e548eba6857051640e5732c1fb857da",
+      "functions": [],
+      "classes": [
+        {
+          "name": "SimpleTweener",
+          "methods": [
+            "constructor",
+            "update",
+            "push"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 25
+        },
+        {
+          "name": "SimpleTweenFloat",
+          "methods": [
+            "constructor",
+            "update",
+            "lerp"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 46
+        },
+        {
+          "name": "SimpleWaitWhile",
+          "methods": [
+            "constructor",
+            "update"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 19
+        },
+        {
+          "name": "SequenceTweener",
+          "methods": [
+            "constructor",
+            "update",
+            "push"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 27
+        },
+        {
+          "name": "ComboCounter",
+          "methods": [
+            "constructor",
+            "nextCombo",
+            "sum",
+            "getComboCounts"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 52
+        },
+        {
+          "name": "Coroutiner",
+          "methods": [
+            "constructor",
+            "start",
+            "stop",
+            "update"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 30
+        },
+        {
+          "name": "ParallelActions",
+          "methods": [
+            "constructor",
+            "add",
+            "start"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 30
+        },
+        {
+          "name": "SequencedActions",
+          "methods": [
+            "constructor",
+            "start",
+            "add",
+            "break",
+            "completeAction"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 40
+        },
+        {
+          "name": "SequenceActionWrapper",
+          "methods": [
+            "constructor",
+            "invoke"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 15
+        },
+        {
+          "name": "EventWrapper",
+          "methods": [
+            "constructor"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 8
+        },
+        {
+          "name": "MKEvent",
+          "methods": [
+            "constructor",
+            "add",
+            "remove",
+            "invoke"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 26
+        },
+        {
+          "name": "SceneButton",
+          "methods": [
+            "constructor",
+            "create",
+            "pointerUp",
+            "pointerDown",
+            "pointerOver",
+            "pointerOut",
+            "setInteractable",
+            "addClickEvent",
+            "release",
+            "setPressed",
+            "setDepth"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 98
+        },
+        {
+          "name": "StateMachine",
+          "methods": [
+            "initialize",
+            "changeState"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 18
+        },
+        {
+          "name": "SoundController",
+          "methods": [
+            "constructor",
+            "soundOn",
+            "musicOn",
+            "playClip",
+            "stopClip",
+            "playMusic",
+            "stopMusic",
+            "stopSounds",
+            "_refreshSoundSources",
+            "stopAll"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 87
+        },
+        {
+          "name": "GuiController",
+          "methods": [
+            "constructor",
+            "showMessageYNC",
+            "showMessage",
+            "showPopUp",
+            "closePopUp",
+            "setInteractable",
+            "hasNoPopUp"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 100
+        },
+        {
+          "name": "PopUpController",
+          "methods": [
+            "constructor",
+            "_show",
+            "setControlsInteractable",
+            "addButton",
+            "add"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 36
+        }
+      ],
+      "imports": [],
+      "exports": [],
+      "totalLines": 684,
+      "hasStructuralAnalysis": true
+    },
+    "js/popups.js": {
+      "filePath": "js/popups.js",
+      "contentHash": "85a26fc1d18f2156aec96229c8a100f1e8d8caf70d009d9da3db474f4aff1f38",
+      "functions": [
+        {
+          "name": "createGameMessagePUHandlerYNC",
+          "params": [
+            "popup"
+          ],
+          "exported": false,
+          "lineCount": 38
+        },
+        {
+          "name": "createGameMessagePUHandler",
+          "params": [
+            "popup"
+          ],
+          "exported": false,
+          "lineCount": 24
+        }
+      ],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 68,
+      "hasStructuralAnalysis": true
+    },
+    "js/slot_classes.js": {
+      "filePath": "js/slot_classes.js",
+      "contentHash": "461512039394e17f58681e509ef8c4e1ccc31739ee55bc0b6171d2f30b66d75e",
+      "functions": [],
+      "classes": [
+        {
+          "name": "Lamp",
+          "methods": [
+            "constructor",
+            "on",
+            "off",
+            "setOn"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 23
+        },
+        {
+          "name": "TimeCoder",
+          "methods": [
+            "constructor",
+            "update",
+            "getState",
+            "start",
+            "stop"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 63
+        },
+        {
+          "name": "LineButton",
+          "methods": [
+            "constructor",
+            "create",
+            "pointerUp",
+            "pointerDown",
+            "pointerOver",
+            "pointerOut",
+            "setInteractable",
+            "setStateTexture",
+            "setState",
+            "addPointerDownEvent"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 75
+        },
+        {
+          "name": "SlotSymbol",
+          "methods": [
+            "constructor",
+            "setPositionY",
+            "setIcon",
+            "showAnim",
+            "setBlur",
+            "setVisible"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 70
+        },
+        {
+          "name": "Reel",
+          "methods": [
+            "constructor",
+            "_create",
+            "spin",
+            "symbolsMove",
+            "getBottomSymbol",
+            "getTopSymbol",
+            "setIconAndAddAtTop",
+            "setIconAndAddAtBottom",
+            "arrangeTape",
+            "arrangeBottomTapePart",
+            "arrangeTopTapePart",
+            "getWindowsSymbols",
+            "findWindowsSymbols",
+            "getDistToNextSymb",
+            "getRandomOrderPosition",
+            "getWindowPosition",
+            "getWindowSymbol",
+            "setBlur"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 276
+        },
+        {
+          "name": "LineBehavior",
+          "methods": [
+            "constructor",
+            "create",
+            "select",
+            "deselect",
+            "setLineVisible",
+            "lineBurn",
+            "lineFlashing",
+            "findWin",
+            "getPayLineWin",
+            "resetLineWinning",
+            "buttonClickHandler",
+            "addChangeSelectionEvent",
+            "lineWinPlay",
+            "lineWinCancel"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 199
+        },
+        {
+          "name": "LinesController",
+          "methods": [
+            "constructor",
+            "create",
+            "setControlActivity",
+            "selectAllLines",
+            "lineButton_Click",
+            "hideAllLines",
+            "changeSelectedLinesHandler",
+            "getAllPossibleLines"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 94
+        },
+        {
+          "name": "WinController",
+          "methods": [
+            "constructor",
+            "hasAnyWinn",
+            "searchWinSymbols",
+            "hasScatterWin",
+            "hasJackpotWin",
+            "winSymbolShowOnce",
+            "winShowCancel",
+            "resetWin",
+            "getLineWinCoins",
+            "getScatterWinCoins",
+            "getJackpotWinCoins",
+            "getWinSpins"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 248
+        },
+        {
+          "name": "PayLine",
+          "methods": [
+            "constructor",
+            "getWildLines",
+            "getPositionsForWild",
+            "isEqual",
+            "containEqualLine"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 96
+        },
+        {
+          "name": "WinData",
+          "methods": [
+            "constructor",
+            "symbolsToString",
+            "toString"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 22
+        },
+        {
+          "name": "SlotPlayer",
+          "methods": [
+            "constructor",
+            "addCoins",
+            "setCoinsCount",
+            "loadCoins",
+            "addChangeCoinsEvent",
+            "addWinCoins",
+            "setWinCoinsCount",
+            "addWinCoinsChangeEvent",
+            "takeWin",
+            "addLevel",
+            "setLevel",
+            "addChangeLevelEvent",
+            "addLevelProgress",
+            "setLevelProgress",
+            "addChangeLevelProgressEvent",
+            "setDefaultData",
+            "hasMoneyForBet"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 139
+        },
+        {
+          "name": "SlotControls",
+          "methods": [
+            "constructor",
+            "init",
+            "isAnyLineSelected",
+            "hasFreeSpin",
+            "useHold",
+            "isReelsSpin",
+            "useManualStop",
+            "setControlActivity",
+            "refresh",
+            "refreshBetLines",
+            "refreshSpins",
+            "linesLoop_Click",
+            "linesPlus_Click",
+            "linesMinus_Click",
+            "lineBetPlus_Click",
+            "lineBetLoop_Click",
+            "lineBetMinus_Click",
+            "autoSpinPlus_Click",
+            "autoSpinMinus_Click",
+            "maxBet_Click",
+            "changeFreeSpinsHandler",
+            "changeTotalBetHandler",
+            "changeLineBetHandler",
+            "changeSelectedLinesHandler",
+            "changeWinCoinsHandler",
+            "changeCreditCoinsHandler",
+            "addLineBet",
+            "setLineBet",
+            "setMaxLineBet",
+            "applyBet",
+            "addSelectedLinesCount",
+            "setSelectedLinesCount",
+            "addFreeSpins",
+            "setFreeSpinsCount",
+            "loadFreeSpins",
+            "applyFreeSpin",
+            "incAutoSpinsCounter",
+            "setAutoSpinsCounter",
+            "resetAutoSpinsMode",
+            "setAutoSpinsMode",
+            "setDefaultData",
+            "setSpinButtonText",
+            "getTotalBet",
+            "setJackpotAmount",
+            "addJackpotAmount",
+            "loadJackpot",
+            "resetJackpot",
+            "changeJackpotHandler"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 415
+        }
+      ],
+      "imports": [],
+      "exports": [],
+      "totalLines": 1731,
+      "hasStructuralAnalysis": true
+    },
+    "js/slotConfig3x5.js": {
+      "filePath": "js/slotConfig3x5.js",
+      "contentHash": "e088e40c02f834c0cf871ccc29ce729f6b91bf6441040c8b98c843137eb41dea",
+      "functions": [],
+      "classes": [
+        {
+          "name": "AnimatedCoinParticle",
+          "methods": [
+            "constructor",
+            "update"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 29
+        }
+      ],
+      "imports": [],
+      "exports": [],
+      "totalLines": 1334,
+      "hasStructuralAnalysis": true
+    },
+    "js/slotGame.js": {
+      "filePath": "js/slotGame.js",
+      "contentHash": "3c4a9b3537dbd432a6e896bf80f60b9d7b090b863691d20779b1a61f95d093d5",
+      "functions": [
+        {
+          "name": "getSymboldData",
+          "params": [
+            "_slotConfig",
+            "spriteName"
+          ],
+          "exported": false,
+          "lineCount": 8
+        },
+        {
+          "name": "spinReels",
+          "params": [
+            "reels",
+            "_slotConfig",
+            "completeCallback"
+          ],
+          "exported": false,
+          "lineCount": 14
+        },
+        {
+          "name": "createFullPaytable",
+          "params": [
+            "payTable",
+            "useWild"
+          ],
+          "exported": false,
+          "lineCount": 11
+        },
+        {
+          "name": "getTime",
+          "params": [],
+          "exported": false,
+          "lineCount": 7
+        }
+      ],
+      "classes": [
+        {
+          "name": "SlotGame",
+          "methods": [
+            "constructor",
+            "loadSceneConfig",
+            "preload",
+            "create",
+            "update",
+            "runSlot",
+            "addSpriteLocPos",
+            "wait_ms",
+            "winShow",
+            "winShowC",
+            "freeInputWinShow",
+            "freeInputWinShowC",
+            "loseShow",
+            "loseShowC",
+            "handleAnimation",
+            "showBigWinMessage",
+            "showWinCoinsMessage",
+            "showWinFreeSpinsMessage",
+            "showJackpotWinMessage",
+            "lampsBlink",
+            "showCoins"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 634
+        }
+      ],
+      "imports": [],
+      "exports": [],
+      "totalLines": 711,
+      "hasStructuralAnalysis": true
+    },
+    "js/state_machine.js": {
+      "filePath": "js/state_machine.js",
+      "contentHash": "e22e323cd32117025e12c0656e74ec2d81feaa2f7716739db56a3ba390898560",
+      "functions": [],
+      "classes": [
+        {
+          "name": "PreSpinState",
+          "methods": [
+            "constructor",
+            "enterFrom",
+            "exitTo",
+            "spin_PointerDown",
+            "spin_LongPointerDown",
+            "longPressSpin_Click",
+            "spin_Click",
+            "autoSpin_Click",
+            "handleInput",
+            "physicsUpdate",
+            "toString"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 121
+        },
+        {
+          "name": "SpinState",
+          "methods": [
+            "constructor",
+            "enterFrom",
+            "exitTo",
+            "handleInput",
+            "physicsUpdate",
+            "toString"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 50
+        },
+        {
+          "name": "AutoSpinState",
+          "methods": [
+            "constructor",
+            "enterFrom",
+            "exitTo",
+            "spin_PointerDown",
+            "spin_LongPointerDown",
+            "longPressSpin_Click",
+            "spin_Click",
+            "autoSpin_Click",
+            "handleInput",
+            "physicsUpdate",
+            "toString"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 94
+        },
+        {
+          "name": "NormalSpinState",
+          "methods": [
+            "constructor",
+            "enterFrom",
+            "exitTo",
+            "spin_PointerDown",
+            "spin_LongPointerDown",
+            "longPressSpin_Click",
+            "spin_Click",
+            "autoSpin_Click",
+            "handleInput",
+            "physicsUpdate",
+            "toString",
+            "calcWinHandler"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 102
+        },
+        {
+          "name": "IddleState",
+          "methods": [
+            "constructor",
+            "enterFrom",
+            "exitTo",
+            "spin_PointerDown",
+            "spin_LongPointerDown",
+            "longPressSpin_Click",
+            "spin_Click",
+            "autoSpin_Click",
+            "handleInput",
+            "physicsUpdate",
+            "toString"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 93
+        },
+        {
+          "name": "FreeSpinState",
+          "methods": [
+            "constructor",
+            "enterFrom",
+            "exitTo",
+            "spin_PointerDown",
+            "spin_LongPointerDown",
+            "longPressSpin_Click",
+            "spin_Click",
+            "autoSpin_Click",
+            "handleInput",
+            "physicsUpdate",
+            "toString"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 95
+        },
+        {
+          "name": "EndLessSpinState",
+          "methods": [
+            "constructor",
+            "enterFrom",
+            "exitTo",
+            "spin_PointerDown",
+            "spin_LongPointerDown",
+            "longPressSpin_Click",
+            "spin_Click",
+            "autoSpin_Click",
+            "handleInput",
+            "physicsUpdate",
+            "toString"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 92
+        },
+        {
+          "name": "CascadeSpinState",
+          "methods": [
+            "constructor",
+            "enterFrom",
+            "exitTo",
+            "spin_PointerDown",
+            "spin_LongPointerDown",
+            "longPressSpin_Click",
+            "spin_Click",
+            "autoSpin_Click",
+            "handleInput",
+            "physicsUpdate",
+            "toString"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 85
+        },
+        {
+          "name": "WinState",
+          "methods": [
+            "constructor",
+            "enterFrom",
+            "exitTo",
+            "spin_PointerDown",
+            "spin_LongPointerDown",
+            "longPressSpin_Click",
+            "spin_Click",
+            "autoSpin_Click",
+            "handleInput",
+            "physicsUpdate",
+            "toString"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 103
+        },
+        {
+          "name": "LoseState",
+          "methods": [
+            "constructor",
+            "enterFrom",
+            "exitTo",
+            "spin_PointerDown",
+            "spin_LongPointerDown",
+            "longPressSpin_Click",
+            "spin_Click",
+            "autoSpin_Click",
+            "setInputActivity",
+            "handleInput",
+            "physicsUpdate",
+            "toString"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 133
+        },
+        {
+          "name": "FreeInputWinState",
+          "methods": [
+            "constructor",
+            "enterFrom",
+            "exitTo",
+            "spin_PointerDown",
+            "spin_LongPointerDown",
+            "longPressSpin_Click",
+            "spin_Click",
+            "autoSpin_Click",
+            "setInputActivity",
+            "handleInput",
+            "physicsUpdate",
+            "toString"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 124
+        },
+        {
+          "name": "SpinButton",
+          "methods": [
+            "constructor",
+            "create",
+            "pointerUp",
+            "pointerDown",
+            "pointerOver",
+            "pointerOut",
+            "setInteractable",
+            "addClickEvent",
+            "release",
+            "setPressed",
+            "setDepth",
+            "setSpinModeText"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 123
+        }
+      ],
+      "imports": [],
+      "exports": [],
+      "totalLines": 1230,
+      "hasStructuralAnalysis": true
+    },
+    "server_examples/client_integration.js": {
+      "filePath": "server_examples/client_integration.js",
+      "contentHash": "04a505d8d2d6c9d673fcfaaa3b527075a44a8ac9bc3013bae18ad4c2d5615519",
+      "functions": [],
+      "classes": [
+        {
+          "name": "ServerClient",
+          "methods": [
+            "constructor",
+            "initSession",
+            "placeSpin",
+            "getBalance"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 81
+        }
+      ],
+      "imports": [],
+      "exports": [],
+      "totalLines": 242,
+      "hasStructuralAnalysis": true
+    },
+    "server_examples/database_schema.sql": {
+      "filePath": "server_examples/database_schema.sql",
+      "contentHash": "91baa6484c67747cea37da9d8ad4e00bb6ffcd8d80ab71ce4984dd77eb4fb057",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 163,
+      "hasStructuralAnalysis": true
+    },
+    "server_examples/package.json": {
+      "filePath": "server_examples/package.json",
+      "contentHash": "8163d3d15c0dbd482606c4652e47898700240be254769147e6723d788fe63036",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 35,
+      "hasStructuralAnalysis": true
+    },
+    "server_examples/server.js": {
+      "filePath": "server_examples/server.js",
+      "contentHash": "f0b25e416da52a03d4b7ae6a07e9ab5e823032239a16ff30352a09749ad950ec",
+      "functions": [
+        {
+          "name": "authenticateToken",
+          "params": [
+            "req",
+            "res",
+            "next"
+          ],
+          "exported": false,
+          "lineCount": 16
+        }
+      ],
+      "classes": [
+        {
+          "name": "ServerRNG",
+          "methods": [
+            "generateSeed",
+            "getReelPosition",
+            "generateSpinOutcome"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 21
+        },
+        {
+          "name": "WinCalculator",
+          "methods": [
+            "constructor",
+            "calculateWin",
+            "getSymbolsAtPositions",
+            "getLineSymbols",
+            "checkPayLine",
+            "checkScatterWin"
+          ],
+          "properties": [],
+          "exported": false,
+          "lineCount": 93
+        }
+      ],
+      "imports": [],
+      "exports": [],
+      "totalLines": 352,
+      "hasStructuralAnalysis": true
+    }
+  }
+}
