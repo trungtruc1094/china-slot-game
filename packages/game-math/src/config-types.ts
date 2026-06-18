@@ -154,6 +154,33 @@ export interface WinBreakdown {
   totalFreeSpins: IntegerUnit;
 }
 
+export interface RtpCalculationInput {
+  lineBet: IntegerUnit;
+  selectedWays: number;
+  totalWager: IntegerUnit;
+}
+
+export interface PayoutDistributionBucket {
+  payout: IntegerUnit;
+  count: number;
+  probability: number;
+}
+
+export interface RtpReport {
+  configId: string;
+  configVersionId: string;
+  totalOutcomes: number;
+  totalWagered: IntegerUnit;
+  totalPaid: IntegerUnit;
+  theoreticalRtp: number;
+  hitRate: number;
+  freeSpinTriggerFrequency: number;
+  jackpotTriggerFrequency: number;
+  maxPayoutExposure: IntegerUnit;
+  payoutDistribution: PayoutDistributionBucket[];
+  diagnostics: MathDiagnostic[];
+}
+
 export type RngMetadata =
   | {
       type: 'seeded';
@@ -178,6 +205,9 @@ export interface SpinResult {
 export type MathDiagnosticCode =
   | 'UNREACHABLE_PAYTABLE_ENTRY'
   | 'UNUSED_SYMBOL_METADATA'
+  | 'MISSING_SYMBOL_METADATA'
+  | 'INVALID_SCATTER_RULE'
+  | 'INVALID_JACKPOT_RULE'
   | 'SERVER_EXAMPLE_MISMATCH'
   | 'CONFIG_SHAPE_WARNING';
 

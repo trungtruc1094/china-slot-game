@@ -9,9 +9,12 @@ export type {
   MathDiagnosticCode,
   PaylineSymbol,
   PaytableEntry,
+  PayoutDistributionBucket,
   PayoutPolicy,
   ReelStop,
   ReelStrip,
+  RtpCalculationInput,
+  RtpReport,
   RngMetadata,
   ScatterPay,
   ScatterRule,
@@ -36,3 +39,8 @@ export {
   findWinCalculationDiagnostics,
 } from './win-calculator.js';
 export type { CalculateWinsOptions } from './win-calculator.js';
+export {
+  calculateRtpReport,
+  findConfigurationDiagnostics,
+} from './rtp-calculator.js';
+export type { CalculateRtpReportOptions, ConfigurationDiagnosticOptions } from './rtp-calculator.js';
