@@ -58,6 +58,30 @@ export class SessionService {
     };
   }
 
+  public getActiveSession(sessionId: string): SessionRecord {
+    const now = this.clock.now();
+    const session = this.sessionsById.get(sessionId);
+
+    if (!session) {
+      throw new ApiHttpError(401, {
+        code: "INVALID_SESSION",
+        message: "A valid active session is required.",
+        details: { sessionId }
+      });
+    }
+
+    if (this.isExpired(session, now)) {
+      session.status = "expired";
+      throw new ApiHttpError(401, {
+        code: "SESSION_EXPIRED",
+        message: "Session has expired. Start a new session to continue.",
+        details: { sessionId }
+      });
+    }
+
+    return session;
+  }
+
   private findSessionForResume(sessionId: string, player: PlayerRecord, now: Date): SessionRecord {
     const session = this.sessionsById.get(sessionId);
 

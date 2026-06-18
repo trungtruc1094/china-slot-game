@@ -1,5 +1,5 @@
 # generated: 2026-06-17T14:58:20.256Z
-# last_updated: 2026-06-18T16:17:05+07:00
+# last_updated: 2026-06-18T16:29:59+07:00
 # project: China Slot Game
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-06-17T14:58:20.256Z"
-last_updated: "2026-06-18T16:17:05+07:00"
+last_updated: "2026-06-18T16:29:59+07:00"
 project: "China Slot Game"
 project_key: NOKEY
 tracking_system: file-system
@@ -54,7 +54,7 @@ development_status:
   2-1-scaffold-typescript-api-service: done
   2-2-create-session-and-player-identity-adapter: done
   2-3-implement-backend-wallet-and-balance-transactions: done
-  2-4-implement-authoritative-spin-endpoint: backlog
+  2-4-implement-authoritative-spin-endpoint: done
   2-5-add-spin-idempotency-and-retry-safety: backlog
   2-6-integrate-phaser-client-with-backend-spin-results: backlog
   epic-2-retrospective: optional

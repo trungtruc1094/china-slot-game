@@ -35,6 +35,15 @@ export interface WalletTransactionResult {
   transaction: WalletTransactionRecord;
 }
 
+export interface WalletTransactionBatchResult {
+  wallet: Wallet;
+  transactions: WalletTransactionRecord[];
+}
+
+export interface WalletTransactionBatchCommitOptions {
+  afterBalanceCommit?: (result: WalletTransactionBatchResult) => void;
+}
+
 export interface WalletServiceTestHooks {
   failAfterBalanceUpdate?: (request: WalletTransactionRequest) => boolean;
 }
@@ -61,47 +70,102 @@ export class WalletService {
   }
 
   public applyTransaction(request: WalletTransactionRequest): Promise<WalletTransactionResult> {
-    return this.enqueue(request.playerId, () => Promise.resolve(this.applyTransactionInLock(request)));
-  }
+    return this.applyTransactionBatch([request]).then((result) => {
+      const transaction = result.transactions[0];
 
-  private applyTransactionInLock(request: WalletTransactionRequest): WalletTransactionResult {
-    this.validateRequest(request);
-
-    const wallet = this.getOrCreateWallet(request.playerId);
-    const transactions = this.getOrCreateTransactions(request.playerId);
-    const balanceBefore = wallet.balance;
-    const transactionCountBefore = transactions.length;
-    const nextTransactionNumberBefore = this.nextTransactionNumber;
-    const balanceAfter = this.calculateBalanceAfter(wallet.balance, request);
-
-    try {
-      wallet.balance = balanceAfter;
-
-      if (this.testHooks.failAfterBalanceUpdate?.(request) === true) {
-        throw new Error("Injected wallet transaction failure");
+      if (!transaction) {
+        throw new ApiHttpError(500, {
+          code: "WALLET_TRANSACTION_FAILED",
+          message: "Wallet transaction could not be committed.",
+          details: {}
+        });
       }
 
-      const transaction: WalletTransactionRecord = {
-        transactionId: `txn_${this.nextTransactionNumber++}`,
-        playerId: request.playerId,
-        type: request.type,
-        amount: request.amount,
-        balanceBefore,
-        balanceAfter,
-        actor: request.actor,
-        source: request.source,
-        createdAt: this.clock.now().toISOString(),
-        metadata: request.metadata ?? {}
-      };
-      transactions.push(transaction);
-      return {
+      return { wallet: result.wallet, transaction };
+    });
+  }
+
+  public applyTransactionBatch(
+    requests: WalletTransactionRequest[],
+    commitOptions: WalletTransactionBatchCommitOptions = {}
+  ): Promise<WalletTransactionBatchResult> {
+    const firstRequest = requests[0];
+
+    if (!firstRequest || requests.some((request) => request.playerId !== firstRequest.playerId)) {
+      return Promise.reject(new ApiHttpError(400, {
+        code: "INVALID_WALLET_BATCH",
+        message: "Wallet transaction batch must target one player.",
+        details: {}
+      }));
+    }
+
+    return this.enqueue(firstRequest.playerId, () => Promise.resolve(this.applyTransactionBatchInLock(requests, commitOptions)));
+  }
+
+  private applyTransactionBatchInLock(
+    requests: WalletTransactionRequest[],
+    commitOptions: WalletTransactionBatchCommitOptions
+  ): WalletTransactionBatchResult {
+    const firstRequest = requests[0];
+
+    if (!firstRequest) {
+      throw new ApiHttpError(400, {
+        code: "INVALID_WALLET_BATCH",
+        message: "Wallet transaction batch must target one player.",
+        details: {}
+      });
+    }
+
+    for (const request of requests) {
+      this.validateRequest(request);
+    }
+
+    const wallet = this.getOrCreateWallet(firstRequest.playerId);
+    const transactions = this.getOrCreateTransactions(firstRequest.playerId);
+    const initialBalance = wallet.balance;
+    const transactionCountBefore = transactions.length;
+    const nextTransactionNumberBefore = this.nextTransactionNumber;
+    const batchTransactions: WalletTransactionRecord[] = [];
+
+    try {
+      for (const request of requests) {
+        const balanceBefore = wallet.balance;
+        const balanceAfter = this.calculateBalanceAfter(wallet.balance, request);
+        wallet.balance = balanceAfter;
+
+        if (this.testHooks.failAfterBalanceUpdate?.(request) === true) {
+          throw new Error("Injected wallet transaction failure");
+        }
+
+        const transaction: WalletTransactionRecord = {
+          transactionId: `txn_${this.nextTransactionNumber++}`,
+          playerId: request.playerId,
+          type: request.type,
+          amount: request.amount,
+          balanceBefore,
+          balanceAfter,
+          actor: request.actor,
+          source: request.source,
+          createdAt: this.clock.now().toISOString(),
+          metadata: request.metadata ?? {}
+        };
+        transactions.push(transaction);
+        batchTransactions.push(transaction);
+      }
+
+      const result = {
         wallet: { ...wallet },
-        transaction
+        transactions: batchTransactions
       };
+      commitOptions.afterBalanceCommit?.(result);
+      return result;
     } catch (error) {
-      wallet.balance = balanceBefore;
+      wallet.balance = initialBalance;
       transactions.length = transactionCountBefore;
       this.nextTransactionNumber = nextTransactionNumberBefore;
+      if (error instanceof ApiHttpError) {
+        throw error;
+      }
       throw new ApiHttpError(500, {
         code: "WALLET_TRANSACTION_FAILED",
         message: "Wallet transaction could not be committed.",
