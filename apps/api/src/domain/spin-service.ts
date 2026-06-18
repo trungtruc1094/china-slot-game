@@ -8,6 +8,7 @@ import {
   type WinBreakdown
 } from "@china-slot-game/game-math";
 import { ApiHttpError } from "../middleware/error-handler.js";
+import type { BudgetProtectionActionRecord, BudgetProtectionProvider } from "./budget-protection-repository.js";
 import type { GameConfigurationProvider } from "./game-configuration-repository.js";
 import type { OperatorLimitRecord, OperatorLimitsProvider } from "./operator-limits-repository.js";
 import type { Clock, SessionService } from "./session-service.js";
@@ -51,6 +52,8 @@ export interface SpinServiceOptions {
   configProvider?: GameConfigurationProvider;
   operatorLimitsProvider?: OperatorLimitsProvider;
   operatorLimitsScopeId?: string;
+  budgetProtectionProvider?: BudgetProtectionProvider;
+  budgetProtectionEnabled?: boolean;
   nextRandom?: () => number;
   failLedgerCommit?: (response: SpinResponse) => boolean;
 }
@@ -105,6 +108,7 @@ export class SpinService {
     this.validateWager(config, request.wager);
 
     const session = this.sessions.getActiveSession(request.sessionId);
+    this.validateBudgetProtection(request.wager);
     const activeLimits = this.options.operatorLimitsProvider?.getActiveLimits(this.options.operatorLimitsScopeId ?? "default");
     if (activeLimits) {
       this.validateOperatorLimits(activeLimits, session.playerId, request.sessionId, request.wager);
@@ -244,6 +248,31 @@ export class SpinService {
     }
   }
 
+  private validateBudgetProtection(wager: WagerInput): void {
+    if (this.options.budgetProtectionEnabled === false) {
+      return;
+    }
+    const scopeId = this.options.operatorLimitsScopeId ?? "default";
+    const activeActions = this.options.budgetProtectionProvider?.listActiveActions(scopeId) ?? [];
+    for (const action of activeActions) {
+      if (action.action === "pauseCampaign") {
+        throw budgetProtectionActive(action, "Campaign is paused.");
+      }
+      if (action.action === "requireHostApproval") {
+        throw budgetProtectionActive(action, "Host approval is required before play can continue.");
+      }
+      if (action.action === "disablePaidSpins" && wager.totalWager > 0) {
+        throw budgetProtectionActive(action, "Paid spins are disabled.");
+      }
+      if (action.action === "lowerMaxBet") {
+        const maxBet = action.parameters.maxBet;
+        if (typeof maxBet === "number" && Number.isSafeInteger(maxBet) && wager.lineBet > maxBet) {
+          throw budgetProtectionActive(action, `Maximum bet is temporarily limited to ${maxBet}.`);
+        }
+      }
+    }
+  }
+
   private totalPaid(): number {
     return this.ledger.reduce((total, entry) => total + entry.payout, 0);
   }
@@ -281,6 +310,18 @@ function limitExceeded(
       current,
       attempted,
       maximum
+    }
+  });
+}
+
+function budgetProtectionActive(action: BudgetProtectionActionRecord, message: string): ApiHttpError {
+  return new ApiHttpError(409, {
+    code: "BUDGET_PROTECTION_ACTIVE",
+    message,
+    details: {
+      scopeId: action.scopeId,
+      action: action.action,
+      message
     }
   });
 }

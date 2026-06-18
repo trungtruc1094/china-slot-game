@@ -5,6 +5,7 @@ import { errorHandler, notFoundHandler } from "./middleware/error-handler.js";
 import { requestIdMiddleware } from "./middleware/request-id.js";
 import { createHealthRouter } from "./routes/health.routes.js";
 import { createAdminAlertsRouter } from "./routes/admin-alerts.routes.js";
+import { createAdminBudgetProtectionRouter } from "./routes/admin-budget-protection.routes.js";
 import { createAdminConfigRouter } from "./routes/admin-config.routes.js";
 import { createAdminMetricsRouter } from "./routes/admin-metrics.routes.js";
 import { createAdminOperatorLimitsRouter } from "./routes/admin-operator-limits.routes.js";
@@ -21,6 +22,7 @@ import { WalletService } from "./domain/wallet-service.js";
 import type { GameConfiguration } from "@china-slot-game/game-math";
 import { InMemoryAlertRepository } from "./domain/alert-repository.js";
 import { AlertService } from "./domain/alert-service.js";
+import { InMemoryBudgetProtectionRepository } from "./domain/budget-protection-repository.js";
 
 export interface AppDependencies {
   clock?: Clock;
@@ -28,6 +30,8 @@ export interface AppDependencies {
   configRepository?: InMemoryGameConfigurationRepository;
   operatorLimitsRepository?: InMemoryOperatorLimitsRepository;
   alertRepository?: InMemoryAlertRepository;
+  budgetProtectionRepository?: InMemoryBudgetProtectionRepository;
+  budgetProtectionEnabled?: boolean;
   configProvider?: GameConfigurationProvider;
   nextRandom?: () => number;
   failLedgerCommit?: SpinServiceOptions["failLedgerCommit"];
@@ -52,6 +56,10 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   const alertRepository = dependencies.alertRepository ?? new InMemoryAlertRepository(
     dependencies.clock ?? { now: () => new Date() }
   );
+  const budgetProtectionRepository = dependencies.budgetProtectionRepository ?? new InMemoryBudgetProtectionRepository(
+    dependencies.clock ?? { now: () => new Date() }
+  );
+  const budgetProtectionEnabled = dependencies.budgetProtectionEnabled ?? process.env.BUDGET_PROTECTION_ENABLED !== "false";
   const spinOptions: SpinServiceOptions = {};
   if (dependencies.activeConfig) {
     spinOptions.activeConfig = dependencies.activeConfig;
@@ -64,6 +72,8 @@ export function createApp(dependencies: AppDependencies = {}): Express {
     spinOptions.failLedgerCommit = dependencies.failLedgerCommit;
   }
   spinOptions.operatorLimitsProvider = operatorLimitsRepository;
+  spinOptions.budgetProtectionProvider = budgetProtectionRepository;
+  spinOptions.budgetProtectionEnabled = budgetProtectionEnabled;
   const spinService = dependencies.spinService ?? new SpinService(
     sessionService,
     walletService,
@@ -81,6 +91,7 @@ export function createApp(dependencies: AppDependencies = {}): Express {
 
   app.use("/api", createHealthRouter());
   app.use("/api", createAdminAlertsRouter(alertRepository, alertService));
+  app.use("/api", createAdminBudgetProtectionRouter(budgetProtectionRepository, budgetProtectionEnabled));
   app.use("/api", createAdminConfigRouter(configRepository));
   app.use("/api", createAdminOperatorLimitsRouter(operatorLimitsRepository));
   app.use("/api", createAdminMetricsRouter(metricsService));
