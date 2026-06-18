@@ -1,0 +1,30 @@
+{
+  "name": "@china-slot-game/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/main.js",
+  "types": "./dist/main.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx src/main.ts",
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "cors": "2.8.5",
+    "dotenv": "17.2.3",
+    "express": "5.1.0",
+    "helmet": "8.1.0",
+    "zod": "4.2.0"
+  },
+  "devDependencies": {
+    "@types/cors": "2.8.19",
+    "@types/express": "5.0.6",
+    "@types/node": "24.10.1",
+    "tsx": "4.21.0",
+    "typescript": "6.0.3",
+    "vitest": "4.1.9"
+  }
+}
