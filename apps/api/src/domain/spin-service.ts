@@ -8,6 +8,7 @@ import {
   type WinBreakdown
 } from "@china-slot-game/game-math";
 import { ApiHttpError } from "../middleware/error-handler.js";
+import type { GameConfigurationProvider } from "./game-configuration-repository.js";
 import type { Clock, SessionService } from "./session-service.js";
 import type { WalletService, WalletTransactionRecord, WalletTransactionRequest } from "./wallet-service.js";
 
@@ -45,6 +46,7 @@ const idempotencyRetryWindowMs = 24 * 60 * 60 * 1000;
 
 export interface SpinServiceOptions {
   activeConfig?: GameConfiguration;
+  configProvider?: GameConfigurationProvider;
   nextRandom?: () => number;
   failLedgerCommit?: (response: SpinResponse) => boolean;
 }
@@ -86,7 +88,7 @@ export class SpinService {
       }
     }
 
-    const config = this.options.activeConfig;
+    const config = this.options.configProvider?.getActiveConfig() ?? this.options.activeConfig;
 
     if (!config) {
       throw new ApiHttpError(503, {

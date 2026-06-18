@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../../src/app.js";
+import { InMemoryGameConfigurationRepository } from "../../src/domain/game-configuration-repository.js";
 import { InMemoryPlayerIdentityAdapter } from "../../src/domain/player-identity.js";
 import { SessionService, type Clock } from "../../src/domain/session-service.js";
 import { SpinService } from "../../src/domain/spin-service.js";
@@ -209,6 +210,59 @@ describe("spin routes", () => {
     });
     expect(walletService.getWallet("player_1").balance).toBe(1000);
     expect(spinService.getLedger()).toEqual([]);
+  });
+
+  it("uses only active configuration versions and ignores draft configs", async () => {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    clock = new MutableClock();
+    const sessionService = new SessionService(new InMemoryPlayerIdentityAdapter(), clock);
+    walletService = new WalletService(clock);
+    const configRepository = new InMemoryGameConfigurationRepository(clock);
+    configRepository.createDraft({ id: "draft-live", config: simpleConfig, actor: "operator-1" });
+    configRepository.activateDraft({ id: "draft-live", actor: "operator-1" });
+    configRepository.createDraft({
+      id: "draft-ignored",
+      config: {
+        ...simpleConfig,
+        versionId: "draft-ignored-v2",
+        paytable: [
+          { id: "a-3", symbols: ["A", "A", "A", "any", "any"], pay: 500, freeSpins: 0 }
+        ]
+      },
+      actor: "operator-2"
+    });
+    spinService = new SpinService(
+      sessionService,
+      walletService,
+      { configProvider: configRepository, nextRandom: () => 0 },
+      clock
+    );
+    server = createServer(createApp({
+      clock,
+      sessionService,
+      walletService,
+      spinService
+    }));
+    await new Promise<void>((resolve) => {
+      server.listen(0, "127.0.0.1", resolve);
+    });
+    const address = server.address() as AddressInfo;
+    baseUrl = `http://127.0.0.1:${address.port}`;
+
+    const sessionId = await createSession();
+    const response = await postSpin({
+      clientSpinId: "spin-ignores-draft",
+      sessionId,
+      wager: { lineBet: 1, selectedWays: 1, totalWager: 1 }
+    });
+    const body = await response.json() as ApiEnvelope<Record<string, unknown>>;
+
+    expect(response.status).toBe(200);
+    expect(body.data).toMatchObject({
+      configVersionId: "simple-config-v1",
+      payout: 5,
+      balanceAfter: 1004
+    });
   });
 
   it("rejects insufficient balance without accepting the spin", async () => {

@@ -7,6 +7,7 @@ import { createHealthRouter } from "./routes/health.routes.js";
 import { createSessionsRouter } from "./routes/sessions.routes.js";
 import { createSpinsRouter } from "./routes/spins.routes.js";
 import { InMemoryPlayerIdentityAdapter } from "./domain/player-identity.js";
+import type { GameConfigurationProvider } from "./domain/game-configuration-repository.js";
 import { SessionService, type Clock } from "./domain/session-service.js";
 import { SpinService } from "./domain/spin-service.js";
 import type { SpinServiceOptions } from "./domain/spin-service.js";
@@ -16,6 +17,7 @@ import type { GameConfiguration } from "@china-slot-game/game-math";
 export interface AppDependencies {
   clock?: Clock;
   activeConfig?: GameConfiguration;
+  configProvider?: GameConfigurationProvider;
   nextRandom?: () => number;
   failLedgerCommit?: SpinServiceOptions["failLedgerCommit"];
   sessionService?: SessionService;
@@ -33,6 +35,9 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   const spinOptions: SpinServiceOptions = {};
   if (dependencies.activeConfig) {
     spinOptions.activeConfig = dependencies.activeConfig;
+  }
+  if (dependencies.configProvider) {
+    spinOptions.configProvider = dependencies.configProvider;
   }
   if (dependencies.nextRandom) {
     spinOptions.nextRandom = dependencies.nextRandom;
