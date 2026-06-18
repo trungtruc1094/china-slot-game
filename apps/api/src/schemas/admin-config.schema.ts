@@ -117,5 +117,14 @@ export const updateDraftConfigRequestSchema = z.object({
   reason: z.string().trim().min(1).max(500).optional()
 });
 
+export const attachMathReportRequestSchema = z.object({
+  wager: z.object({
+    lineBet: positiveIntegerSchema,
+    selectedWays: positiveIntegerSchema,
+    totalWager: positiveIntegerSchema
+  }).optional()
+});
+
 export type CreateDraftConfigRequest = z.infer<typeof createDraftConfigRequestSchema>;
 export type UpdateDraftConfigRequest = z.infer<typeof updateDraftConfigRequestSchema>;
+export type AttachMathReportRequest = z.infer<typeof attachMathReportRequestSchema>;

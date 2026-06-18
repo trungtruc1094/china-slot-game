@@ -1,4 +1,4 @@
-import type { GameConfiguration } from "@china-slot-game/game-math";
+import type { GameConfiguration, RtpReport } from "@china-slot-game/game-math";
 import { ApiHttpError } from "../middleware/error-handler.js";
 import type { Clock } from "./session-service.js";
 
@@ -11,6 +11,7 @@ export interface GameConfigurationRecord {
   versionNumber?: number;
   status: GameConfigurationStatus;
   config: GameConfiguration;
+  mathReportId?: string;
   metadata: Record<string, unknown>;
   createdBy: string;
   updatedBy: string;
@@ -18,6 +19,16 @@ export interface GameConfigurationRecord {
   createdAt: Date;
   updatedAt: Date;
   activatedAt?: Date;
+}
+
+export interface MathReportRecord {
+  id: string;
+  draftId: string;
+  configId: string;
+  configVersionId: string;
+  report: RtpReport;
+  createdBy: string;
+  createdAt: Date;
 }
 
 export interface DraftConfigurationInput {
@@ -40,12 +51,19 @@ export interface ActivationInput {
   reason?: string;
 }
 
+export interface AttachMathReportInput {
+  draftId: string;
+  report: RtpReport;
+  actor: string;
+}
+
 export interface GameConfigurationProvider {
   getActiveConfig(): GameConfiguration | undefined;
 }
 
 export class InMemoryGameConfigurationRepository implements GameConfigurationProvider {
   private readonly records = new Map<string, GameConfigurationRecord>();
+  private readonly mathReports = new Map<string, MathReportRecord>();
 
   public constructor(private readonly clock: Clock = { now: () => new Date() }) {}
 
@@ -123,6 +141,14 @@ export class InMemoryGameConfigurationRepository implements GameConfigurationPro
         details: { id: input.id, status: draft.status }
       });
     }
+    const existingReport = draft.mathReportId ? this.mathReports.get(draft.mathReportId) : undefined;
+    if (existingReport?.report.diagnostics.some((diagnostic) => diagnostic.severity === "error")) {
+      throw new ApiHttpError(409, {
+        code: "CONFIG_MATH_REPORT_BLOCKED",
+        message: "Draft configuration has blocking math diagnostics.",
+        details: { id: input.id, mathReportId: draft.mathReportId }
+      });
+    }
 
     const now = this.clock.now();
     const nextVersionNumber = this.nextVersionNumber(draft.configId);
@@ -157,6 +183,52 @@ export class InMemoryGameConfigurationRepository implements GameConfigurationPro
   public getActiveRecord(): GameConfigurationRecord | undefined {
     const active = [...this.records.values()].find((record) => record.status === "active");
     return active ? cloneRecord(active) : undefined;
+  }
+
+  public attachMathReport(input: AttachMathReportInput): MathReportRecord {
+    const draft = this.requireRecord(input.draftId);
+    if (draft.status !== "draft") {
+      throw new ApiHttpError(409, {
+        code: "CONFIG_STATUS_CONFLICT",
+        message: "Math reports can only be attached to draft configurations.",
+        details: { id: input.draftId, status: draft.status }
+      });
+    }
+    if (draft.mathReportId) {
+      throw new ApiHttpError(409, {
+        code: "MATH_REPORT_IMMUTABLE",
+        message: "A math report is already attached to this draft configuration.",
+        details: { id: input.draftId, mathReportId: draft.mathReportId }
+      });
+    }
+
+    const reportId = `math_report_${this.mathReports.size + 1}`;
+    const mathReport: MathReportRecord = {
+      id: reportId,
+      draftId: input.draftId,
+      configId: input.report.configId,
+      configVersionId: input.report.configVersionId,
+      report: cloneReport(input.report),
+      createdBy: input.actor,
+      createdAt: this.clock.now()
+    };
+    this.mathReports.set(reportId, cloneMathReportRecord(mathReport));
+    this.records.set(draft.id, {
+      ...draft,
+      mathReportId: reportId,
+      updatedBy: input.actor,
+      updatedAt: this.clock.now()
+    });
+    return cloneMathReportRecord(mathReport);
+  }
+
+  public getMathReportForDraft(draftId: string): MathReportRecord | undefined {
+    const draft = this.requireRecord(draftId);
+    if (!draft.mathReportId) {
+      return undefined;
+    }
+    const report = this.mathReports.get(draft.mathReportId);
+    return report ? cloneMathReportRecord(report) : undefined;
   }
 
   public getActiveConfig(): GameConfiguration | undefined {
@@ -216,4 +288,16 @@ function cloneRecord(record: GameConfigurationRecord): GameConfigurationRecord {
 
 function cloneConfig(config: GameConfiguration): GameConfiguration {
   return structuredClone(config) as GameConfiguration;
+}
+
+function cloneReport(report: RtpReport): RtpReport {
+  return structuredClone(report) as RtpReport;
+}
+
+function cloneMathReportRecord(record: MathReportRecord): MathReportRecord {
+  return {
+    ...record,
+    report: cloneReport(record.report),
+    createdAt: new Date(record.createdAt)
+  };
 }

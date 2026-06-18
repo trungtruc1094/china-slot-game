@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { calculateRtpReport, type RtpReport } from "@china-slot-game/game-math";
 import { InMemoryGameConfigurationRepository } from "../../src/domain/game-configuration-repository.js";
 import type { Clock } from "../../src/domain/session-service.js";
 import { simpleConfig } from "../fixtures/simple-config.js";
@@ -127,5 +128,59 @@ describe("game configuration persistence", () => {
     expect(migration).toContain("WHERE status = 'active'");
     expect(migration).toContain("CREATE TRIGGER game_config_versions_status_transition");
     expect(migration).toContain("DROP TRIGGER IF EXISTS game_config_versions_status_transition");
+  });
+
+  it("stores immutable math reports and blocks activation with error diagnostics", () => {
+    const repository = new InMemoryGameConfigurationRepository();
+    repository.createDraft({ id: "draft-report", config: simpleConfig, actor: "operator-1" });
+    const report = calculateRtpReport(simpleConfig, {
+      wager: { lineBet: 1, selectedWays: 1, totalWager: 1 }
+    });
+    const attached = repository.attachMathReport({
+      draftId: "draft-report",
+      report,
+      actor: "operator-1"
+    });
+
+    expect(attached.report).toMatchObject({
+      configId: simpleConfig.id,
+      configVersionId: simpleConfig.versionId,
+      theoreticalRtp: 0.625,
+      hitRate: 0.125,
+      freeSpinTriggerFrequency: 0,
+      jackpotTriggerFrequency: 0,
+      maxPayoutExposure: 5
+    });
+    expect(repository.read("draft-report")).toMatchObject({ mathReportId: attached.id });
+    expect(() => repository.attachMathReport({
+      draftId: "draft-report",
+      report,
+      actor: "operator-2"
+    })).toThrow("A math report is already attached to this draft configuration.");
+
+    const blockingReport: RtpReport = {
+      ...report,
+      diagnostics: [{
+        code: "MISSING_SYMBOL_METADATA",
+        severity: "error",
+        message: "Missing symbol metadata blocks activation.",
+        path: ["symbols", "Missing"]
+      }]
+    };
+    repository.createDraft({
+      id: "draft-blocked-report",
+      config: { ...simpleConfig, versionId: "simple-config-blocked-report" },
+      actor: "operator-1"
+    });
+    repository.attachMathReport({
+      draftId: "draft-blocked-report",
+      report: blockingReport,
+      actor: "operator-1"
+    });
+
+    expect(() => repository.activateDraft({
+      id: "draft-blocked-report",
+      actor: "operator-1"
+    })).toThrow("Draft configuration has blocking math diagnostics.");
   });
 });
