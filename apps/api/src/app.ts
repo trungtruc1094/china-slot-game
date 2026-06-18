@@ -4,6 +4,7 @@ import helmet from "helmet";
 import { errorHandler, notFoundHandler } from "./middleware/error-handler.js";
 import { requestIdMiddleware } from "./middleware/request-id.js";
 import { createHealthRouter } from "./routes/health.routes.js";
+import { createAdminAlertsRouter } from "./routes/admin-alerts.routes.js";
 import { createAdminConfigRouter } from "./routes/admin-config.routes.js";
 import { createAdminMetricsRouter } from "./routes/admin-metrics.routes.js";
 import { createAdminOperatorLimitsRouter } from "./routes/admin-operator-limits.routes.js";
@@ -18,12 +19,15 @@ import { SpinService } from "./domain/spin-service.js";
 import type { SpinServiceOptions } from "./domain/spin-service.js";
 import { WalletService } from "./domain/wallet-service.js";
 import type { GameConfiguration } from "@china-slot-game/game-math";
+import { InMemoryAlertRepository } from "./domain/alert-repository.js";
+import { AlertService } from "./domain/alert-service.js";
 
 export interface AppDependencies {
   clock?: Clock;
   activeConfig?: GameConfiguration;
   configRepository?: InMemoryGameConfigurationRepository;
   operatorLimitsRepository?: InMemoryOperatorLimitsRepository;
+  alertRepository?: InMemoryAlertRepository;
   configProvider?: GameConfigurationProvider;
   nextRandom?: () => number;
   failLedgerCommit?: SpinServiceOptions["failLedgerCommit"];
@@ -45,6 +49,9 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   const operatorLimitsRepository = dependencies.operatorLimitsRepository ?? new InMemoryOperatorLimitsRepository(
     dependencies.clock ?? { now: () => new Date() }
   );
+  const alertRepository = dependencies.alertRepository ?? new InMemoryAlertRepository(
+    dependencies.clock ?? { now: () => new Date() }
+  );
   const spinOptions: SpinServiceOptions = {};
   if (dependencies.activeConfig) {
     spinOptions.activeConfig = dependencies.activeConfig;
@@ -63,7 +70,8 @@ export function createApp(dependencies: AppDependencies = {}): Express {
     spinOptions,
     dependencies.clock
   );
-  const metricsService = new MetricsService(spinService, spinOptions.configProvider, operatorLimitsRepository);
+  const metricsService = new MetricsService(spinService, spinOptions.configProvider, operatorLimitsRepository, alertRepository);
+  const alertService = new AlertService(alertRepository, metricsService);
 
   app.disable("x-powered-by");
   app.use(helmet());
@@ -72,6 +80,7 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use(express.json({ limit: "1mb" }));
 
   app.use("/api", createHealthRouter());
+  app.use("/api", createAdminAlertsRouter(alertRepository, alertService));
   app.use("/api", createAdminConfigRouter(configRepository));
   app.use("/api", createAdminOperatorLimitsRouter(operatorLimitsRepository));
   app.use("/api", createAdminMetricsRouter(metricsService));

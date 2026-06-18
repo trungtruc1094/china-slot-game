@@ -1,6 +1,7 @@
 import { calculateRtpReport } from "@china-slot-game/game-math";
 import { ApiHttpError } from "../middleware/error-handler.js";
 import type { GameConfigurationProvider } from "./game-configuration-repository.js";
+import type { AlertStateProvider } from "./alert-repository.js";
 import type { OperatorLimitsProvider } from "./operator-limits-repository.js";
 import type { SpinLedgerEntry, SpinService } from "./spin-service.js";
 
@@ -21,7 +22,7 @@ export interface OperatingMetrics {
   activeSessions: number;
   jackpotLiability: number;
   remainingBudget: number | null;
-  alertState: "none";
+  alertState: "none" | "active";
   filters: {
     from: string | null;
     to: string | null;
@@ -38,7 +39,8 @@ export class MetricsService {
   public constructor(
     private readonly spinService: SpinService,
     private readonly configProvider: GameConfigurationProvider,
-    private readonly operatorLimitsProvider?: OperatorLimitsProvider
+    private readonly operatorLimitsProvider?: OperatorLimitsProvider,
+    private readonly alertStateProvider?: AlertStateProvider
   ) {}
 
   public getMetrics(query: MetricsQuery = {}): OperatingMetrics {
@@ -73,7 +75,7 @@ export class MetricsService {
       activeSessions,
       jackpotLiability,
       remainingBudget,
-      alertState: "none",
+      alertState: this.alertStateProvider?.getAlertState(scopeId) ?? "none",
       filters: {
         from: query.from?.toISOString() ?? null,
         to: query.to?.toISOString() ?? null,
