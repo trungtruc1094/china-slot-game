@@ -181,6 +181,45 @@ export interface RtpReport {
   diagnostics: MathDiagnostic[];
 }
 
+export interface SimulationInput {
+  spinCount: number;
+  seed?: string;
+  wager?: RtpCalculationInput;
+  theoreticalRtp?: number;
+}
+
+export interface VolatilitySummary {
+  meanPayout: number;
+  variance: number;
+  standardDeviation: number;
+  zeroPayCount: number;
+  smallWinCount: number;
+  mediumWinCount: number;
+  largeWinCount: number;
+}
+
+export interface SimulationConfidenceNote {
+  code: 'LOW_SAMPLE_SIZE' | 'RTP_DELTA';
+  severity: 'info' | 'warning';
+  message: string;
+}
+
+export interface SimulationResult {
+  configId: string;
+  configVersionId: string;
+  spinCount: number;
+  seed: string;
+  totalWagered: IntegerUnit;
+  totalPaid: IntegerUnit;
+  observedRtp: number;
+  hitRate: number;
+  largestWin: IntegerUnit;
+  scatterCount: number;
+  jackpotCount: number;
+  volatility: VolatilitySummary;
+  confidenceNotes: SimulationConfidenceNote[];
+}
+
 export type RngMetadata =
   | {
       type: 'seeded';

@@ -19,11 +19,15 @@ export type {
   ScatterPay,
   ScatterRule,
   ScatterWin,
+  SimulationConfidenceNote,
+  SimulationInput,
+  SimulationResult,
   SpinResult,
   SymbolMetadata,
   SymbolId,
   VisibleSymbol,
   VisibleWindow,
+  VolatilitySummary,
   WagerInput,
   WayWin,
   WayCoordinate,
@@ -44,3 +48,4 @@ export {
   findConfigurationDiagnostics,
 } from './rtp-calculator.js';
 export type { CalculateRtpReportOptions, ConfigurationDiagnosticOptions } from './rtp-calculator.js';
+export { runSimulation } from './simulator.js';
