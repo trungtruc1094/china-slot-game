@@ -5,10 +5,12 @@ import { errorHandler, notFoundHandler } from "./middleware/error-handler.js";
 import { requestIdMiddleware } from "./middleware/request-id.js";
 import { createHealthRouter } from "./routes/health.routes.js";
 import { createAdminConfigRouter } from "./routes/admin-config.routes.js";
+import { createAdminOperatorLimitsRouter } from "./routes/admin-operator-limits.routes.js";
 import { createSessionsRouter } from "./routes/sessions.routes.js";
 import { createSpinsRouter } from "./routes/spins.routes.js";
 import { InMemoryPlayerIdentityAdapter } from "./domain/player-identity.js";
 import { InMemoryGameConfigurationRepository, type GameConfigurationProvider } from "./domain/game-configuration-repository.js";
+import { InMemoryOperatorLimitsRepository } from "./domain/operator-limits-repository.js";
 import { SessionService, type Clock } from "./domain/session-service.js";
 import { SpinService } from "./domain/spin-service.js";
 import type { SpinServiceOptions } from "./domain/spin-service.js";
@@ -19,6 +21,7 @@ export interface AppDependencies {
   clock?: Clock;
   activeConfig?: GameConfiguration;
   configRepository?: InMemoryGameConfigurationRepository;
+  operatorLimitsRepository?: InMemoryOperatorLimitsRepository;
   configProvider?: GameConfigurationProvider;
   nextRandom?: () => number;
   failLedgerCommit?: SpinServiceOptions["failLedgerCommit"];
@@ -35,6 +38,9 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   );
   const walletService = dependencies.walletService ?? new WalletService(dependencies.clock ?? { now: () => new Date() });
   const configRepository = dependencies.configRepository ?? new InMemoryGameConfigurationRepository(
+    dependencies.clock ?? { now: () => new Date() }
+  );
+  const operatorLimitsRepository = dependencies.operatorLimitsRepository ?? new InMemoryOperatorLimitsRepository(
     dependencies.clock ?? { now: () => new Date() }
   );
   const spinOptions: SpinServiceOptions = {};
@@ -63,6 +69,7 @@ export function createApp(dependencies: AppDependencies = {}): Express {
 
   app.use("/api", createHealthRouter());
   app.use("/api", createAdminConfigRouter(configRepository));
+  app.use("/api", createAdminOperatorLimitsRouter(operatorLimitsRepository));
   app.use("/api", createSessionsRouter(sessionService));
   app.use("/api", createSpinsRouter(spinService));
   app.use(notFoundHandler);
