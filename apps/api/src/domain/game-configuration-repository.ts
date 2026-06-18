@@ -1,4 +1,4 @@
-import type { GameConfiguration, RtpReport } from "@china-slot-game/game-math";
+import type { GameConfiguration, RtpReport, SimulationInput, SimulationResult } from "@china-slot-game/game-math";
 import { ApiHttpError } from "../middleware/error-handler.js";
 import type { Clock } from "./session-service.js";
 
@@ -31,6 +31,17 @@ export interface MathReportRecord {
   createdAt: Date;
 }
 
+export interface SimulationRunRecord {
+  id: string;
+  draftId: string;
+  configId: string;
+  configVersionId: string;
+  input: SimulationInput;
+  result: SimulationResult;
+  createdBy: string;
+  createdAt: Date;
+}
+
 export interface DraftConfigurationInput {
   id: string;
   config: GameConfiguration;
@@ -57,6 +68,13 @@ export interface AttachMathReportInput {
   actor: string;
 }
 
+export interface StoreSimulationRunInput {
+  draftId: string;
+  input: SimulationInput;
+  result: SimulationResult;
+  actor: string;
+}
+
 export interface GameConfigurationProvider {
   getActiveConfig(): GameConfiguration | undefined;
 }
@@ -64,6 +82,7 @@ export interface GameConfigurationProvider {
 export class InMemoryGameConfigurationRepository implements GameConfigurationProvider {
   private readonly records = new Map<string, GameConfigurationRecord>();
   private readonly mathReports = new Map<string, MathReportRecord>();
+  private readonly simulationRuns = new Map<string, SimulationRunRecord>();
 
   public constructor(private readonly clock: Clock = { now: () => new Date() }) {}
 
@@ -231,6 +250,44 @@ export class InMemoryGameConfigurationRepository implements GameConfigurationPro
     return report ? cloneMathReportRecord(report) : undefined;
   }
 
+  public storeSimulationRun(input: StoreSimulationRunInput): SimulationRunRecord {
+    const draft = this.requireRecord(input.draftId);
+    if (draft.status !== "draft") {
+      throw new ApiHttpError(409, {
+        code: "CONFIG_STATUS_CONFLICT",
+        message: "Simulation runs can only be stored for draft configurations.",
+        details: { id: input.draftId, status: draft.status }
+      });
+    }
+    const runId = `simulation_run_${this.simulationRuns.size + 1}`;
+    const run: SimulationRunRecord = {
+      id: runId,
+      draftId: input.draftId,
+      configId: input.result.configId,
+      configVersionId: input.result.configVersionId,
+      input: cloneSimulationInput(input.input),
+      result: cloneSimulationResult(input.result),
+      createdBy: input.actor,
+      createdAt: this.clock.now()
+    };
+    this.simulationRuns.set(runId, cloneSimulationRunRecord(run));
+    return cloneSimulationRunRecord(run);
+  }
+
+  public getSimulationRun(draftId: string, runId: string): SimulationRunRecord | undefined {
+    this.requireRecord(draftId);
+    const run = this.simulationRuns.get(runId);
+    return run && run.draftId === draftId ? cloneSimulationRunRecord(run) : undefined;
+  }
+
+  public listSimulationRuns(draftId: string): SimulationRunRecord[] {
+    this.requireRecord(draftId);
+    return [...this.simulationRuns.values()]
+      .filter((run) => run.draftId === draftId)
+      .sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime())
+      .map((run) => cloneSimulationRunRecord(run));
+  }
+
   public getActiveConfig(): GameConfiguration | undefined {
     const active = this.getActiveRecord();
     return active ? cloneConfig(active.config) : undefined;
@@ -298,6 +355,23 @@ function cloneMathReportRecord(record: MathReportRecord): MathReportRecord {
   return {
     ...record,
     report: cloneReport(record.report),
+    createdAt: new Date(record.createdAt)
+  };
+}
+
+function cloneSimulationInput(input: SimulationInput): SimulationInput {
+  return structuredClone(input) as SimulationInput;
+}
+
+function cloneSimulationResult(result: SimulationResult): SimulationResult {
+  return structuredClone(result) as SimulationResult;
+}
+
+function cloneSimulationRunRecord(record: SimulationRunRecord): SimulationRunRecord {
+  return {
+    ...record,
+    input: cloneSimulationInput(record.input),
+    result: cloneSimulationResult(record.result),
     createdAt: new Date(record.createdAt)
   };
 }

@@ -1,16 +1,18 @@
 import { Router } from "express";
 import { ZodError } from "zod";
-import { calculateRtpReport } from "@china-slot-game/game-math";
+import { calculateRtpReport, runSimulation } from "@china-slot-game/game-math";
 import type { GameConfigurationRecord, InMemoryGameConfigurationRepository } from "../domain/game-configuration-repository.js";
 import { ApiHttpError } from "../middleware/error-handler.js";
 import { okEnvelope } from "../schemas/api-envelope.js";
 import {
   attachMathReportRequestSchema,
   createDraftConfigRequestSchema,
+  runSimulationRequestSchema,
   updateDraftConfigRequestSchema
 } from "../schemas/admin-config.schema.js";
 
 type AdminRole = "operator" | "support" | "viewer";
+const maxSimulationDurationMs = 1_000;
 
 export function createAdminConfigRouter(configRepository: InMemoryGameConfigurationRepository): Router {
   const router = Router();
@@ -103,6 +105,90 @@ export function createAdminConfigRouter(configRepository: InMemoryGameConfigurat
     }
   });
 
+  router.post("/admin/configs/drafts/:id/simulations", (request, response, next) => {
+    try {
+      const actor = requireRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator"]);
+      const parsedRequest = runSimulationRequestSchema.parse(request.body);
+      const draft = configRepository.read(request.params.id ?? "");
+      if (!draft || draft.status !== "draft") {
+        throw new ApiHttpError(404, {
+          code: "CONFIG_NOT_FOUND",
+          message: "Draft configuration was not found.",
+          details: { id: request.params.id }
+        });
+      }
+      const mathReport = configRepository.getMathReportForDraft(draft.id);
+      if (!mathReport) {
+        throw new ApiHttpError(404, {
+          code: "MATH_REPORT_NOT_FOUND",
+          message: "A math report must be attached before simulation.",
+          details: { id: draft.id }
+        });
+      }
+      if (mathReport.report.diagnostics.some((diagnostic) => diagnostic.severity === "error")) {
+        throw new ApiHttpError(409, {
+          code: "CONFIG_MATH_REPORT_BLOCKED",
+          message: "Draft configuration has blocking math diagnostics.",
+          details: { id: draft.id, mathReportId: mathReport.id }
+        });
+      }
+
+      const simulationInput = {
+        spinCount: parsedRequest.spinCount,
+        ...(parsedRequest.seed ? { seed: parsedRequest.seed } : {}),
+        ...(parsedRequest.wager ? { wager: parsedRequest.wager } : {}),
+        theoreticalRtp: mathReport.report.theoreticalRtp
+      };
+      const startedAt = Date.now();
+      const result = runSimulation(draft.config, simulationInput);
+      const durationMs = Date.now() - startedAt;
+      if (durationMs > maxSimulationDurationMs) {
+        throw new ApiHttpError(409, {
+          code: "SIMULATION_LIMIT_EXCEEDED",
+          message: "Simulation exceeded the configured runtime limit.",
+          details: { durationMs, maxSimulationDurationMs }
+        });
+      }
+      const simulationRun = configRepository.storeSimulationRun({
+        draftId: draft.id,
+        input: simulationInput,
+        result,
+        actor
+      });
+      response.status(201).json(okEnvelope({ simulationRun: serializeSimulationRun(simulationRun) }, request.requestId));
+    } catch (error) {
+      next(normalizeDraftError(error, "INVALID_SIMULATION_REQUEST"));
+    }
+  });
+
+  router.get("/admin/configs/drafts/:id/simulations", (request, response, next) => {
+    try {
+      requireRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
+      const simulationRuns = configRepository.listSimulationRuns(request.params.id ?? "")
+        .map((run) => serializeSimulationRun(run));
+      response.status(200).json(okEnvelope({ simulationRuns }, request.requestId));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get("/admin/configs/drafts/:id/simulations/:runId", (request, response, next) => {
+    try {
+      requireRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
+      const simulationRun = configRepository.getSimulationRun(request.params.id ?? "", request.params.runId ?? "");
+      if (!simulationRun) {
+        throw new ApiHttpError(404, {
+          code: "SIMULATION_NOT_FOUND",
+          message: "Simulation run was not found.",
+          details: { id: request.params.id, runId: request.params.runId }
+        });
+      }
+      response.status(200).json(okEnvelope({ simulationRun: serializeSimulationRun(simulationRun) }, request.requestId));
+    } catch (error) {
+      next(error);
+    }
+  });
+
   router.get("/admin/configs/drafts/:id", (request, response, next) => {
     try {
       requireRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
@@ -181,6 +267,28 @@ function serializeMathReport(record: {
     configId: record.configId,
     configVersionId: record.configVersionId,
     report: record.report,
+    createdBy: record.createdBy,
+    createdAt: record.createdAt.toISOString()
+  };
+}
+
+function serializeSimulationRun(record: {
+  id: string;
+  draftId: string;
+  configId: string;
+  configVersionId: string;
+  input: unknown;
+  result: unknown;
+  createdBy: string;
+  createdAt: Date;
+}): Record<string, unknown> {
+  return {
+    id: record.id,
+    draftId: record.draftId,
+    configId: record.configId,
+    configVersionId: record.configVersionId,
+    input: record.input,
+    result: record.result,
     createdBy: record.createdBy,
     createdAt: record.createdAt.toISOString()
   };

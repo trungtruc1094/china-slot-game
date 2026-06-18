@@ -125,6 +125,17 @@ export const attachMathReportRequestSchema = z.object({
   }).optional()
 });
 
+export const runSimulationRequestSchema = z.object({
+  spinCount: positiveIntegerSchema.max(10_000),
+  seed: z.string().trim().min(1).max(128).optional(),
+  wager: z.object({
+    lineBet: positiveIntegerSchema,
+    selectedWays: positiveIntegerSchema,
+    totalWager: positiveIntegerSchema
+  }).optional()
+});
+
 export type CreateDraftConfigRequest = z.infer<typeof createDraftConfigRequestSchema>;
 export type UpdateDraftConfigRequest = z.infer<typeof updateDraftConfigRequestSchema>;
 export type AttachMathReportRequest = z.infer<typeof attachMathReportRequestSchema>;
+export type RunSimulationRequest = z.infer<typeof runSimulationRequestSchema>;
