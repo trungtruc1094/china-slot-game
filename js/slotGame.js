@@ -167,6 +167,11 @@ class SlotGame extends Phaser.Scene{
         this.guiController = new GuiController(this);
         this.slotControls = new SlotControls(this, this.slotPlayer, slotConfig.lines, slotConfig.lineColor, slotConfig.lineBetMaxValue, slotConfig.jackpot.defaultAmount);
         this.winController = new WinController(this, this.slotControls.linesController, slotConfig.useScatter, slotConfig.scatter, slotConfig.jackpot, slotConfig.winShowTime);
+        this.serverClient = (window.ChinaSlotServerClient) ? window.ChinaSlotServerClient.createFromWindow() : null;
+        this.backendSpinResult = null;
+        this.backendSpinPlan = null;
+        this.backendSpinPending = false;
+        this.backendSpinStatus = (this.serverClient && this.serverClient.mode === "production") ? "idle" : "demo";
    
         // 5) add sounds 
         this.box_click_clip = this.sound.add('box_click_clip');
@@ -241,6 +246,22 @@ class SlotGame extends Phaser.Scene{
 
     runSlot()
     {
+        if (this.isBackendProductionMode() && this.backendSpinResult === null) {
+            this.requestBackendSpin();
+            return;
+        }
+
+        const backendResult = this.backendSpinResult;
+        const backendPlan = (this.isBackendProductionMode() && backendResult && window.ChinaSlotServerClient)
+            ? window.ChinaSlotServerClient.resolveSpinRenderPlan({
+                mode: "production",
+                backendResult: backendResult,
+                reelCount: this.reels.length
+            })
+            : null;
+        this.backendSpinPlan = backendPlan;
+        this.backendSpinResult = null;
+
         // 0) prepare, set flags
         let anyWin = false;
         let lineCoins = 0;          // lines win coins
@@ -256,7 +277,7 @@ class SlotGame extends Phaser.Scene{
         if(this.winCorout !== null) this.winCorout.stop();
         if(this.freeInputWinCorout !== null) this.freeInputWinCorout.stop();
         this.lampsBlink(false);
-        this.slotControls.addJackpotAmount(slotConfig.jackpot.increaseValue);
+        if (!backendPlan) this.slotControls.addJackpotAmount(slotConfig.jackpot.increaseValue);
 
         // 1) start spin sound
         this.soundController.stopSounds(); // this.soundController.stopAll(); 
@@ -265,7 +286,7 @@ class SlotGame extends Phaser.Scene{
         // 2) create spin sequence
         this.spinCount++;
         var sA = new SequencedActions();
-        sA.add((callBack) =>{spinReels(this.reels, slotConfig, callBack);}, this);
+        sA.add((callBack) =>{spinReels(this.reels, slotConfig, callBack, backendPlan ? backendPlan.reelStopPositions : null);}, this);
         sA.add((callBack) =>{
             console.log('spin complete');
             this.soundController.stopSounds(); // this.soundController.stopAll(); 
@@ -278,15 +299,15 @@ class SlotGame extends Phaser.Scene{
             }, this);  // search spin result
 
         sA.add((callBack) =>{
-            anyWin = this.winController.hasAnyWinn(); 
+            anyWin = backendPlan ? backendPlan.payout > 0 || backendPlan.freeSpinState.awarded > 0 || backendPlan.jackpotState.awarded > 0 : this.winController.hasAnyWinn(); 
             if(anyWin)
             {
-                lineCoins = this.winController.getLineWinCoins();
-                scatterCoins = this.winController.getScatterWinCoins();
-                jpCoins = this.winController.getJackpotWinCoins();
-                if(jpCoins > 0) this.jackPotWinEvent.events.forEach((eW)=>{if (eW != null && eW.action != null) eW.action.call(eW.context, wjpCoins);}); 
+                lineCoins = backendPlan ? backendPlan.payout : this.winController.getLineWinCoins();
+                scatterCoins = backendPlan ? 0 : this.winController.getScatterWinCoins();
+                jpCoins = backendPlan ? backendPlan.jackpotState.awarded : this.winController.getJackpotWinCoins();
+                if(jpCoins > 0) this.jackPotWinEvent.events.forEach((eW)=>{if (eW != null && eW.action != null) eW.action.call(eW.context, jpCoins);}); 
 
-                if (this.useLineBetMultiplier) 
+                if (!backendPlan && this.useLineBetMultiplier) 
                 {
                     lineCoins *= this.slotControls.lineBet;
                     scatterCoins *= this.slotControls.lineBet; 
@@ -294,14 +315,15 @@ class SlotGame extends Phaser.Scene{
                 var summCoins = jpCoins + lineCoins + scatterCoins;
                 if (summCoins > 0) this.winCoinsEvent.events.forEach((eW)=>{if (eW != null && eW.action != null) eW.action.call(eW.context, summCoins);}); 
 
-                winSpins = this.winController.getWinSpins();
-                if (this.useLineBetFreeSpinMultiplier) winSpins *= this.slotControls.lineBet;
+                winSpins = backendPlan ? backendPlan.freeSpinState.awarded : this.winController.getWinSpins();
+                if (!backendPlan && this.useLineBetFreeSpinMultiplier) winSpins *= this.slotControls.lineBet;
                 if (winSpins > 0) this.freeSpinWinEvent.events.forEach((eW)=>{if (eW != null && eW.action != null) eW.action.call(eW.context, winSpins);}); 
             }
             else
             {
                 this.isCascadeSpin = false;
             }
+            if (backendPlan) this.applyBackendSpinPlanDisplay(backendPlan);
             this.endWinCalcEvent.events.forEach((eW)=>{if (eW != null && eW.action != null) eW.action.call(eW.context, anyWin);});   // start win show or loose show
             callBack();
         }, this);
@@ -309,6 +331,69 @@ class SlotGame extends Phaser.Scene{
         sA.add((callBack) =>{callBack();}, this);
 
         sA.start();
+    }
+
+    isBackendProductionMode()
+    {
+        return this.serverClient !== null && this.serverClient.mode === "production";
+    }
+
+    createClientSpinId()
+    {
+        return "client-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2);
+    }
+
+    createBackendWager()
+    {
+        var selectedWays = (slotConfig.waysPolicy && slotConfig.waysPolicy.totalWays) || slotConfig.selectedWays || 243;
+        var lineBet = this.slotControls.lineBet;
+
+        return {
+            lineBet: lineBet,
+            selectedWays: selectedWays,
+            totalWager: lineBet * selectedWays
+        };
+    }
+
+    requestBackendSpin()
+    {
+        if (this.backendSpinPending) return;
+
+        this.backendSpinPending = true;
+        this.backendSpinStatus = "pending";
+        this.slotControls.setSpinButtonText("WAIT");
+        this.slotControls.setControlActivity(false, false, false);
+
+        this.serverClient.spin({
+            clientSpinId: this.createClientSpinId(),
+            wager: this.createBackendWager()
+        }).then((result) => {
+            this.backendSpinResult = result;
+            this.backendSpinPending = false;
+            this.backendSpinStatus = "ready";
+            this.runSlot();
+        }).catch((error) => {
+            this.backendSpinPending = false;
+            this.backendSpinStatus = "retry";
+            this.backendSpinPlan = window.ChinaSlotServerClient ? window.ChinaSlotServerClient.buildRetryState(error) : null;
+            this.slotControls.setSpinButtonText("RETRY");
+            this.slotControls.setControlActivity(true, true, true);
+            if (this.slotControls.auto) this.slotControls.resetAutoSpinsMode();
+            if (this.guiController && this.guiController.showMessage) {
+                var message = this.guiController.showMessage("Backend unavailable", (error && error.message) || "Please retry the spin.", this, () => {
+                    this.guiController.closePopUp(message);
+                });
+            }
+            this.stateMachine.changeState(this.iddleState);
+        });
+    }
+
+    applyBackendSpinPlanDisplay(backendPlan)
+    {
+        this.slotPlayer.setWinCoinsCount(backendPlan.payout);
+        this.slotPlayer.setCoinsCount(backendPlan.balanceAfter);
+        this.slotControls.setFreeSpinsCount(backendPlan.freeSpinState.remaining);
+        this.slotControls.setJackpotAmount(backendPlan.jackpotState.awarded);
     }
 
     // add sprite relative to scene center
@@ -360,11 +445,13 @@ class SlotGame extends Phaser.Scene{
         }
 
         //3c0 -----------------calc coins -------------------
-        let jpCoins = this.winController.getJackpotWinCoins();
-        let winCoins = this.winController.getLineWinCoins() + this.winController.getScatterWinCoins();
-        if (this.useLineBetMultiplier) winCoins *= this.slotControls.lineBet;
+        let backendPlan = this.backendSpinPlan;
+        let jpCoins = backendPlan ? backendPlan.jackpotState.awarded : this.winController.getJackpotWinCoins();
+        let winCoins = backendPlan ? backendPlan.payout : this.winController.getLineWinCoins() + this.winController.getScatterWinCoins();
+        if (!backendPlan && this.useLineBetMultiplier) winCoins *= this.slotControls.lineBet;
         this.slotPlayer.setWinCoinsCount(winCoins + jpCoins);
-        this.slotPlayer.addCoins(winCoins + jpCoins);
+        if (backendPlan) this.applyBackendSpinPlanDisplay(backendPlan);
+        else this.slotPlayer.addCoins(winCoins + jpCoins);
        
         while(this.miniGame !== null || !this.guiController.hasNoPopUp())
         {
@@ -380,9 +467,9 @@ class SlotGame extends Phaser.Scene{
         }
 
         //3c1 ----------- calc free spins ----------------
-        let winSpins = this.winController.getWinSpins();
+        let winSpins = backendPlan ? backendPlan.freeSpinState.awarded : this.winController.getWinSpins();
         let winLinesCount = this.winController.winLines.length;
-        if (this.useLineBetFreeSpinMultiplier) winSpins *= this.slotControls.lineBet;
+        if (!backendPlan && this.useLineBetFreeSpinMultiplier) winSpins *= this.slotControls.lineBet;
 
         // win coins, big win, win spins sounds and messages
         let bigWin = (winCoins > 0 && winCoins >= this.slotPlayer.minWin && this.slotPlayer.useBigWinCongratulation);
@@ -415,7 +502,8 @@ class SlotGame extends Phaser.Scene{
             }, winCoins > 0 ? 1500 : 100);
             
         }
-        this.slotControls.addFreeSpins(winSpins);
+        if (backendPlan) this.applyBackendSpinPlanDisplay(backendPlan);
+        else this.slotControls.addFreeSpins(winSpins);
         while(this.miniGame !== null || !this.guiController.hasNoPopUp())
         {
             yield null;
@@ -675,14 +763,14 @@ function getSymboldData(_slotConfig, spriteName)
     return null;
 } 
 
-function spinReels(reels, _slotConfig, completeCallback){
+function spinReels(reels, _slotConfig, completeCallback, forcedOrderPositions){
 
     var pA = new ParallelActions();
     var ri = 0;
     reels.forEach((r)=>{
         pA.add((callBack)=>
         {
-            var rand = (_slotConfig.reels_simulate && _slotConfig.reels_simulate[ri] >= 0) ? _slotConfig.reels_simulate[ri] : r.getRandomOrderPosition();
+            var rand = (forcedOrderPositions && forcedOrderPositions[ri] !== undefined) ? forcedOrderPositions[ri] : ((_slotConfig.reels_simulate && _slotConfig.reels_simulate[ri] >= 0) ? _slotConfig.reels_simulate[ri] : r.getRandomOrderPosition());
             r.spin(rand, ()=>{callBack();}); 
             ri++;
         });         

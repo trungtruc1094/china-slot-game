@@ -204,7 +204,9 @@ class AutoSpinState
         this.slotControls.setSpinButtonText("SPIN");
         this.slotControls.setControlActivity(false, true, true);
         console.log(this.toString() + " - run auto spin");
-        this.slotControls.applyBet();
+        if (!this.stateObject.isBackendProductionMode || !this.stateObject.isBackendProductionMode()) {
+            this.slotControls.applyBet();
+        }
         this.stateObject.runSlot();
      }
 
@@ -300,7 +302,9 @@ class NormalSpinState
         this.slotControls.setSpinButtonText('SPIN');
         this.slotControls.setControlActivity(false, false,false);       // activity, spinButtonAcivity, autoSpinButtonAcivity
         console.log(this.toString() + '  - run normal spin');
-        this.slotControls.applyBet();
+        if (!this.stateObject.isBackendProductionMode || !this.stateObject.isBackendProductionMode()) {
+            this.slotControls.applyBet();
+        }
         this.stateObject.runSlot();
     }
 
@@ -590,7 +594,9 @@ class EndLessSpinState
         this.slotControls.setControlActivity(false, true, false);       // activity, spinButtonAcivity, autoSpinButtonAcivity
 
         console.log(this.toString() + "  - run endless spin");
-        this.slotControls.applyBet();
+        if (!this.stateObject.isBackendProductionMode || !this.stateObject.isBackendProductionMode()) {
+            this.slotControls.applyBet();
+        }
         this.stateObject.runSlotEndLess();
     }
 
