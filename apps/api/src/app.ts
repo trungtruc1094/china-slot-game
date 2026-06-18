@@ -4,10 +4,11 @@ import helmet from "helmet";
 import { errorHandler, notFoundHandler } from "./middleware/error-handler.js";
 import { requestIdMiddleware } from "./middleware/request-id.js";
 import { createHealthRouter } from "./routes/health.routes.js";
+import { createAdminConfigRouter } from "./routes/admin-config.routes.js";
 import { createSessionsRouter } from "./routes/sessions.routes.js";
 import { createSpinsRouter } from "./routes/spins.routes.js";
 import { InMemoryPlayerIdentityAdapter } from "./domain/player-identity.js";
-import type { GameConfigurationProvider } from "./domain/game-configuration-repository.js";
+import { InMemoryGameConfigurationRepository, type GameConfigurationProvider } from "./domain/game-configuration-repository.js";
 import { SessionService, type Clock } from "./domain/session-service.js";
 import { SpinService } from "./domain/spin-service.js";
 import type { SpinServiceOptions } from "./domain/spin-service.js";
@@ -17,6 +18,7 @@ import type { GameConfiguration } from "@china-slot-game/game-math";
 export interface AppDependencies {
   clock?: Clock;
   activeConfig?: GameConfiguration;
+  configRepository?: InMemoryGameConfigurationRepository;
   configProvider?: GameConfigurationProvider;
   nextRandom?: () => number;
   failLedgerCommit?: SpinServiceOptions["failLedgerCommit"];
@@ -32,13 +34,14 @@ export function createApp(dependencies: AppDependencies = {}): Express {
     dependencies.clock
   );
   const walletService = dependencies.walletService ?? new WalletService(dependencies.clock ?? { now: () => new Date() });
+  const configRepository = dependencies.configRepository ?? new InMemoryGameConfigurationRepository(
+    dependencies.clock ?? { now: () => new Date() }
+  );
   const spinOptions: SpinServiceOptions = {};
   if (dependencies.activeConfig) {
     spinOptions.activeConfig = dependencies.activeConfig;
   }
-  if (dependencies.configProvider) {
-    spinOptions.configProvider = dependencies.configProvider;
-  }
+  spinOptions.configProvider = dependencies.configProvider ?? configRepository;
   if (dependencies.nextRandom) {
     spinOptions.nextRandom = dependencies.nextRandom;
   }
@@ -59,6 +62,7 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use(express.json({ limit: "1mb" }));
 
   app.use("/api", createHealthRouter());
+  app.use("/api", createAdminConfigRouter(configRepository));
   app.use("/api", createSessionsRouter(sessionService));
   app.use("/api", createSpinsRouter(spinService));
   app.use(notFoundHandler);
