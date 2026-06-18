@@ -5,8 +5,10 @@ import type { GameConfigurationRecord, InMemoryGameConfigurationRepository } fro
 import { ApiHttpError } from "../middleware/error-handler.js";
 import { okEnvelope } from "../schemas/api-envelope.js";
 import {
+  activateDraftRequestSchema,
   attachMathReportRequestSchema,
   createDraftConfigRequestSchema,
+  rollbackConfigRequestSchema,
   runSimulationRequestSchema,
   updateDraftConfigRequestSchema
 } from "../schemas/admin-config.schema.js";
@@ -189,6 +191,70 @@ export function createAdminConfigRouter(configRepository: InMemoryGameConfigurat
     }
   });
 
+  router.post("/admin/configs/drafts/:id/activate", (request, response, next) => {
+    try {
+      const actor = requireRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator"]);
+      const parsedRequest = activateDraftRequestSchema.parse(request.body);
+      const draft = configRepository.read(request.params.id ?? "");
+      if (!draft || draft.status !== "draft") {
+        throw new ApiHttpError(draft ? 409 : 404, {
+          code: draft ? "CONFIG_STATUS_CONFLICT" : "CONFIG_NOT_FOUND",
+          message: draft ? "Only draft configurations can be activated." : "Draft configuration was not found.",
+          details: { id: request.params.id, status: draft?.status }
+        });
+      }
+      const mathReport = configRepository.getMathReportForDraft(draft.id);
+      if (!mathReport) {
+        throw new ApiHttpError(404, {
+          code: "MATH_REPORT_NOT_FOUND",
+          message: "A math report must be attached before activation.",
+          details: { id: draft.id }
+        });
+      }
+      const simulationRuns = configRepository.listSimulationRuns(draft.id);
+      if (simulationRuns.length === 0) {
+        throw new ApiHttpError(404, {
+          code: "SIMULATION_NOT_FOUND",
+          message: "At least one simulation run must exist before activation.",
+          details: { id: draft.id }
+        });
+      }
+      const activeConfig = configRepository.activateDraft({
+        id: draft.id,
+        actor,
+        ...(parsedRequest.reason ? { reason: parsedRequest.reason } : {})
+      });
+      response.status(200).json(okEnvelope({ activeConfig: serializeRecord(activeConfig) }, request.requestId));
+    } catch (error) {
+      next(normalizeDraftError(error, "INVALID_ACTIVATION_REQUEST"));
+    }
+  });
+
+  router.post("/admin/configs/rollback", (request, response, next) => {
+    try {
+      const actor = requireRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator"]);
+      const parsedRequest = rollbackConfigRequestSchema.parse(request.body);
+      const activeConfig = configRepository.rollbackToVersion({
+        targetVersionId: parsedRequest.targetVersionId,
+        actor,
+        ...(parsedRequest.reason ? { reason: parsedRequest.reason } : {})
+      });
+      response.status(200).json(okEnvelope({ activeConfig: serializeRecord(activeConfig) }, request.requestId));
+    } catch (error) {
+      next(normalizeDraftError(error, "INVALID_ACTIVATION_REQUEST"));
+    }
+  });
+
+  router.get("/admin/configs/audit-events", (request, response, next) => {
+    try {
+      requireRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
+      const auditEvents = configRepository.listAuditEvents().map((event) => serializeAuditEvent(event));
+      response.status(200).json(okEnvelope({ auditEvents }, request.requestId));
+    } catch (error) {
+      next(error);
+    }
+  });
+
   router.get("/admin/configs/drafts/:id", (request, response, next) => {
     try {
       requireRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
@@ -290,6 +356,26 @@ function serializeSimulationRun(record: {
     input: record.input,
     result: record.result,
     createdBy: record.createdBy,
+    createdAt: record.createdAt.toISOString()
+  };
+}
+
+function serializeAuditEvent(record: {
+  id: string;
+  action: string;
+  targetId: string;
+  actor: string;
+  reason?: string;
+  metadata: Record<string, unknown>;
+  createdAt: Date;
+}): Record<string, unknown> {
+  return {
+    id: record.id,
+    action: record.action,
+    targetId: record.targetId,
+    actor: record.actor,
+    reason: record.reason ?? null,
+    metadata: record.metadata,
     createdAt: record.createdAt.toISOString()
   };
 }

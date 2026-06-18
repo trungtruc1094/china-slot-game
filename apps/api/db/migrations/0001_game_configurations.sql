@@ -42,8 +42,8 @@ BEGIN
       RAISE EXCEPTION 'active game configurations may only remain active or become retired';
     END IF;
 
-    IF OLD.status = 'retired' AND NEW.status <> 'retired' THEN
-      RAISE EXCEPTION 'retired game configurations cannot be reactivated in place';
+    IF OLD.status = 'retired' AND NEW.status NOT IN ('retired', 'active') THEN
+      RAISE EXCEPTION 'retired game configurations may only remain retired or become active during rollback';
     END IF;
 
     IF OLD.status = 'draft' AND NEW.status = 'retired' THEN

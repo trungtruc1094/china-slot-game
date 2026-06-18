@@ -42,6 +42,18 @@ export interface SimulationRunRecord {
   createdAt: Date;
 }
 
+export type AdminAuditAction = "config.activate" | "config.rollback";
+
+export interface AdminAuditEventRecord {
+  id: string;
+  action: AdminAuditAction;
+  targetId: string;
+  actor: string;
+  reason?: string;
+  metadata: Record<string, unknown>;
+  createdAt: Date;
+}
+
 export interface DraftConfigurationInput {
   id: string;
   config: GameConfiguration;
@@ -58,6 +70,12 @@ export interface UpdateDraftConfigurationInput {
 
 export interface ActivationInput {
   id: string;
+  actor: string;
+  reason?: string;
+}
+
+export interface RollbackInput {
+  targetVersionId: string;
   actor: string;
   reason?: string;
 }
@@ -83,6 +101,7 @@ export class InMemoryGameConfigurationRepository implements GameConfigurationPro
   private readonly records = new Map<string, GameConfigurationRecord>();
   private readonly mathReports = new Map<string, MathReportRecord>();
   private readonly simulationRuns = new Map<string, SimulationRunRecord>();
+  private readonly auditEvents: AdminAuditEventRecord[] = [];
 
   public constructor(private readonly clock: Clock = { now: () => new Date() }) {}
 
@@ -196,7 +215,80 @@ export class InMemoryGameConfigurationRepository implements GameConfigurationPro
     };
     this.assertNoOtherActive(activated.id);
     this.records.set(activated.id, cloneRecord(activated));
+    this.auditEvents.push(cloneAuditEvent({
+      id: `audit_event_${this.auditEvents.length + 1}`,
+      action: "config.activate",
+      targetId: activated.id,
+      actor: input.actor,
+      ...(input.reason ? { reason: input.reason } : {}),
+      metadata: {
+        versionId: activated.versionId,
+        versionNumber: activated.versionNumber,
+        mathReportId: activated.mathReportId ?? null
+      },
+      createdAt: now
+    }));
     return cloneRecord(activated);
+  }
+
+  public rollbackToVersion(input: RollbackInput): GameConfigurationRecord {
+    const target = [...this.records.values()].find((record) => record.versionId === input.targetVersionId);
+    if (!target) {
+      throw new ApiHttpError(404, {
+        code: "CONFIG_NOT_FOUND",
+        message: "Rollback target configuration version was not found.",
+        details: { versionId: input.targetVersionId }
+      });
+    }
+    if (target.status === "draft") {
+      throw new ApiHttpError(409, {
+        code: "CONFIG_STATUS_CONFLICT",
+        message: "Rollback target must be an activated configuration version.",
+        details: { versionId: input.targetVersionId, status: target.status }
+      });
+    }
+
+    const now = this.clock.now();
+    const previousActive = this.getActiveRecord();
+    for (const record of this.records.values()) {
+      if (record.status === "active" && record.id !== target.id) {
+        this.records.set(record.id, cloneRecord({
+          ...record,
+          status: "retired",
+          updatedBy: input.actor,
+          updatedAt: now
+        }));
+      }
+    }
+
+    const rolledBack: GameConfigurationRecord = {
+      ...target,
+      status: "active",
+      activatedBy: input.actor,
+      activatedAt: now,
+      updatedBy: input.actor,
+      updatedAt: now,
+      config: cloneConfig(target.config)
+    };
+    this.records.set(rolledBack.id, cloneRecord(rolledBack));
+    this.auditEvents.push(cloneAuditEvent({
+      id: `audit_event_${this.auditEvents.length + 1}`,
+      action: "config.rollback",
+      targetId: rolledBack.id,
+      actor: input.actor,
+      ...(input.reason ? { reason: input.reason } : {}),
+      metadata: {
+        targetVersionId: input.targetVersionId,
+        previousActiveVersionId: previousActive?.versionId ?? null,
+        restoredConfig: cloneConfig(rolledBack.config)
+      },
+      createdAt: now
+    }));
+    return cloneRecord(rolledBack);
+  }
+
+  public listAuditEvents(): AdminAuditEventRecord[] {
+    return this.auditEvents.map((event) => cloneAuditEvent(event));
   }
 
   public getActiveRecord(): GameConfigurationRecord | undefined {
@@ -372,6 +464,14 @@ function cloneSimulationRunRecord(record: SimulationRunRecord): SimulationRunRec
     ...record,
     input: cloneSimulationInput(record.input),
     result: cloneSimulationResult(record.result),
+    createdAt: new Date(record.createdAt)
+  };
+}
+
+function cloneAuditEvent(record: AdminAuditEventRecord): AdminAuditEventRecord {
+  return {
+    ...record,
+    metadata: structuredClone(record.metadata) as Record<string, unknown>,
     createdAt: new Date(record.createdAt)
   };
 }

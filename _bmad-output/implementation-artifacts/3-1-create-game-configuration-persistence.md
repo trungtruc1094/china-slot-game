@@ -18,7 +18,7 @@ As a host, I want draft and active game configurations stored separately, so tha
 ## Dev Notes
 
 - Persistence is modeled with PostgreSQL migration `apps/api/db/migrations/0001_game_configurations.sql`. The migration has reversible `up` and `down` sections.
-- DB-level integrity is documented in the migration: status is constrained by `game_config_status`, active uniqueness is enforced by the partial unique index `game_config_versions_one_active`, status transitions are guarded by `enforce_game_config_status_transition()`, and activated configs must have `version_number` and `activated_at`.
+- DB-level integrity is documented in the migration: status is constrained by `game_config_status`, active uniqueness is enforced by the partial unique index `game_config_versions_one_active`, status transitions are guarded by `enforce_game_config_status_transition()`, rollback may promote a retired version back to active, and activated configs must have `version_number` and `activated_at`.
 - Runtime tests use `InMemoryGameConfigurationRepository` because this repo does not yet ship a Postgres test harness. The in-memory repository mirrors the migration constraints so acceptance tests can run in `npm test`.
 - Drafts are never returned to live spins: `SpinService` reads through `GameConfigurationProvider.getActiveConfig()` and only receives active immutable versions.
 - Public API/contract introduced for application code: `GameConfigurationProvider.getActiveConfig()` returns the active `GameConfiguration` or `undefined`; `InMemoryGameConfigurationRepository` methods throw `ApiHttpError` with `CONFIG_NOT_FOUND`, `CONFIG_STATUS_CONFLICT`, or `CONFIG_VERSION_CONFLICT` for invalid persistence operations.

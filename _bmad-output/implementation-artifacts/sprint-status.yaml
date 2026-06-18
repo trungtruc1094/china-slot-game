@@ -59,12 +59,12 @@ development_status:
   2-6-integrate-phaser-client-with-backend-spin-results: done
   epic-2-retrospective: done
 
-  epic-3: in-progress
+  epic-3: done
   3-1-create-game-configuration-persistence: done
   3-2-create-draft-configuration-api: done
   3-3-attach-math-reports-to-draft-configurations: done
   3-4-run-and-store-simulation-batches: done
-  3-5-activate-and-roll-back-configurations: backlog
+  3-5-activate-and-roll-back-configurations: done
   epic-3-retrospective: optional
 
   epic-4: backlog

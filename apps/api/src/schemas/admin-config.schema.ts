@@ -135,7 +135,18 @@ export const runSimulationRequestSchema = z.object({
   }).optional()
 });
 
+export const activateDraftRequestSchema = z.object({
+  reason: z.string().trim().min(1).max(500).optional()
+});
+
+export const rollbackConfigRequestSchema = z.object({
+  targetVersionId: z.string().trim().min(1).max(128),
+  reason: z.string().trim().min(1).max(500).optional()
+});
+
 export type CreateDraftConfigRequest = z.infer<typeof createDraftConfigRequestSchema>;
 export type UpdateDraftConfigRequest = z.infer<typeof updateDraftConfigRequestSchema>;
 export type AttachMathReportRequest = z.infer<typeof attachMathReportRequestSchema>;
 export type RunSimulationRequest = z.infer<typeof runSimulationRequestSchema>;
+export type ActivateDraftRequest = z.infer<typeof activateDraftRequestSchema>;
+export type RollbackConfigRequest = z.infer<typeof rollbackConfigRequestSchema>;
