@@ -9,6 +9,7 @@ import {
 } from "@china-slot-game/game-math";
 import { ApiHttpError } from "../middleware/error-handler.js";
 import type { GameConfigurationProvider } from "./game-configuration-repository.js";
+import type { OperatorLimitRecord, OperatorLimitsProvider } from "./operator-limits-repository.js";
 import type { Clock, SessionService } from "./session-service.js";
 import type { WalletService, WalletTransactionRecord, WalletTransactionRequest } from "./wallet-service.js";
 
@@ -47,6 +48,8 @@ const idempotencyRetryWindowMs = 24 * 60 * 60 * 1000;
 export interface SpinServiceOptions {
   activeConfig?: GameConfiguration;
   configProvider?: GameConfigurationProvider;
+  operatorLimitsProvider?: OperatorLimitsProvider;
+  operatorLimitsScopeId?: string;
   nextRandom?: () => number;
   failLedgerCommit?: (response: SpinResponse) => boolean;
 }
@@ -101,6 +104,10 @@ export class SpinService {
     this.validateWager(config, request.wager);
 
     const session = this.sessions.getActiveSession(request.sessionId);
+    const activeLimits = this.options.operatorLimitsProvider?.getActiveLimits(this.options.operatorLimitsScopeId ?? "default");
+    if (activeLimits) {
+      this.validateOperatorLimits(activeLimits, session.playerId, request.sessionId, request.wager);
+    }
     const reelStops = this.sampleReelStops(config);
     const visibleWindow = buildVisibleWindow(config, reelStops);
     const winBreakdown = calculateWins(config, visibleWindow);
@@ -189,6 +196,56 @@ export class SpinService {
     }
   }
 
+  private validateOperatorLimits(
+    activeLimits: OperatorLimitRecord,
+    playerId: string,
+    sessionId: string,
+    wager: WagerInput
+  ): void {
+    const limits = activeLimits.limits;
+    if (wager.lineBet < limits.perSpin.minBet) {
+      throw limitExceeded(activeLimits.scopeId, "perSpin.minBet", wager.lineBet, wager.lineBet, limits.perSpin.minBet);
+    }
+    if (wager.lineBet > limits.perSpin.maxBet) {
+      throw limitExceeded(activeLimits.scopeId, "perSpin.maxBet", wager.lineBet, wager.lineBet, limits.perSpin.maxBet);
+    }
+    if (limits.perSpin.maxPayout > limits.campaign.budget) {
+      throw limitExceeded(activeLimits.scopeId, "campaign.budget", this.totalPaid(), limits.perSpin.maxPayout, limits.campaign.budget);
+    }
+
+    const sessionLedger = this.ledger.filter((entry) => entry.sessionId === sessionId);
+    if (sessionLedger.length + 1 > limits.perSession.maxSpins) {
+      throw limitExceeded(activeLimits.scopeId, "perSession.maxSpins", sessionLedger.length, 1, limits.perSession.maxSpins);
+    }
+    const sessionWagered = sessionLedger.reduce((total, entry) => total + entry.wager.totalWager, 0);
+    if (sessionWagered + wager.totalWager > limits.perSession.maxWager) {
+      throw limitExceeded(activeLimits.scopeId, "perSession.maxWager", sessionWagered, wager.totalWager, limits.perSession.maxWager);
+    }
+
+    const playerLedger = this.ledger.filter((entry) => entry.playerId === playerId);
+    const playerWagered = playerLedger.reduce((total, entry) => total + entry.wager.totalWager, 0);
+    if (playerWagered + wager.totalWager > limits.perDay.playerMaxWager) {
+      throw limitExceeded(activeLimits.scopeId, "perDay.playerMaxWager", playerWagered, wager.totalWager, limits.perDay.playerMaxWager);
+    }
+    const playerPaid = playerLedger.reduce((total, entry) => total + entry.payout, 0);
+    if (playerPaid + limits.perSpin.maxPayout > limits.perDay.playerMaxReward) {
+      throw limitExceeded(activeLimits.scopeId, "perDay.playerMaxReward", playerPaid, limits.perSpin.maxPayout, limits.perDay.playerMaxReward);
+    }
+
+    const campaignPaid = this.totalPaid();
+    if (campaignPaid + limits.perSpin.maxPayout > limits.campaign.budget) {
+      throw limitExceeded(activeLimits.scopeId, "campaign.budget", campaignPaid, limits.perSpin.maxPayout, limits.campaign.budget);
+    }
+    const jackpotAwarded = this.ledger.reduce((total, entry) => total + entry.jackpotState.awarded, 0);
+    if (jackpotAwarded + limits.perSpin.maxPayout > limits.campaign.jackpotCap) {
+      throw limitExceeded(activeLimits.scopeId, "campaign.jackpotCap", jackpotAwarded, limits.perSpin.maxPayout, limits.campaign.jackpotCap);
+    }
+  }
+
+  private totalPaid(): number {
+    return this.ledger.reduce((total, entry) => total + entry.payout, 0);
+  }
+
   private sampleReelStops(config: GameConfiguration): ReelStop[] {
     const nextRandom = this.options.nextRandom ?? Math.random;
     return config.reels.map((reel) => ({
@@ -204,4 +261,24 @@ export class SpinService {
       totalWager: wager.totalWager
     });
   }
+}
+
+function limitExceeded(
+  scopeId: string,
+  limit: string,
+  current: number,
+  attempted: number,
+  maximum: number
+): ApiHttpError {
+  return new ApiHttpError(409, {
+    code: "OPERATOR_LIMIT_EXCEEDED",
+    message: "Spin violates active operator limits.",
+    details: {
+      scopeId,
+      limit,
+      current,
+      attempted,
+      maximum
+    }
+  });
 }

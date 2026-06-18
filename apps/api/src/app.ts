@@ -54,6 +54,7 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   if (dependencies.failLedgerCommit) {
     spinOptions.failLedgerCommit = dependencies.failLedgerCommit;
   }
+  spinOptions.operatorLimitsProvider = operatorLimitsRepository;
   const spinService = dependencies.spinService ?? new SpinService(
     sessionService,
     walletService,

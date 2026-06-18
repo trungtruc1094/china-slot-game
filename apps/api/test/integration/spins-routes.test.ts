@@ -3,6 +3,7 @@ import type { AddressInfo } from "node:net";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../../src/app.js";
 import { InMemoryGameConfigurationRepository } from "../../src/domain/game-configuration-repository.js";
+import { InMemoryOperatorLimitsRepository, type OperatorLimits } from "../../src/domain/operator-limits-repository.js";
 import { InMemoryPlayerIdentityAdapter } from "../../src/domain/player-identity.js";
 import { SessionService, type Clock } from "../../src/domain/session-service.js";
 import { SpinService } from "../../src/domain/spin-service.js";
@@ -22,20 +23,40 @@ let baseUrl: string;
 let clock: MutableClock;
 let walletService: WalletService;
 let spinService: SpinService;
+let operatorLimitsRepository: InMemoryOperatorLimitsRepository;
 
-async function startServer(options: { activeConfig?: typeof simpleConfig | null; failLedgerCommit?: () => boolean } = {}): Promise<void> {
+const permissiveOperatorLimits: OperatorLimits = {
+  currency: "POINTS",
+  perSpin: { minBet: 1, maxBet: 1000, maxPayout: 1000 },
+  perSession: { maxSpins: 100, maxWager: 10_000 },
+  perDay: { playerMaxWager: 10_000, playerMaxReward: 10_000 },
+  campaign: { budget: 100_000, jackpotCap: 10_000 }
+};
+
+async function startServer(options: {
+  activeConfig?: typeof simpleConfig | null;
+  failLedgerCommit?: () => boolean;
+  nextRandom?: () => number;
+  operatorLimits?: OperatorLimits;
+} = {}): Promise<void> {
   const activeConfig = options.activeConfig === null ? undefined : options.activeConfig ?? simpleConfig;
   clock = new MutableClock();
   const sessionService = new SessionService(new InMemoryPlayerIdentityAdapter(), clock);
   walletService = new WalletService(clock);
+  operatorLimitsRepository = new InMemoryOperatorLimitsRepository(clock);
+  if (options.operatorLimits) {
+    operatorLimitsRepository.create({ scopeId: "default", limits: options.operatorLimits, actor: "operator-1" });
+  }
   const appOptions: Parameters<typeof createApp>[0] = {
     clock,
     sessionService,
-    walletService
+    walletService,
+    operatorLimitsRepository
   };
   const spinOptions = {
     ...(activeConfig ? { activeConfig } : {}),
-    nextRandom: () => 0,
+    nextRandom: options.nextRandom ?? (() => 0),
+    operatorLimitsProvider: operatorLimitsRepository,
     ...(options.failLedgerCommit ? { failLedgerCommit: options.failLedgerCommit } : {})
   };
   spinService = new SpinService(sessionService, walletService, spinOptions, clock);
@@ -279,6 +300,95 @@ describe("spin routes", () => {
       error: { code: "INSUFFICIENT_BALANCE" }
     });
     await expect(currentBalanceAfterValidSpin(sessionId)).resolves.toBe(1004);
+  });
+
+  it("allows a spin exactly at the active operator wager limit", async () => {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await startServer({
+      operatorLimits: {
+        ...permissiveOperatorLimits,
+        perSpin: { ...permissiveOperatorLimits.perSpin, maxBet: 1 },
+        perDay: { ...permissiveOperatorLimits.perDay, playerMaxWager: 2 }
+      }
+    });
+    const sessionId = await createSession();
+    await postSpin({
+      clientSpinId: "spin-at-limit-1",
+      sessionId,
+      wager: { lineBet: 1, selectedWays: 1, totalWager: 1 }
+    });
+    const response = await postSpin({
+      clientSpinId: "spin-at-limit-2",
+      sessionId,
+      wager: { lineBet: 1, selectedWays: 1, totalWager: 1 }
+    });
+    const body = await response.json() as ApiEnvelope<Record<string, unknown>>;
+
+    expect(response.status).toBe(200);
+    expect(body.data).toMatchObject({
+      spinId: "spin_2",
+      balanceAfter: 1008
+    });
+    expect(walletService.getTransactions("player_1")).toHaveLength(4);
+    expect(spinService.getLedger()).toHaveLength(2);
+  });
+
+  it("rejects one minor unit over active operator limits before wallet debit or reel generation", async () => {
+    let randomCalls = 0;
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await startServer({
+      nextRandom: () => {
+        randomCalls += 1;
+        return 0;
+      },
+      operatorLimits: {
+        ...permissiveOperatorLimits,
+        perSpin: { ...permissiveOperatorLimits.perSpin, maxBet: 1 },
+        perDay: { ...permissiveOperatorLimits.perDay, playerMaxWager: 1 }
+      }
+    });
+    const sessionId = await createSession();
+    const acceptedResponse = await postSpin({
+      clientSpinId: "spin-limit-accepted",
+      sessionId,
+      wager: { lineBet: 1, selectedWays: 1, totalWager: 1 }
+    });
+    const randomCallsAfterAcceptedSpin = randomCalls;
+    const walletBeforeRejectedSpin = walletService.getWallet("player_1");
+    const transactionsBeforeRejectedSpin = walletService.getTransactions("player_1");
+    const ledgerBeforeRejectedSpin = spinService.getLedger();
+    const rejectedResponse = await postSpin({
+      clientSpinId: "spin-limit-rejected",
+      sessionId,
+      wager: { lineBet: 1, selectedWays: 1, totalWager: 1 }
+    });
+
+    expect(acceptedResponse.status).toBe(200);
+    expect(rejectedResponse.status).toBe(409);
+    await expect(rejectedResponse.json()).resolves.toMatchObject({
+      data: null,
+      error: {
+        code: "OPERATOR_LIMIT_EXCEEDED",
+        details: {
+          limit: "perDay.playerMaxWager",
+          current: 1,
+          attempted: 1,
+          maximum: 1
+        }
+      }
+    });
+    expect(randomCalls).toBe(randomCallsAfterAcceptedSpin);
+    expect(walletService.getWallet("player_1")).toEqual(walletBeforeRejectedSpin);
+    expect(walletService.getTransactions("player_1")).toEqual(transactionsBeforeRejectedSpin);
+    expect(spinService.getLedger()).toEqual(ledgerBeforeRejectedSpin);
+
+    const retryResponse = await postSpin({
+      clientSpinId: "spin-after-limit-rejection",
+      sessionId,
+      wager: { lineBet: 2, selectedWays: 1, totalWager: 2 }
+    });
+    expect(retryResponse.status).toBe(409);
+    expect(spinService.getLedger()).toHaveLength(1);
   });
 
   it("ignores manipulated client outcome fields", async () => {
