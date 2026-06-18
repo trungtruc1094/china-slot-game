@@ -40,7 +40,12 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   if (dependencies.failLedgerCommit) {
     spinOptions.failLedgerCommit = dependencies.failLedgerCommit;
   }
-  const spinService = dependencies.spinService ?? new SpinService(sessionService, walletService, spinOptions);
+  const spinService = dependencies.spinService ?? new SpinService(
+    sessionService,
+    walletService,
+    spinOptions,
+    dependencies.clock
+  );
 
   app.disable("x-powered-by");
   app.use(helmet());

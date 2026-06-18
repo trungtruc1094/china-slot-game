@@ -37,7 +37,7 @@ async function startServer(options: { activeConfig?: typeof simpleConfig | null;
     nextRandom: () => 0,
     ...(options.failLedgerCommit ? { failLedgerCommit: options.failLedgerCommit } : {})
   };
-  spinService = new SpinService(sessionService, walletService, spinOptions);
+  spinService = new SpinService(sessionService, walletService, spinOptions, clock);
   appOptions.spinService = spinService;
   server = createServer(createApp(appOptions));
   await new Promise<void>((resolve) => {
@@ -91,7 +91,9 @@ async function postSpin(body: unknown): Promise<Response> {
 }
 
 async function currentBalanceAfterValidSpin(sessionId: string): Promise<number> {
+  currentBalanceSpinCounter += 1;
   const response = await postSpin({
+    clientSpinId: `spin-balance-check-${currentBalanceSpinCounter}`,
     sessionId,
     wager: { lineBet: 1, selectedWays: 1, totalWager: 1 }
   });
@@ -99,10 +101,13 @@ async function currentBalanceAfterValidSpin(sessionId: string): Promise<number> 
   return body.data?.balanceAfter ?? Number.NaN;
 }
 
+let currentBalanceSpinCounter = 0;
+
 describe("spin routes", () => {
   it("returns an authoritative backend spin result and updates backend balance", async () => {
     const sessionId = await createSession();
     const response = await postSpin({
+      clientSpinId: "spin-success",
       sessionId,
       wager: { lineBet: 1, selectedWays: 1, totalWager: 1 }
     });
@@ -155,6 +160,7 @@ describe("spin routes", () => {
   it("rejects invalid wagers without mutating balance", async () => {
     const sessionId = await createSession();
     const response = await postSpin({
+      clientSpinId: "spin-invalid-wager",
       sessionId,
       wager: { lineBet: 1, selectedWays: 2, totalWager: 2 }
     });
@@ -171,6 +177,7 @@ describe("spin routes", () => {
     const sessionId = await createSession();
     clock.current = new Date("2026-06-18T09:00:00.000Z");
     const response = await postSpin({
+      clientSpinId: "spin-expired",
       sessionId,
       wager: { lineBet: 1, selectedWays: 1, totalWager: 1 }
     });
@@ -190,6 +197,7 @@ describe("spin routes", () => {
     await startServer({ activeConfig: null });
     const sessionId = await createSession();
     const response = await postSpin({
+      clientSpinId: "spin-no-config",
       sessionId,
       wager: { lineBet: 1, selectedWays: 1, totalWager: 1 }
     });
@@ -206,6 +214,7 @@ describe("spin routes", () => {
   it("rejects insufficient balance without accepting the spin", async () => {
     const sessionId = await createSession();
     const response = await postSpin({
+      clientSpinId: "spin-insufficient",
       sessionId,
       wager: { lineBet: 1001, selectedWays: 1, totalWager: 1001 }
     });
@@ -221,6 +230,7 @@ describe("spin routes", () => {
   it("ignores manipulated client outcome fields", async () => {
     const sessionId = await createSession();
     const response = await postSpin({
+      clientSpinId: "spin-manipulated",
       sessionId,
       wager: { lineBet: 1, selectedWays: 1, totalWager: 1 },
       rng: { seed: "client-seed" },
@@ -247,6 +257,7 @@ describe("spin routes", () => {
     await startServer({ failLedgerCommit: () => true });
     const sessionId = await createSession();
     const response = await postSpin({
+      clientSpinId: "spin-ledger-fails",
       sessionId,
       wager: { lineBet: 1, selectedWays: 1, totalWager: 1 }
     });
@@ -259,5 +270,119 @@ describe("spin routes", () => {
     expect(walletService.getWallet("player_1").balance).toBe(1000);
     expect(walletService.getTransactions("player_1")).toEqual([]);
     expect(spinService.getLedger()).toEqual([]);
+  });
+
+  it("does not cache failed idempotency attempts so the same key can be retried after recovery", async () => {
+    let shouldFailLedger = true;
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await startServer({ failLedgerCommit: () => shouldFailLedger });
+    const sessionId = await createSession();
+    const request = {
+      clientSpinId: "spin-retry-after-rollback",
+      sessionId,
+      wager: { lineBet: 1, selectedWays: 1, totalWager: 1 }
+    };
+
+    const failedResponse = await postSpin(request);
+    shouldFailLedger = false;
+    const retryResponse = await postSpin(request);
+    const retryBody = await retryResponse.json() as ApiEnvelope<Record<string, unknown>>;
+
+    expect(failedResponse.status).toBe(500);
+    expect(retryResponse.status).toBe(200);
+    expect(retryBody.data).toMatchObject({
+      spinId: "spin_2",
+      balanceAfter: 1004
+    });
+    expect(walletService.getTransactions("player_1")).toHaveLength(2);
+    expect(spinService.getLedger()).toHaveLength(1);
+  });
+
+  it("returns the original result for duplicate matching clientSpinId without double debit", async () => {
+    const sessionId = await createSession();
+    const request = {
+      clientSpinId: "spin-duplicate",
+      sessionId,
+      wager: { lineBet: 1, selectedWays: 1, totalWager: 1 }
+    };
+
+    const firstResponse = await postSpin(request);
+    const secondResponse = await postSpin(request);
+    const firstBody = await firstResponse.json();
+    const secondBody = await secondResponse.json();
+
+    expect(secondResponse.status).toBe(200);
+    expect(secondBody).toEqual(firstBody);
+    expect(walletService.getTransactions("player_1")).toHaveLength(2);
+    expect(spinService.getLedger()).toHaveLength(1);
+  });
+
+  it("does not return cached results after the idempotency retry window", async () => {
+    const sessionId = await createSession();
+    const request = {
+      clientSpinId: "spin-expiring-idempotency",
+      sessionId,
+      wager: { lineBet: 1, selectedWays: 1, totalWager: 1 }
+    };
+
+    const firstResponse = await postSpin(request);
+    const firstBody = await firstResponse.json() as ApiEnvelope<{ spinId: string }>;
+    clock.current = new Date("2026-06-19T08:00:00.001Z");
+    const secondResponse = await postSpin(request);
+
+    expect(firstBody.data?.spinId).toBe("spin_1");
+    expect(secondResponse.status).toBe(401);
+    await expect(secondResponse.json()).resolves.toMatchObject({
+      data: null,
+      error: { code: "SESSION_EXPIRED" }
+    });
+    expect(walletService.getTransactions("player_1")).toHaveLength(2);
+    expect(spinService.getLedger()).toHaveLength(1);
+  });
+
+  it("does not return idempotency conflicts after the retry window expires", async () => {
+    const sessionId = await createSession();
+    await postSpin({
+      clientSpinId: "spin-expired-conflict-window",
+      sessionId,
+      wager: { lineBet: 1, selectedWays: 1, totalWager: 1 }
+    });
+
+    clock.current = new Date("2026-06-19T08:00:00.001Z");
+    const response = await postSpin({
+      clientSpinId: "spin-expired-conflict-window",
+      sessionId,
+      wager: { lineBet: 2, selectedWays: 1, totalWager: 2 }
+    });
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toMatchObject({
+      data: null,
+      error: { code: "SESSION_EXPIRED" }
+    });
+    expect(walletService.getTransactions("player_1")).toHaveLength(2);
+    expect(spinService.getLedger()).toHaveLength(1);
+  });
+
+  it("rejects conflicting clientSpinId reuse with different wager data", async () => {
+    const sessionId = await createSession();
+    await postSpin({
+      clientSpinId: "spin-conflict",
+      sessionId,
+      wager: { lineBet: 1, selectedWays: 1, totalWager: 1 }
+    });
+    const response = await postSpin({
+      clientSpinId: "spin-conflict",
+      sessionId,
+      wager: { lineBet: 2, selectedWays: 1, totalWager: 2 }
+    });
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      data: null,
+      error: { code: "IDEMPOTENCY_CONFLICT" }
+    });
+    expect(walletService.getTransactions("player_1")).toHaveLength(2);
+    expect(spinService.getLedger()).toHaveLength(1);
   });
 });

@@ -8,7 +8,7 @@ import {
   type WinBreakdown
 } from "@china-slot-game/game-math";
 import { ApiHttpError } from "../middleware/error-handler.js";
-import type { SessionService } from "./session-service.js";
+import type { Clock, SessionService } from "./session-service.js";
 import type { WalletService, WalletTransactionRecord, WalletTransactionRequest } from "./wallet-service.js";
 
 export interface SpinResponse {
@@ -35,6 +35,14 @@ export interface SpinLedgerEntry extends SpinResponse {
   walletTransactions: WalletTransactionRecord[];
 }
 
+interface IdempotencyRecord {
+  fingerprint: string;
+  response: SpinResponse;
+  acceptedAtMs: number;
+}
+
+const idempotencyRetryWindowMs = 24 * 60 * 60 * 1000;
+
 export interface SpinServiceOptions {
   activeConfig?: GameConfiguration;
   nextRandom?: () => number;
@@ -43,19 +51,41 @@ export interface SpinServiceOptions {
 
 export class SpinService {
   private readonly ledger: SpinLedgerEntry[] = [];
+  private readonly idempotencyRecords = new Map<string, IdempotencyRecord>();
   private nextSpinNumber = 1;
 
   public constructor(
     private readonly sessions: SessionService,
     private readonly wallets: WalletService,
-    private readonly options: SpinServiceOptions = {}
+    private readonly options: SpinServiceOptions = {},
+    private readonly clock: Clock = { now: () => new Date() }
   ) {}
 
   public getLedger(): SpinLedgerEntry[] {
     return [...this.ledger];
   }
 
-  public async spin(request: { sessionId: string; wager: WagerInput }): Promise<SpinResponse> {
+  public async spin(request: { clientSpinId: string; sessionId: string; wager: WagerInput }): Promise<SpinResponse> {
+    const idempotencyKey = `${request.sessionId}:${request.clientSpinId}`;
+    const fingerprint = this.fingerprint(request.wager);
+    const existingRecord = this.idempotencyRecords.get(idempotencyKey);
+
+    if (existingRecord) {
+      if (this.clock.now().getTime() - existingRecord.acceptedAtMs > idempotencyRetryWindowMs) {
+        this.idempotencyRecords.delete(idempotencyKey);
+      } else {
+      if (existingRecord.fingerprint !== fingerprint) {
+        throw new ApiHttpError(409, {
+          code: "IDEMPOTENCY_CONFLICT",
+          message: "clientSpinId has already been used with different wager data.",
+          details: { clientSpinId: request.clientSpinId, sessionId: request.sessionId }
+        });
+      }
+
+        return existingRecord.response;
+      }
+    }
+
     const config = this.options.activeConfig;
 
     if (!config) {
@@ -128,6 +158,11 @@ export class SpinService {
           playerId: session.playerId,
           walletTransactions: result.transactions
         });
+        this.idempotencyRecords.set(idempotencyKey, {
+          fingerprint,
+          response: spinResponse,
+          acceptedAtMs: this.clock.now().getTime()
+        });
       }
     });
 
@@ -158,5 +193,13 @@ export class SpinService {
       reelIndex: reel.reelIndex,
       stopIndex: Math.floor(nextRandom() * reel.symbols.length)
     }));
+  }
+
+  private fingerprint(wager: WagerInput): string {
+    return JSON.stringify({
+      lineBet: wager.lineBet,
+      selectedWays: wager.selectedWays,
+      totalWager: wager.totalWager
+    });
   }
 }

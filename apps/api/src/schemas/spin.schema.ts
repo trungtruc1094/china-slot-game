@@ -7,6 +7,7 @@ export const spinWagerSchema = z.object({
 });
 
 export const createSpinRequestSchema = z.object({
+  clientSpinId: z.string().trim().min(1).max(128),
   sessionId: z.string().trim().min(1),
   wager: spinWagerSchema
 }).strip();
