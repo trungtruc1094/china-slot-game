@@ -35,6 +35,7 @@ export interface SpinLedgerEntry extends SpinResponse {
   sessionId: string;
   playerId: string;
   walletTransactions: WalletTransactionRecord[];
+  acceptedAt: Date;
 }
 
 interface IdempotencyRecord {
@@ -165,7 +166,8 @@ export class SpinService {
           ...spinResponse,
           sessionId: request.sessionId,
           playerId: session.playerId,
-          walletTransactions: result.transactions
+          walletTransactions: result.transactions,
+          acceptedAt: this.clock.now()
         });
         this.idempotencyRecords.set(idempotencyKey, {
           fingerprint,

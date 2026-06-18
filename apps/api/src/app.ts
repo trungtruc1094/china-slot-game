@@ -5,11 +5,13 @@ import { errorHandler, notFoundHandler } from "./middleware/error-handler.js";
 import { requestIdMiddleware } from "./middleware/request-id.js";
 import { createHealthRouter } from "./routes/health.routes.js";
 import { createAdminConfigRouter } from "./routes/admin-config.routes.js";
+import { createAdminMetricsRouter } from "./routes/admin-metrics.routes.js";
 import { createAdminOperatorLimitsRouter } from "./routes/admin-operator-limits.routes.js";
 import { createSessionsRouter } from "./routes/sessions.routes.js";
 import { createSpinsRouter } from "./routes/spins.routes.js";
 import { InMemoryPlayerIdentityAdapter } from "./domain/player-identity.js";
 import { InMemoryGameConfigurationRepository, type GameConfigurationProvider } from "./domain/game-configuration-repository.js";
+import { MetricsService } from "./domain/metrics-service.js";
 import { InMemoryOperatorLimitsRepository } from "./domain/operator-limits-repository.js";
 import { SessionService, type Clock } from "./domain/session-service.js";
 import { SpinService } from "./domain/spin-service.js";
@@ -61,6 +63,7 @@ export function createApp(dependencies: AppDependencies = {}): Express {
     spinOptions,
     dependencies.clock
   );
+  const metricsService = new MetricsService(spinService, spinOptions.configProvider, operatorLimitsRepository);
 
   app.disable("x-powered-by");
   app.use(helmet());
@@ -71,6 +74,7 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use("/api", createHealthRouter());
   app.use("/api", createAdminConfigRouter(configRepository));
   app.use("/api", createAdminOperatorLimitsRouter(operatorLimitsRepository));
+  app.use("/api", createAdminMetricsRouter(metricsService));
   app.use("/api", createSessionsRouter(sessionService));
   app.use("/api", createSpinsRouter(spinService));
   app.use(notFoundHandler);
