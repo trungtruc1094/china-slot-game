@@ -10,10 +10,12 @@
     "build": "npm run build --workspaces",
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run test --workspaces",
+    "test:coverage": "vitest run --coverage",
     "typecheck": "npm run typecheck --workspaces"
   },
   "devDependencies": {
     "@types/node": "24.10.1",
+    "@vitest/coverage-v8": "^4.1.9",
     "typescript": "6.0.3",
     "vitest": "4.1.9"
   }

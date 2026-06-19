@@ -1,0 +1,39 @@
+name: Quality Gates
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  quality-gates:
+    name: Lint, Typecheck, Test, Coverage, Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint all workspaces
+        run: npm run lint
+
+      - name: Typecheck all workspaces
+        run: npm run typecheck
+
+      - name: Test API and game math
+        run: npm test
+
+      - name: Coverage thresholds 80/79 percent
+        run: npm run test:coverage
+
+      - name: Build all workspaces
+        run: npm run build
