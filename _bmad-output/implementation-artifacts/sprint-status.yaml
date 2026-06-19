@@ -75,12 +75,12 @@ development_status:
   4-5-apply-budget-protection-actions: done
   epic-4-retrospective: done
 
-  epic-5: in-progress
+  epic-5: done
   5-1-implement-admin-authentication-and-roles: done
   5-2-search-spin-ledger: done
   5-3-search-balance-transactions: done
   5-4-record-admin-audit-events: done
-  5-5-provide-admin-audit-search: backlog
+  5-5-provide-admin-audit-search: done
   epic-5-retrospective: optional
 
   epic-6: backlog
