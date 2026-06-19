@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-06-17T14:58:20.256Z"
-last_updated: "2026-06-19T16:55:00+07:00"
+last_updated: "2026-06-19T17:02:00+07:00"
 project: "China Slot Game"
 project_key: NOKEY
 tracking_system: file-system
@@ -87,7 +87,7 @@ development_status:
   6-1-enforce-non-cash-reward-boundary: done
   6-2-add-safe-backend-unavailable-behavior: done
   6-3-add-observability-and-request-tracing: done
-  6-4-define-retention-and-launch-data-policies: backlog
+  6-4-define-retention-and-launch-data-policies: done
   6-5-add-ci-quality-gates: backlog
   6-6-produce-launch-readiness-checklist: backlog
   epic-6-retrospective: optional
