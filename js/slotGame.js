@@ -368,24 +368,40 @@ class SlotGame extends Phaser.Scene{
             clientSpinId: this.createClientSpinId(),
             wager: this.createBackendWager()
         }).then((result) => {
+            if (result && result.retryable) {
+                this.handleBackendSpinRetry(result);
+                return;
+            }
+
             this.backendSpinResult = result;
             this.backendSpinPending = false;
             this.backendSpinStatus = "ready";
             this.runSlot();
         }).catch((error) => {
-            this.backendSpinPending = false;
-            this.backendSpinStatus = "retry";
-            this.backendSpinPlan = window.ChinaSlotServerClient ? window.ChinaSlotServerClient.buildRetryState(error) : null;
-            this.slotControls.setSpinButtonText("RETRY");
-            this.slotControls.setControlActivity(true, true, true);
-            if (this.slotControls.auto) this.slotControls.resetAutoSpinsMode();
-            if (this.guiController && this.guiController.showMessage) {
-                var message = this.guiController.showMessage("Backend unavailable", (error && error.message) || "Please retry the spin.", this, () => {
-                    this.guiController.closePopUp(message);
-                });
-            }
-            this.stateMachine.changeState(this.iddleState);
+            var retryState = window.ChinaSlotServerClient ? window.ChinaSlotServerClient.buildRetryState(error) : {
+                status: "retry",
+                retryable: true,
+                message: "Reward-bearing play is paused while the backend is unavailable."
+            };
+            this.handleBackendSpinRetry(retryState);
         });
+    }
+
+    handleBackendSpinRetry(retryState)
+    {
+        this.backendSpinResult = null;
+        this.backendSpinPending = false;
+        this.backendSpinStatus = "retry";
+        this.backendSpinPlan = retryState;
+        this.slotControls.setSpinButtonText("RETRY");
+        this.slotControls.setControlActivity(true, true, true);
+        if (this.slotControls.auto) this.slotControls.resetAutoSpinsMode();
+        if (this.guiController && this.guiController.showMessage) {
+            var message = this.guiController.showMessage("Backend unavailable", retryState.message, this, () => {
+                this.guiController.closePopUp(message);
+            });
+        }
+        this.stateMachine.changeState(this.iddleState);
     }
 
     applyBackendSpinPlanDisplay(backendPlan)
@@ -796,4 +812,8 @@ function getTime() {
 
     //return the number of milliseconds since 1 January 1970 00:00:00.
     return d.getTime();
+}
+
+if (typeof globalThis !== "undefined") {
+    globalThis.SlotGame = SlotGame;
 }

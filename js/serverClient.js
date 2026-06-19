@@ -1,7 +1,7 @@
 (function (globalScope) {
     "use strict";
 
-    var defaultRetryWindowMessage = "Backend spin failed. Retry is available.";
+    var defaultRetryWindowMessage = "Reward-bearing play is paused while the backend is unavailable.";
 
     function getQueryMode(locationSearch) {
         if (!locationSearch || typeof URLSearchParams === "undefined") return null;
@@ -9,9 +9,13 @@
     }
 
     function resolveMode(options) {
-        if (options && options.mode) return options.mode;
+        if (options && options.mode) return normalizeMode(options.mode);
         var queryMode = getQueryMode(globalScope.location && globalScope.location.search);
-        return queryMode || globalScope.CHINA_SLOT_MODE || "demo";
+        return normalizeMode(queryMode || globalScope.CHINA_SLOT_MODE || "production");
+    }
+
+    function normalizeMode(mode) {
+        return mode === "demo" ? "demo" : "production";
     }
 
     function resolveApiBaseUrl(options) {
@@ -84,6 +88,10 @@
     }
 
     function buildProductionRenderPlan(options) {
+        if (!options.backendResult) {
+            return buildRetryState();
+        }
+
         var backendResult = normalizeBackendSpinResult(options.backendResult);
         var reelCount = options.reelCount || backendResult.reelStops.length;
 
@@ -123,8 +131,12 @@
             source: "backend",
             status: "retry",
             retryable: true,
-            message: (error && error.message) || defaultRetryWindowMessage
+            message: safeRetryMessage(error)
         };
+    }
+
+    function safeRetryMessage(_error) {
+        return defaultRetryWindowMessage;
     }
 
     function createBackendClient(options) {
@@ -173,15 +185,19 @@
                 throw new Error("Backend spins are only available in production mode.");
             }
 
-            status = "pending";
-            var activeSession = await startSession();
-            var result = await postJson("/api/spins", {
-                clientSpinId: request.clientSpinId,
-                sessionId: activeSession.sessionId,
-                wager: request.wager
-            });
-            status = "ready";
-            return normalizeBackendSpinResult(result);
+            try {
+                status = "pending";
+                var activeSession = await startSession();
+                var result = await postJson("/api/spins", {
+                    clientSpinId: request.clientSpinId,
+                    sessionId: activeSession.sessionId,
+                    wager: request.wager
+                });
+                status = "ready";
+                return normalizeBackendSpinResult(result);
+            } catch (error) {
+                return setRetry(error);
+            }
         }
 
         function setRetry(error) {
