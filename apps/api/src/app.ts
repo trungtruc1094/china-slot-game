@@ -9,6 +9,7 @@ import { createAdminBudgetProtectionRouter } from "./routes/admin-budget-protect
 import { createAdminConfigRouter } from "./routes/admin-config.routes.js";
 import { createAdminMetricsRouter } from "./routes/admin-metrics.routes.js";
 import { createAdminOperatorLimitsRouter } from "./routes/admin-operator-limits.routes.js";
+import { createAdminSpinLedgerRouter } from "./routes/admin-spin-ledger.routes.js";
 import { createSessionsRouter } from "./routes/sessions.routes.js";
 import { createSpinsRouter } from "./routes/spins.routes.js";
 import { InMemoryPlayerIdentityAdapter } from "./domain/player-identity.js";
@@ -94,6 +95,7 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use("/api", createAdminBudgetProtectionRouter(budgetProtectionRepository, budgetProtectionEnabled));
   app.use("/api", createAdminConfigRouter(configRepository));
   app.use("/api", createAdminOperatorLimitsRouter(operatorLimitsRepository));
+  app.use("/api", createAdminSpinLedgerRouter(spinService));
   app.use("/api", createAdminMetricsRouter(metricsService));
   app.use("/api", createSessionsRouter(sessionService));
   app.use("/api", createSpinsRouter(spinService));
