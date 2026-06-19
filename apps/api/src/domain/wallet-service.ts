@@ -69,6 +69,10 @@ export class WalletService {
     return [...(this.transactionsByPlayerId.get(playerId) ?? [])];
   }
 
+  public listTransactions(): WalletTransactionRecord[] {
+    return [...this.transactionsByPlayerId.values()].flatMap((transactions) => [...transactions]);
+  }
+
   public applyTransaction(request: WalletTransactionRequest): Promise<WalletTransactionResult> {
     return this.applyTransactionBatch([request]).then((result) => {
       const transaction = result.transactions[0];

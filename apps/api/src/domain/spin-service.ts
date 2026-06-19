@@ -126,7 +126,8 @@ export class SpinService {
         type: "debit" as const,
         amount: request.wager.totalWager,
         actor: "spin-service",
-        source: request.sessionId
+        source: request.sessionId,
+        metadata: { clientSpinId: request.clientSpinId }
       }
     ];
 
@@ -136,7 +137,8 @@ export class SpinService {
         type: "credit" as const,
         amount: payout,
         actor: "spin-service",
-        source: request.sessionId
+        source: request.sessionId,
+        metadata: { clientSpinId: request.clientSpinId }
       });
     }
 
@@ -164,6 +166,13 @@ export class SpinService {
 
         if (this.options.failLedgerCommit?.(spinResponse) === true) {
           throw new Error("Injected spin ledger failure");
+        }
+
+        for (const transaction of result.transactions) {
+          transaction.metadata = {
+            ...transaction.metadata,
+            spinId: spinResponse.spinId
+          };
         }
 
         this.ledger.push({
