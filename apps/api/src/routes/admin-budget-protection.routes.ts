@@ -5,14 +5,13 @@ import type {
   BudgetProtectionAuditEventRecord,
   InMemoryBudgetProtectionRepository
 } from "../domain/budget-protection-repository.js";
+import { requireAdminRole } from "../middleware/admin-auth.js";
 import { ApiHttpError } from "../middleware/error-handler.js";
 import { okEnvelope } from "../schemas/api-envelope.js";
 import {
   applyBudgetProtectionRequestSchema,
   revertBudgetProtectionRequestSchema
 } from "../schemas/budget-protection.schema.js";
-
-type AdminRole = "operator" | "support" | "viewer";
 
 export function createAdminBudgetProtectionRouter(
   budgetProtectionRepository: InMemoryBudgetProtectionRepository,
@@ -23,7 +22,7 @@ export function createAdminBudgetProtectionRouter(
   router.post("/admin/budget-protection/actions", (request, response, next) => {
     try {
       assertEnabled(enabled);
-      const actor = requireRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator"]);
+      const { actor } = requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator"]);
       const parsedRequest = applyBudgetProtectionRequestSchema.parse(request.body);
       const action = budgetProtectionRepository.apply({ ...parsedRequest, actor });
       response.status(201).json(okEnvelope({ action: serializeAction(action) }, request.requestId));
@@ -35,7 +34,7 @@ export function createAdminBudgetProtectionRouter(
   router.post("/admin/budget-protection/actions/:id/revert", (request, response, next) => {
     try {
       assertEnabled(enabled);
-      const actor = requireRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator"]);
+      const { actor } = requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator"]);
       const parsedRequest = revertBudgetProtectionRequestSchema.parse(request.body);
       const action = budgetProtectionRepository.revert(request.params.id ?? "", actor, parsedRequest.reason);
       response.status(200).json(okEnvelope({ action: serializeAction(action) }, request.requestId));
@@ -46,7 +45,7 @@ export function createAdminBudgetProtectionRouter(
 
   router.get("/admin/budget-protection/actions", (request, response, next) => {
     try {
-      requireRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
+      requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
       const scopeId = typeof request.query.scopeId === "string" && request.query.scopeId.trim().length > 0
         ? request.query.scopeId.trim()
         : undefined;
@@ -60,7 +59,7 @@ export function createAdminBudgetProtectionRouter(
 
   router.get("/admin/budget-protection/audit-events", (request, response, next) => {
     try {
-      requireRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
+      requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
       response.status(200).json(okEnvelope({
         auditEvents: budgetProtectionRepository.listAuditEvents().map((event) => serializeAuditEvent(event))
       }, request.requestId));
@@ -80,19 +79,6 @@ function assertEnabled(enabled: boolean): void {
       details: {}
     });
   }
-}
-
-function requireRole(roleHeader: string | undefined, actorHeader: string | undefined, allowed: AdminRole[]): string {
-  const role = roleHeader as AdminRole | undefined;
-  if (!role || !allowed.includes(role)) {
-    throw new ApiHttpError(403, {
-      code: "ADMIN_UNAUTHORIZED",
-      message: "Admin role is not authorized for this operation.",
-      details: { requiredRoles: allowed }
-    });
-  }
-
-  return actorHeader?.trim() || "operator-system";
 }
 
 function normalizeBudgetProtectionError(error: unknown): unknown {

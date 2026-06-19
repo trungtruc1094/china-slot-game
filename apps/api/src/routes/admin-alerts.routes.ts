@@ -2,6 +2,7 @@ import { Router } from "express";
 import { ZodError } from "zod";
 import { AlertService } from "../domain/alert-service.js";
 import type { AlertHistoryEventRecord, AlertRuleRecord, InMemoryAlertRepository } from "../domain/alert-repository.js";
+import { requireAdminRole } from "../middleware/admin-auth.js";
 import { ApiHttpError } from "../middleware/error-handler.js";
 import { okEnvelope } from "../schemas/api-envelope.js";
 import {
@@ -9,8 +10,6 @@ import {
   alertEvaluationRequestSchema,
   alertRuleRequestSchema
 } from "../schemas/alert.schema.js";
-
-type AdminRole = "operator" | "support" | "viewer";
 
 export function createAdminAlertsRouter(
   alertRepository: InMemoryAlertRepository,
@@ -20,7 +19,7 @@ export function createAdminAlertsRouter(
 
   router.post("/admin/alert-rules", (request, response, next) => {
     try {
-      const actor = requireRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator"]);
+      const { actor } = requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator"]);
       const parsedRequest = alertRuleRequestSchema.parse(request.body);
       const alertRule = alertRepository.upsertRule({ ...parsedRequest, actor });
       response.status(201).json(okEnvelope({ alertRule: serializeRule(alertRule) }, request.requestId));
@@ -31,7 +30,7 @@ export function createAdminAlertsRouter(
 
   router.get("/admin/alert-rules", (request, response, next) => {
     try {
-      requireRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
+      requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
       const scopeId = typeof request.query.scopeId === "string" && request.query.scopeId.trim().length > 0
         ? request.query.scopeId.trim()
         : undefined;
@@ -45,7 +44,7 @@ export function createAdminAlertsRouter(
 
   router.post("/admin/alerts/evaluate", (request, response, next) => {
     try {
-      requireRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support"]);
+      requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support"]);
       const parsedRequest = alertEvaluationRequestSchema.parse(request.body);
       const alerts = alertService.evaluate({
         ...(parsedRequest.from ? { from: new Date(parsedRequest.from) } : {}),
@@ -61,7 +60,7 @@ export function createAdminAlertsRouter(
 
   router.get("/admin/alerts", (request, response, next) => {
     try {
-      requireRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
+      requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
       const scopeId = typeof request.query.scopeId === "string" && request.query.scopeId.trim().length > 0
         ? request.query.scopeId.trim()
         : undefined;
@@ -75,7 +74,7 @@ export function createAdminAlertsRouter(
 
   router.post("/admin/alerts/:id/acknowledge", (request, response, next) => {
     try {
-      const actor = requireRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support"]);
+      const { actor } = requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support"]);
       const parsedRequest = acknowledgeAlertRequestSchema.parse(request.body);
       const alert = alertRepository.acknowledge(request.params.id ?? "", actor, parsedRequest.reason);
       response.status(200).json(okEnvelope({ alert: serializeEvent(alert) }, request.requestId));
@@ -85,19 +84,6 @@ export function createAdminAlertsRouter(
   });
 
   return router;
-}
-
-function requireRole(roleHeader: string | undefined, actorHeader: string | undefined, allowed: AdminRole[]): string {
-  const role = roleHeader as AdminRole | undefined;
-  if (!role || !allowed.includes(role)) {
-    throw new ApiHttpError(403, {
-      code: "ADMIN_UNAUTHORIZED",
-      message: "Admin role is not authorized for this operation.",
-      details: { requiredRoles: allowed }
-    });
-  }
-
-  return actorHeader?.trim() || "operator-system";
 }
 
 function normalizeAlertError(error: unknown, code: string): unknown {

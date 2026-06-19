@@ -245,7 +245,7 @@ describe("admin config activation routes", () => {
     });
     await expect(rollbackResponse.json()).resolves.toMatchObject({
       data: null,
-      error: { code: "ADMIN_UNAUTHORIZED" }
+      error: { code: "ADMIN_FORBIDDEN" }
     });
   });
 });

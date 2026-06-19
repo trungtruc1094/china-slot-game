@@ -2,6 +2,7 @@ import { Router } from "express";
 import { ZodError } from "zod";
 import { calculateRtpReport, runSimulation } from "@china-slot-game/game-math";
 import type { GameConfigurationRecord, InMemoryGameConfigurationRepository } from "../domain/game-configuration-repository.js";
+import { requireAdminRole } from "../middleware/admin-auth.js";
 import { ApiHttpError } from "../middleware/error-handler.js";
 import { okEnvelope } from "../schemas/api-envelope.js";
 import {
@@ -13,7 +14,6 @@ import {
   updateDraftConfigRequestSchema
 } from "../schemas/admin-config.schema.js";
 
-type AdminRole = "operator" | "support" | "viewer";
 const maxSimulationDurationMs = 1_000;
 
 export function createAdminConfigRouter(configRepository: InMemoryGameConfigurationRepository): Router {
@@ -21,7 +21,7 @@ export function createAdminConfigRouter(configRepository: InMemoryGameConfigurat
 
   router.post("/admin/configs/drafts", (request, response, next) => {
     try {
-      const actor = requireRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator"]);
+      const { actor } = requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator"]);
       const parsedRequest = createDraftConfigRequestSchema.parse(request.body);
       const draft = configRepository.createDraft({
         id: parsedRequest.id,
@@ -37,7 +37,7 @@ export function createAdminConfigRouter(configRepository: InMemoryGameConfigurat
 
   router.put("/admin/configs/drafts/:id", (request, response, next) => {
     try {
-      const actor = requireRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator"]);
+      const { actor } = requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator"]);
       const parsedRequest = updateDraftConfigRequestSchema.parse(request.body);
       const draft = configRepository.updateDraft({
         id: request.params.id ?? "",
@@ -53,7 +53,7 @@ export function createAdminConfigRouter(configRepository: InMemoryGameConfigurat
 
   router.get("/admin/configs/drafts", (request, response, next) => {
     try {
-      requireRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
+      requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
       const drafts = configRepository.list()
         .filter((record) => record.status === "draft")
         .map((record) => serializeRecord(record));
@@ -65,7 +65,7 @@ export function createAdminConfigRouter(configRepository: InMemoryGameConfigurat
 
   router.post("/admin/configs/drafts/:id/math-report", (request, response, next) => {
     try {
-      const actor = requireRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator"]);
+      const { actor } = requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator"]);
       const parsedRequest = attachMathReportRequestSchema.parse(request.body);
       const draft = configRepository.read(request.params.id ?? "");
       if (!draft || draft.status !== "draft") {
@@ -92,7 +92,7 @@ export function createAdminConfigRouter(configRepository: InMemoryGameConfigurat
 
   router.get("/admin/configs/drafts/:id/math-report", (request, response, next) => {
     try {
-      requireRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
+      requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
       const mathReport = configRepository.getMathReportForDraft(request.params.id ?? "");
       if (!mathReport) {
         throw new ApiHttpError(404, {
@@ -109,7 +109,7 @@ export function createAdminConfigRouter(configRepository: InMemoryGameConfigurat
 
   router.post("/admin/configs/drafts/:id/simulations", (request, response, next) => {
     try {
-      const actor = requireRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator"]);
+      const { actor } = requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator"]);
       const parsedRequest = runSimulationRequestSchema.parse(request.body);
       const draft = configRepository.read(request.params.id ?? "");
       if (!draft || draft.status !== "draft") {
@@ -165,7 +165,7 @@ export function createAdminConfigRouter(configRepository: InMemoryGameConfigurat
 
   router.get("/admin/configs/drafts/:id/simulations", (request, response, next) => {
     try {
-      requireRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
+      requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
       const simulationRuns = configRepository.listSimulationRuns(request.params.id ?? "")
         .map((run) => serializeSimulationRun(run));
       response.status(200).json(okEnvelope({ simulationRuns }, request.requestId));
@@ -176,7 +176,7 @@ export function createAdminConfigRouter(configRepository: InMemoryGameConfigurat
 
   router.get("/admin/configs/drafts/:id/simulations/:runId", (request, response, next) => {
     try {
-      requireRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
+      requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
       const simulationRun = configRepository.getSimulationRun(request.params.id ?? "", request.params.runId ?? "");
       if (!simulationRun) {
         throw new ApiHttpError(404, {
@@ -193,7 +193,7 @@ export function createAdminConfigRouter(configRepository: InMemoryGameConfigurat
 
   router.post("/admin/configs/drafts/:id/activate", (request, response, next) => {
     try {
-      const actor = requireRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator"]);
+      const { actor } = requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator"]);
       const parsedRequest = activateDraftRequestSchema.parse(request.body);
       const draft = configRepository.read(request.params.id ?? "");
       if (!draft || draft.status !== "draft") {
@@ -232,7 +232,7 @@ export function createAdminConfigRouter(configRepository: InMemoryGameConfigurat
 
   router.post("/admin/configs/rollback", (request, response, next) => {
     try {
-      const actor = requireRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator"]);
+      const { actor } = requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator"]);
       const parsedRequest = rollbackConfigRequestSchema.parse(request.body);
       const activeConfig = configRepository.rollbackToVersion({
         targetVersionId: parsedRequest.targetVersionId,
@@ -247,7 +247,7 @@ export function createAdminConfigRouter(configRepository: InMemoryGameConfigurat
 
   router.get("/admin/configs/audit-events", (request, response, next) => {
     try {
-      requireRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
+      requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
       const auditEvents = configRepository.listAuditEvents().map((event) => serializeAuditEvent(event));
       response.status(200).json(okEnvelope({ auditEvents }, request.requestId));
     } catch (error) {
@@ -257,7 +257,7 @@ export function createAdminConfigRouter(configRepository: InMemoryGameConfigurat
 
   router.get("/admin/configs/drafts/:id", (request, response, next) => {
     try {
-      requireRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
+      requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
       const record = configRepository.read(request.params.id ?? "");
       if (!record || record.status !== "draft") {
         throw new ApiHttpError(404, {
@@ -273,19 +273,6 @@ export function createAdminConfigRouter(configRepository: InMemoryGameConfigurat
   });
 
   return router;
-}
-
-function requireRole(roleHeader: string | undefined, actorHeader: string | undefined, allowed: AdminRole[]): string {
-  const role = roleHeader as AdminRole | undefined;
-  if (!role || !allowed.includes(role)) {
-    throw new ApiHttpError(403, {
-      code: "ADMIN_UNAUTHORIZED",
-      message: "Admin role is not authorized for this operation.",
-      details: { requiredRoles: allowed }
-    });
-  }
-
-  return actorHeader?.trim() || "operator-system";
 }
 
 function normalizeDraftError(error: unknown, code = "INVALID_CONFIG_DRAFT"): unknown {

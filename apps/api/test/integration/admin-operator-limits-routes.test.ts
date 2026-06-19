@@ -168,7 +168,7 @@ describe("admin operator limit routes", () => {
     expect(viewerResponse.status).toBe(403);
     await expect(viewerResponse.json()).resolves.toMatchObject({
       data: null,
-      error: { code: "ADMIN_UNAUTHORIZED" }
+      error: { code: "ADMIN_FORBIDDEN" }
     });
     expect(auditBody.data?.auditEvents).toMatchObject([
       {

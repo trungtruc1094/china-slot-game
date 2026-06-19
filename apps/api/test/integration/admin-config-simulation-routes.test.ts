@@ -180,7 +180,7 @@ describe("admin config simulation routes", () => {
     });
     await expect(unauthorizedResponse.json()).resolves.toMatchObject({
       data: null,
-      error: { code: "ADMIN_UNAUTHORIZED" }
+      error: { code: "ADMIN_FORBIDDEN" }
     });
   });
 });

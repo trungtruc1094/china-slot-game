@@ -177,11 +177,11 @@ describe("admin config draft routes", () => {
     expect(updateResponse.status).toBe(403);
     await expect(createResponse.json()).resolves.toMatchObject({
       data: null,
-      error: { code: "ADMIN_UNAUTHORIZED" }
+      error: { code: "ADMIN_FORBIDDEN" }
     });
     await expect(updateResponse.json()).resolves.toMatchObject({
       data: null,
-      error: { code: "ADMIN_UNAUTHORIZED" }
+      error: { code: "ADMIN_FORBIDDEN" }
     });
   });
 

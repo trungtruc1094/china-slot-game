@@ -181,10 +181,10 @@ describe("admin metrics routes", () => {
       data: null,
       error: { code: "INVALID_METRICS_QUERY" }
     });
-    expect(unauthorizedResponse.status).toBe(403);
+    expect(unauthorizedResponse.status).toBe(401);
     await expect(unauthorizedResponse.json()).resolves.toMatchObject({
       data: null,
-      error: { code: "ADMIN_UNAUTHORIZED" }
+      error: { code: "ADMIN_UNAUTHENTICATED" }
     });
   });
 });

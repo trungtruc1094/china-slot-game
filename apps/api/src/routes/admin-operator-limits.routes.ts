@@ -5,6 +5,7 @@ import type {
   OperatorLimitAuditEventRecord,
   OperatorLimitRecord
 } from "../domain/operator-limits-repository.js";
+import { requireAdminRole } from "../middleware/admin-auth.js";
 import { ApiHttpError } from "../middleware/error-handler.js";
 import { okEnvelope } from "../schemas/api-envelope.js";
 import {
@@ -12,14 +13,12 @@ import {
   updateOperatorLimitsRequestSchema
 } from "../schemas/operator-limits.schema.js";
 
-type AdminRole = "operator" | "support" | "viewer";
-
 export function createAdminOperatorLimitsRouter(operatorLimitsRepository: InMemoryOperatorLimitsRepository): Router {
   const router = Router();
 
   router.post("/admin/operator-limits", (request, response, next) => {
     try {
-      const actor = requireRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator"]);
+      const { actor } = requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator"]);
       const parsedRequest = createOperatorLimitsRequestSchema.parse(request.body);
       const operatorLimits = operatorLimitsRepository.create({
         scopeId: parsedRequest.scopeId,
@@ -35,7 +34,7 @@ export function createAdminOperatorLimitsRouter(operatorLimitsRepository: InMemo
 
   router.put("/admin/operator-limits/:scopeId", (request, response, next) => {
     try {
-      const actor = requireRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator"]);
+      const { actor } = requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator"]);
       const parsedRequest = updateOperatorLimitsRequestSchema.parse(request.body);
       const operatorLimits = operatorLimitsRepository.update({
         scopeId: request.params.scopeId ?? "",
@@ -51,7 +50,7 @@ export function createAdminOperatorLimitsRouter(operatorLimitsRepository: InMemo
 
   router.get("/admin/operator-limits/active", (request, response, next) => {
     try {
-      requireRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
+      requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
       const scopeId = typeof request.query.scopeId === "string" && request.query.scopeId.trim().length > 0
         ? request.query.scopeId.trim()
         : "default";
@@ -66,7 +65,7 @@ export function createAdminOperatorLimitsRouter(operatorLimitsRepository: InMemo
 
   router.get("/admin/operator-limits", (request, response, next) => {
     try {
-      requireRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
+      requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
       const scopeId = typeof request.query.scopeId === "string" && request.query.scopeId.trim().length > 0
         ? request.query.scopeId.trim()
         : undefined;
@@ -80,7 +79,7 @@ export function createAdminOperatorLimitsRouter(operatorLimitsRepository: InMemo
 
   router.get("/admin/operator-limits/audit-events", (request, response, next) => {
     try {
-      requireRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
+      requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
       const auditEvents = operatorLimitsRepository.listAuditEvents()
         .map((event) => serializeAuditEvent(event));
       response.status(200).json(okEnvelope({ auditEvents }, request.requestId));
@@ -90,19 +89,6 @@ export function createAdminOperatorLimitsRouter(operatorLimitsRepository: InMemo
   });
 
   return router;
-}
-
-function requireRole(roleHeader: string | undefined, actorHeader: string | undefined, allowed: AdminRole[]): string {
-  const role = roleHeader as AdminRole | undefined;
-  if (!role || !allowed.includes(role)) {
-    throw new ApiHttpError(403, {
-      code: "ADMIN_UNAUTHORIZED",
-      message: "Admin role is not authorized for this operation.",
-      details: { requiredRoles: allowed }
-    });
-  }
-
-  return actorHeader?.trim() || "operator-system";
 }
 
 function normalizeOperatorLimitError(error: unknown): unknown {
