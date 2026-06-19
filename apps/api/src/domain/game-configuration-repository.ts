@@ -1,5 +1,6 @@
 import type { GameConfiguration, RtpReport, SimulationInput, SimulationResult } from "@china-slot-game/game-math";
 import { ApiHttpError } from "../middleware/error-handler.js";
+import type { AdminAuditRepository } from "./admin-audit-repository.js";
 import type { Clock } from "./session-service.js";
 
 export type GameConfigurationStatus = "draft" | "active" | "retired";
@@ -103,7 +104,10 @@ export class InMemoryGameConfigurationRepository implements GameConfigurationPro
   private readonly simulationRuns = new Map<string, SimulationRunRecord>();
   private readonly auditEvents: AdminAuditEventRecord[] = [];
 
-  public constructor(private readonly clock: Clock = { now: () => new Date() }) {}
+  public constructor(
+    private readonly clock: Clock = { now: () => new Date() },
+    private readonly adminAuditRepository?: AdminAuditRepository
+  ) {}
 
   public createDraft(input: DraftConfigurationInput): GameConfigurationRecord {
     if (this.records.has(input.id)) {
@@ -228,6 +232,25 @@ export class InMemoryGameConfigurationRepository implements GameConfigurationPro
       },
       createdAt: now
     }));
+    this.adminAuditRepository?.record({
+      actor: input.actor,
+      role: "operator",
+      action: "config.activate",
+      resource: { type: "config_version", id: activated.id },
+      reason: input.reason ?? null,
+      source: "config",
+      outcome: "succeeded",
+      before: null,
+      after: {
+        status: activated.status,
+        versionId: activated.versionId,
+        versionNumber: activated.versionNumber ?? null
+      },
+      metadata: {
+        configId: activated.configId,
+        mathReportId: activated.mathReportId ?? null
+      }
+    });
     return cloneRecord(activated);
   }
 
@@ -284,6 +307,28 @@ export class InMemoryGameConfigurationRepository implements GameConfigurationPro
       },
       createdAt: now
     }));
+    this.adminAuditRepository?.record({
+      actor: input.actor,
+      role: "operator",
+      action: "config.rollback",
+      resource: { type: "config_version", id: rolledBack.id },
+      reason: input.reason ?? null,
+      source: "config",
+      outcome: "succeeded",
+      before: previousActive ? {
+        id: previousActive.id,
+        versionId: previousActive.versionId,
+        status: previousActive.status
+      } : null,
+      after: {
+        id: rolledBack.id,
+        versionId: rolledBack.versionId,
+        status: rolledBack.status
+      },
+      metadata: {
+        targetVersionId: input.targetVersionId
+      }
+    });
     return cloneRecord(rolledBack);
   }
 

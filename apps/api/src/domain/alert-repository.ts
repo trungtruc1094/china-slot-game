@@ -1,4 +1,5 @@
 import { ApiHttpError } from "../middleware/error-handler.js";
+import type { AdminAuditRepository } from "./admin-audit-repository.js";
 import type { Clock } from "./session-service.js";
 
 export type AlertMetric = "observedRtpAbove" | "observedRtpBelow" | "remainingBudgetBelow" | "jackpotLiabilityAbove";
@@ -45,7 +46,10 @@ export class InMemoryAlertRepository implements AlertStateProvider {
   private readonly rules = new Map<string, AlertRuleRecord>();
   private readonly history: AlertHistoryEventRecord[] = [];
 
-  public constructor(private readonly clock: Clock = { now: () => new Date() }) {}
+  public constructor(
+    private readonly clock: Clock = { now: () => new Date() },
+    private readonly adminAuditRepository?: AdminAuditRepository
+  ) {}
 
   public upsertRule(input: Omit<AlertRuleRecord, "createdBy" | "updatedBy" | "createdAt" | "updatedAt"> & { actor: string }): AlertRuleRecord {
     const now = this.clock.now();
@@ -89,6 +93,31 @@ export class InMemoryAlertRepository implements AlertStateProvider {
       createdAt: this.clock.now()
     };
     this.history.push(cloneEvent(event));
+    this.adminAuditRepository?.record({
+      actor: event.actor,
+      role: event.actor === "alert-service" ? "system" : "operator",
+      action: `alert.${event.status}`,
+      resource: { type: "alert", id: event.id },
+      reason: event.reason ?? null,
+      source: "alerts",
+      outcome: "succeeded",
+      before: null,
+      after: {
+        ruleId: event.ruleId,
+        scopeId: event.scopeId,
+        status: event.status,
+        metric: event.metric,
+        metricValue: event.metricValue,
+        threshold: event.threshold,
+        severity: event.severity
+      },
+      metadata: {
+        evaluationKey: event.evaluationKey,
+        suggestedAction: event.suggestedAction,
+        windowStartAt: event.windowStartAt?.toISOString() ?? null,
+        windowEndAt: event.windowEndAt?.toISOString() ?? null
+      }
+    });
     return cloneEvent(event);
   }
 

@@ -25,6 +25,7 @@ import type { GameConfiguration } from "@china-slot-game/game-math";
 import { InMemoryAlertRepository } from "./domain/alert-repository.js";
 import { AlertService } from "./domain/alert-service.js";
 import { InMemoryBudgetProtectionRepository } from "./domain/budget-protection-repository.js";
+import { InMemoryAdminAuditRepository } from "./domain/admin-audit-repository.js";
 
 export interface AppDependencies {
   clock?: Clock;
@@ -40,6 +41,7 @@ export interface AppDependencies {
   sessionService?: SessionService;
   walletService?: WalletService;
   spinService?: SpinService;
+  adminAuditRepository?: InMemoryAdminAuditRepository;
 }
 
 export function createApp(dependencies: AppDependencies = {}): Express {
@@ -49,17 +51,24 @@ export function createApp(dependencies: AppDependencies = {}): Express {
     dependencies.clock
   );
   const walletService = dependencies.walletService ?? new WalletService(dependencies.clock ?? { now: () => new Date() });
-  const configRepository = dependencies.configRepository ?? new InMemoryGameConfigurationRepository(
+  const adminAuditRepository = dependencies.adminAuditRepository ?? new InMemoryAdminAuditRepository(
     dependencies.clock ?? { now: () => new Date() }
+  );
+  const configRepository = dependencies.configRepository ?? new InMemoryGameConfigurationRepository(
+    dependencies.clock ?? { now: () => new Date() },
+    adminAuditRepository
   );
   const operatorLimitsRepository = dependencies.operatorLimitsRepository ?? new InMemoryOperatorLimitsRepository(
-    dependencies.clock ?? { now: () => new Date() }
+    dependencies.clock ?? { now: () => new Date() },
+    adminAuditRepository
   );
   const alertRepository = dependencies.alertRepository ?? new InMemoryAlertRepository(
-    dependencies.clock ?? { now: () => new Date() }
+    dependencies.clock ?? { now: () => new Date() },
+    adminAuditRepository
   );
   const budgetProtectionRepository = dependencies.budgetProtectionRepository ?? new InMemoryBudgetProtectionRepository(
-    dependencies.clock ?? { now: () => new Date() }
+    dependencies.clock ?? { now: () => new Date() },
+    adminAuditRepository
   );
   const budgetProtectionEnabled = dependencies.budgetProtectionEnabled ?? process.env.BUDGET_PROTECTION_ENABLED !== "false";
   const spinOptions: SpinServiceOptions = {};
@@ -94,10 +103,10 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use("/api", createHealthRouter());
   app.use("/api", createAdminAlertsRouter(alertRepository, alertService));
   app.use("/api", createAdminBudgetProtectionRouter(budgetProtectionRepository, budgetProtectionEnabled));
-  app.use("/api", createAdminBalanceTransactionsRouter(walletService));
+  app.use("/api", createAdminBalanceTransactionsRouter(walletService, adminAuditRepository));
   app.use("/api", createAdminConfigRouter(configRepository));
   app.use("/api", createAdminOperatorLimitsRouter(operatorLimitsRepository));
-  app.use("/api", createAdminSpinLedgerRouter(spinService));
+  app.use("/api", createAdminSpinLedgerRouter(spinService, adminAuditRepository));
   app.use("/api", createAdminMetricsRouter(metricsService));
   app.use("/api", createSessionsRouter(sessionService));
   app.use("/api", createSpinsRouter(spinService));

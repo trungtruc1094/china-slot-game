@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { z, ZodError } from "zod";
+import type { AdminAuditRepository } from "../domain/admin-audit-repository.js";
 import type { SpinLedgerEntry, SpinService } from "../domain/spin-service.js";
 import type { WalletTransactionType } from "../domain/wallet-service.js";
 import { requireAdminRole } from "../middleware/admin-auth.js";
@@ -26,12 +27,15 @@ const spinLedgerQuerySchema = z.object({
   path: ["from"]
 });
 
-export function createAdminSpinLedgerRouter(spinService: SpinService): Router {
+export function createAdminSpinLedgerRouter(
+  spinService: SpinService,
+  adminAuditRepository?: AdminAuditRepository
+): Router {
   const router = Router();
 
   router.get("/admin/spins", (request, response, next) => {
     try {
-      requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support"]);
+      const identity = requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support"]);
       const query = spinLedgerQuerySchema.parse(request.query);
       const matchingEntries = spinService.getLedger()
         .filter((entry) => matchesQuery(entry, query))
@@ -39,6 +43,23 @@ export function createAdminSpinLedgerRouter(spinService: SpinService): Router {
       const records = matchingEntries
         .slice(query.offset, query.offset + query.limit)
         .map((entry) => serializeSpinLedgerEntry(entry));
+
+      adminAuditRepository?.record({
+        actor: identity.actor,
+        role: identity.role,
+        action: "admin.spin_ledger.search",
+        resource: { type: "admin_search", id: request.requestId ?? "req_unavailable" },
+        requestId: request.requestId ?? null,
+        source: "support-search",
+        outcome: "succeeded",
+        before: null,
+        after: null,
+        metadata: {
+          filters: redactQuery(query),
+          returned: records.length,
+          total: matchingEntries.length
+        }
+      });
 
       response.status(200).json(okEnvelope({
         records,
@@ -58,11 +79,48 @@ export function createAdminSpinLedgerRouter(spinService: SpinService): Router {
         }));
         return;
       }
+      recordAuthFailure(error, adminAuditRepository, request.requestId ?? null);
       next(error);
     }
   });
 
   return router;
+}
+
+function recordAuthFailure(
+  error: unknown,
+  adminAuditRepository: AdminAuditRepository | undefined,
+  requestId: string | null
+): void {
+  if (!(error instanceof ApiHttpError) || !["ADMIN_UNAUTHENTICATED", "ADMIN_FORBIDDEN"].includes(error.apiError.code)) {
+    return;
+  }
+  adminAuditRepository?.record({
+    actor: "unknown-admin",
+    role: "unknown",
+    action: error.apiError.code === "ADMIN_UNAUTHENTICATED" ? "admin.auth.unauthenticated" : "admin.auth.forbidden",
+    resource: { type: "admin_search", id: requestId ?? "req_unavailable" },
+    requestId,
+    source: "auth",
+    outcome: "failed",
+    before: null,
+    after: null,
+    metadata: { route: "GET /api/admin/spins" }
+  });
+}
+
+function redactQuery(query: ParsedSpinLedgerQuery): Record<string, unknown> {
+  return {
+    hasPlayerId: Boolean(query.playerId),
+    hasSessionId: Boolean(query.sessionId),
+    hasSpinId: Boolean(query.spinId),
+    hasConfigVersionId: Boolean(query.configVersionId),
+    from: query.from ?? null,
+    to: query.to ?? null,
+    transactionType: query.transactionType ?? null,
+    limit: query.limit,
+    offset: query.offset
+  };
 }
 
 type ParsedSpinLedgerQuery = z.infer<typeof spinLedgerQuerySchema>;

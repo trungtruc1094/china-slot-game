@@ -1,4 +1,5 @@
 import { ApiHttpError } from "../middleware/error-handler.js";
+import type { AdminAuditRepository } from "./admin-audit-repository.js";
 import type { Clock } from "./session-service.js";
 
 export type BudgetProtectionActionType = "disablePaidSpins" | "lowerMaxBet" | "pauseCampaign" | "requireHostApproval";
@@ -38,7 +39,10 @@ export class InMemoryBudgetProtectionRepository implements BudgetProtectionProvi
   private readonly actions = new Map<string, BudgetProtectionActionRecord>();
   private readonly auditEvents: BudgetProtectionAuditEventRecord[] = [];
 
-  public constructor(private readonly clock: Clock = { now: () => new Date() }) {}
+  public constructor(
+    private readonly clock: Clock = { now: () => new Date() },
+    private readonly adminAuditRepository?: AdminAuditRepository
+  ) {}
 
   public apply(input: {
     scopeId: string;
@@ -75,6 +79,27 @@ export class InMemoryBudgetProtectionRepository implements BudgetProtectionProvi
       },
       createdAt: now
     }));
+    this.adminAuditRepository?.record({
+      actor: input.actor,
+      role: "operator",
+      action: "budget_protection.apply",
+      resource: { type: "budget_protection_action", id: record.id },
+      reason: input.reason,
+      source: "budget-protection",
+      outcome: "succeeded",
+      before: null,
+      after: {
+        scopeId: record.scopeId,
+        action: record.action,
+        status: record.status,
+        parameters: record.parameters,
+        metricState: record.metricState
+      },
+      metadata: {
+        scopeId: input.scopeId,
+        action: input.action
+      }
+    });
     return cloneAction(record);
   }
 
@@ -111,6 +136,30 @@ export class InMemoryBudgetProtectionRepository implements BudgetProtectionProvi
       },
       createdAt: now
     }));
+    this.adminAuditRepository?.record({
+      actor,
+      role: "operator",
+      action: "budget_protection.revert",
+      resource: { type: "budget_protection_action", id: reverted.id },
+      reason,
+      source: "budget-protection",
+      outcome: "succeeded",
+      before: {
+        status: existing.status,
+        action: existing.action,
+        scopeId: existing.scopeId
+      },
+      after: {
+        status: reverted.status,
+        action: reverted.action,
+        scopeId: reverted.scopeId,
+        revertedBy: reverted.revertedBy ?? null
+      },
+      metadata: {
+        scopeId: reverted.scopeId,
+        action: reverted.action
+      }
+    });
     return cloneAction(reverted);
   }
 

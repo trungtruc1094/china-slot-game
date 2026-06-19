@@ -1,4 +1,5 @@
 import { ApiHttpError } from "../middleware/error-handler.js";
+import type { AdminAuditRepository } from "./admin-audit-repository.js";
 import type { Clock } from "./session-service.js";
 
 export type OperatorLimitStatus = "active" | "retired";
@@ -62,7 +63,10 @@ export class InMemoryOperatorLimitsRepository implements OperatorLimitsProvider 
   private readonly records = new Map<string, OperatorLimitRecord>();
   private readonly auditEvents: OperatorLimitAuditEventRecord[] = [];
 
-  public constructor(private readonly clock: Clock = { now: () => new Date() }) {}
+  public constructor(
+    private readonly clock: Clock = { now: () => new Date() },
+    private readonly adminAuditRepository?: AdminAuditRepository
+  ) {}
 
   public create(input: OperatorLimitInput): OperatorLimitRecord {
     this.assertNoActive(input.scopeId);
@@ -83,7 +87,7 @@ export class InMemoryOperatorLimitsRepository implements OperatorLimitsProvider 
     this.audit("operator_limits.create", record, input.actor, input.reason, {
       version: record.version,
       previousActiveVersion: null
-    });
+    }, null);
     return cloneRecord(record);
   }
 
@@ -122,6 +126,10 @@ export class InMemoryOperatorLimitsRepository implements OperatorLimitsProvider 
       version: record.version,
       previousActiveVersion: previousActive.version,
       previousActiveId: previousActive.id
+    }, {
+      id: previousActive.id,
+      version: previousActive.version,
+      limits: previousActive.limits
     });
     return cloneRecord(record);
   }
@@ -187,7 +195,8 @@ export class InMemoryOperatorLimitsRepository implements OperatorLimitsProvider 
     target: OperatorLimitRecord,
     actor: string,
     reason: string | undefined,
-    metadata: Record<string, unknown>
+    metadata: Record<string, unknown>,
+    before: Record<string, unknown> | null
   ): void {
     this.auditEvents.push(cloneAuditEvent({
       id: `operator_limit_audit_${this.auditEvents.length + 1}`,
@@ -198,6 +207,24 @@ export class InMemoryOperatorLimitsRepository implements OperatorLimitsProvider 
       metadata,
       createdAt: this.clock.now()
     }));
+    this.adminAuditRepository?.record({
+      actor,
+      role: "operator",
+      action,
+      resource: { type: "operator_limits", id: target.id },
+      reason: reason ?? null,
+      source: "operator-limits",
+      outcome: "succeeded",
+      before,
+      after: {
+        id: target.id,
+        scopeId: target.scopeId,
+        version: target.version,
+        status: target.status,
+        limits: target.limits
+      },
+      metadata
+    });
   }
 }
 

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { z, ZodError } from "zod";
+import type { AdminAuditRepository } from "../domain/admin-audit-repository.js";
 import type { WalletService, WalletTransactionRecord } from "../domain/wallet-service.js";
 import { requireAdminRole } from "../middleware/admin-auth.js";
 import { ApiHttpError } from "../middleware/error-handler.js";
@@ -23,12 +24,15 @@ const balanceTransactionQuerySchema = z.object({
   path: ["from"]
 });
 
-export function createAdminBalanceTransactionsRouter(walletService: WalletService): Router {
+export function createAdminBalanceTransactionsRouter(
+  walletService: WalletService,
+  adminAuditRepository?: AdminAuditRepository
+): Router {
   const router = Router();
 
   router.get("/admin/balance-transactions", (request, response, next) => {
     try {
-      requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support"]);
+      const identity = requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support"]);
       const query = balanceTransactionQuerySchema.parse(request.query);
       const matchingTransactions = walletService.listTransactions()
         .filter((transaction) => matchesQuery(transaction, query))
@@ -36,6 +40,23 @@ export function createAdminBalanceTransactionsRouter(walletService: WalletServic
       const records = matchingTransactions
         .slice(query.offset, query.offset + query.limit)
         .map((transaction) => serializeTransaction(transaction));
+
+      adminAuditRepository?.record({
+        actor: identity.actor,
+        role: identity.role,
+        action: "admin.balance_transactions.search",
+        resource: { type: "admin_search", id: request.requestId ?? "req_unavailable" },
+        requestId: request.requestId ?? null,
+        source: "support-search",
+        outcome: "succeeded",
+        before: null,
+        after: null,
+        metadata: {
+          filters: redactQuery(query),
+          returned: records.length,
+          total: matchingTransactions.length
+        }
+      });
 
       response.status(200).json(okEnvelope({
         records,
@@ -55,11 +76,46 @@ export function createAdminBalanceTransactionsRouter(walletService: WalletServic
         }));
         return;
       }
+      recordAuthFailure(error, adminAuditRepository, request.requestId ?? null);
       next(error);
     }
   });
 
   return router;
+}
+
+function recordAuthFailure(
+  error: unknown,
+  adminAuditRepository: AdminAuditRepository | undefined,
+  requestId: string | null
+): void {
+  if (!(error instanceof ApiHttpError) || !["ADMIN_UNAUTHENTICATED", "ADMIN_FORBIDDEN"].includes(error.apiError.code)) {
+    return;
+  }
+  adminAuditRepository?.record({
+    actor: "unknown-admin",
+    role: "unknown",
+    action: error.apiError.code === "ADMIN_UNAUTHENTICATED" ? "admin.auth.unauthenticated" : "admin.auth.forbidden",
+    resource: { type: "admin_search", id: requestId ?? "req_unavailable" },
+    requestId,
+    source: "auth",
+    outcome: "failed",
+    before: null,
+    after: null,
+    metadata: { route: "GET /api/admin/balance-transactions" }
+  });
+}
+
+function redactQuery(query: ParsedBalanceTransactionQuery): Record<string, unknown> {
+  return {
+    hasPlayerId: Boolean(query.playerId),
+    hasSessionId: Boolean(query.sessionId),
+    from: query.from ?? null,
+    to: query.to ?? null,
+    transactionType: query.transactionType ?? null,
+    limit: query.limit,
+    offset: query.offset
+  };
 }
 
 type ParsedBalanceTransactionQuery = z.infer<typeof balanceTransactionQuerySchema>;
