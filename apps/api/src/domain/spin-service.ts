@@ -76,7 +76,7 @@ export class SpinService {
     return [...this.ledger];
   }
 
-  public async spin(request: { clientSpinId: string; sessionId: string; wager: WagerInput }): Promise<SpinResponse> {
+  public async spin(request: { clientSpinId: string; sessionId: string; wager: WagerInput; correlationId?: string }): Promise<SpinResponse> {
     const idempotencyKey = `${request.sessionId}:${request.clientSpinId}`;
     const fingerprint = this.fingerprint(request.wager);
     const existingRecord = this.idempotencyRecords.get(idempotencyKey);
@@ -129,7 +129,7 @@ export class SpinService {
         amount: request.wager.totalWager,
         actor: "spin-service",
         source: request.sessionId,
-        metadata: { clientSpinId: request.clientSpinId }
+        metadata: { clientSpinId: request.clientSpinId, correlationId: request.correlationId ?? null }
       }
     ];
 
@@ -140,7 +140,7 @@ export class SpinService {
         amount: payout,
         actor: "spin-service",
         source: request.sessionId,
-        metadata: { clientSpinId: request.clientSpinId }
+        metadata: { clientSpinId: request.clientSpinId, correlationId: request.correlationId ?? null }
       });
     }
 
@@ -174,7 +174,8 @@ export class SpinService {
         for (const transaction of result.transactions) {
           transaction.metadata = {
             ...transaction.metadata,
-            spinId: spinResponse.spinId
+            spinId: spinResponse.spinId,
+            correlationId: request.correlationId ?? null
           };
         }
 

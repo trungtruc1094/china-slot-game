@@ -14,7 +14,21 @@ export function createSpinsRouter(spinService: SpinService, adminAuditRepository
     try {
       rejectCashEquivalentSignals(request.body, request.requestId, adminAuditRepository);
       const parsedRequest = createSpinRequestSchema.parse(request.body);
-      const spin = await spinService.spin(parsedRequest);
+      const spin = await spinService.spin({ ...parsedRequest, correlationId: request.requestId });
+      adminAuditRepository?.record({
+        actor: "spin-service",
+        role: "system",
+        action: "spin.accepted",
+        resource: { type: "spin", id: spin.spinId },
+        requestId: request.requestId,
+        source: "spins",
+        outcome: "succeeded",
+        metadata: {
+          clientSpinId: parsedRequest.clientSpinId,
+          sessionId: parsedRequest.sessionId,
+          configVersionId: spin.configVersionId
+        }
+      });
       response.status(200).json(okEnvelope(spin, request.requestId));
     } catch (error) {
       if (error instanceof ZodError) {

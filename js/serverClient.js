@@ -52,6 +52,10 @@
         return { provider: "guest", subject: subject };
     }
 
+    function createRequestId() {
+        return "req_browser_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2);
+    }
+
     function normalizeBackendSpinResult(result) {
         if (!result || !Array.isArray(result.reelStops)) {
             throw new Error("Backend spin result is missing reelStops.");
@@ -154,7 +158,7 @@
 
             var response = await fetchImpl(apiBaseUrl + path, {
                 method: "POST",
-                headers: { "content-type": "application/json" },
+                headers: { "content-type": "application/json", "x-request-id": createRequestId() },
                 body: JSON.stringify(body)
             });
             var envelope = await response.json();

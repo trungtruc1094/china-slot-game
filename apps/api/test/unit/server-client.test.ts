@@ -208,6 +208,45 @@ describe("browser server client render contract", () => {
     ]);
   });
 
+  it("propagates browser correlation IDs to session and spin backend requests", async () => {
+    const client = loadServerClient();
+    const headers: Array<Record<string, string>> = [];
+    const fetchMock = async (url: string, init: { headers: Record<string, string> }): Promise<MockResponse> => {
+      headers.push(init.headers);
+
+      if (url.endsWith("/api/sessions")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ data: { sessionId: "sess_123", playerId: "player_123" }, error: null })
+        };
+      }
+
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ data: backendResult, error: null })
+      };
+    };
+
+    const backendClient = client.createBackendClient({
+      mode: "production",
+      apiBaseUrl: "https://api.example.test",
+      identity: { provider: "guest", subject: "browser-player" },
+      fetch: fetchMock
+    });
+
+    await backendClient.spin({
+      clientSpinId: "client-spin-correlation",
+      wager: { lineBet: 1, selectedWays: 243, totalWager: 243 }
+    });
+
+    expect(headers).toHaveLength(2);
+    expect(headers[0]?.["x-request-id"]).toMatch(/^req_browser_/);
+    expect(headers[1]?.["x-request-id"]).toMatch(/^req_browser_/);
+    expect(headers[0]?.["x-request-id"]).not.toBe(headers[1]?.["x-request-id"]);
+  });
+
   it("keeps demo mode distinguishable and eligible to use local outcomes", () => {
     const client = loadServerClient();
     const localOutcome = { reelStopPositions: [1, 1, 1], payout: 10 };

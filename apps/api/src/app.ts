@@ -3,6 +3,7 @@ import express, { type Express } from "express";
 import helmet from "helmet";
 import { errorHandler, notFoundHandler } from "./middleware/error-handler.js";
 import { requestIdMiddleware } from "./middleware/request-id.js";
+import { requestTracingMiddleware } from "./middleware/request-tracing.js";
 import { createHealthRouter } from "./routes/health.routes.js";
 import { createRewardBoundaryRouter } from "./routes/reward-boundary.routes.js";
 import { createAdminAlertsRouter } from "./routes/admin-alerts.routes.js";
@@ -28,6 +29,7 @@ import { InMemoryAlertRepository } from "./domain/alert-repository.js";
 import { AlertService } from "./domain/alert-service.js";
 import { InMemoryBudgetProtectionRepository } from "./domain/budget-protection-repository.js";
 import { InMemoryAdminAuditRepository } from "./domain/admin-audit-repository.js";
+import { InMemoryRequestTraceRepository } from "./domain/request-trace-repository.js";
 
 export interface AppDependencies {
   clock?: Clock;
@@ -44,6 +46,7 @@ export interface AppDependencies {
   walletService?: WalletService;
   spinService?: SpinService;
   adminAuditRepository?: InMemoryAdminAuditRepository;
+  requestTraceRepository?: InMemoryRequestTraceRepository;
 }
 
 export function createApp(dependencies: AppDependencies = {}): Express {
@@ -56,6 +59,7 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   const adminAuditRepository = dependencies.adminAuditRepository ?? new InMemoryAdminAuditRepository(
     dependencies.clock ?? { now: () => new Date() }
   );
+  const requestTraceRepository = dependencies.requestTraceRepository ?? new InMemoryRequestTraceRepository();
   const configRepository = dependencies.configRepository ?? new InMemoryGameConfigurationRepository(
     dependencies.clock ?? { now: () => new Date() },
     adminAuditRepository
@@ -100,6 +104,7 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use(helmet());
   app.use(cors());
   app.use(requestIdMiddleware);
+  app.use(requestTracingMiddleware(requestTraceRepository, dependencies.clock ?? { now: () => new Date() }));
   app.use(express.json({ limit: "1mb" }));
 
   app.use("/api", createHealthRouter());
