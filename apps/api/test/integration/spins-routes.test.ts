@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../../src/app.js";
+import { InMemoryAdminAuditRepository } from "../../src/domain/admin-audit-repository.js";
 import { InMemoryGameConfigurationRepository } from "../../src/domain/game-configuration-repository.js";
 import { InMemoryOperatorLimitsRepository, type OperatorLimits } from "../../src/domain/operator-limits-repository.js";
 import { InMemoryPlayerIdentityAdapter } from "../../src/domain/player-identity.js";
@@ -24,6 +25,7 @@ let clock: MutableClock;
 let walletService: WalletService;
 let spinService: SpinService;
 let operatorLimitsRepository: InMemoryOperatorLimitsRepository;
+let auditRepository: InMemoryAdminAuditRepository;
 
 const permissiveOperatorLimits: OperatorLimits = {
   currency: "POINTS",
@@ -43,6 +45,7 @@ async function startServer(options: {
   clock = new MutableClock();
   const sessionService = new SessionService(new InMemoryPlayerIdentityAdapter(), clock);
   walletService = new WalletService(clock);
+  auditRepository = new InMemoryAdminAuditRepository(clock);
   operatorLimitsRepository = new InMemoryOperatorLimitsRepository(clock);
   if (options.operatorLimits) {
     operatorLimitsRepository.create({ scopeId: "default", limits: options.operatorLimits, actor: "operator-1" });
@@ -51,6 +54,7 @@ async function startServer(options: {
     clock,
     sessionService,
     walletService,
+    adminAuditRepository: auditRepository,
     operatorLimitsRepository
   };
   const spinOptions = {
@@ -147,6 +151,14 @@ describe("spin routes", () => {
       wager: { lineBet: 1, selectedWays: 1, totalWager: 1 },
       payout: 5,
       balanceAfter: 1004,
+      rewardModel: {
+        mode: "mvp_non_cash",
+        unit: "points",
+        cashEquivalent: false,
+        redemptionEnabled: false,
+        cashOutEnabled: false,
+        cryptoEnabled: false
+      },
       freeSpinState: { awarded: 0, remaining: 0 },
       jackpotState: { awarded: 0 }
     });
@@ -193,6 +205,74 @@ describe("spin routes", () => {
       error: { code: "INVALID_WAGER" }
     });
     await expect(currentBalanceAfterValidSpin(sessionId)).resolves.toBe(1004);
+  });
+
+  it("rejects cash-equivalent spin payload fields before wallet or ledger state changes", async () => {
+    const sessionId = await createSession();
+    const response = await postSpin({
+      clientSpinId: "spin-cashout-bypass",
+      sessionId,
+      wager: { lineBet: 1, selectedWays: 1, totalWager: 1 },
+      rewardType: "cash",
+      cashOutEnabled: true
+    });
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({
+      data: null,
+      error: {
+        code: "REWARD_TYPE_FORBIDDEN",
+        details: { rewardType: "cash" }
+      },
+      requestId: "req_spin_test"
+    });
+    expect(walletService.getWallet("player_1")).toMatchObject({ balance: 1000 });
+    expect(walletService.getTransactions("player_1")).toEqual([]);
+    expect(spinService.getLedger()).toEqual([]);
+    expect(auditRepository.list()).toEqual([
+      expect.objectContaining({
+        action: "reward_boundary.reject",
+        resource: { type: "reward_type", id: "cash" },
+        requestId: "req_spin_test",
+        source: "reward-boundary",
+        outcome: "failed",
+        metadata: expect.objectContaining({
+          rewardType: "cash",
+          route: "POST /api/spins"
+        })
+      })
+    ]);
+  });
+
+  it("rejects cash-equivalent spin payload key names before Zod stripping", async () => {
+    const sessionId = await createSession();
+    const response = await postSpin({
+      clientSpinId: "spin-cashout-key-bypass",
+      sessionId,
+      wager: { lineBet: 1, selectedWays: 1, totalWager: 1 },
+      cash_out: true
+    });
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({
+      data: null,
+      error: {
+        code: "REWARD_TYPE_FORBIDDEN",
+        details: { rewardType: "cash_out" }
+      },
+      requestId: "req_spin_test"
+    });
+    expect(walletService.getTransactions("player_1")).toEqual([]);
+    expect(spinService.getLedger()).toEqual([]);
+    expect(auditRepository.list()).toEqual([
+      expect.objectContaining({
+        action: "reward_boundary.reject",
+        resource: { type: "reward_type", id: "cash_out" },
+        requestId: "req_spin_test",
+        source: "reward-boundary",
+        outcome: "failed"
+      })
+    ]);
   });
 
   it("rejects inactive sessions", async () => {

@@ -100,6 +100,7 @@ describe("admin balance transaction search", () => {
       { headers: adminHeaders() }
     );
     const body = await response.json() as ApiEnvelope<{
+      rewardModel: Record<string, unknown>;
       records: Array<Record<string, unknown>>;
       page: Record<string, unknown>;
     }>;
@@ -109,6 +110,14 @@ describe("admin balance transaction search", () => {
 
     expect(response.status).toBe(200);
     expect(body.data?.page).toEqual({ limit: 1, offset: 0, total: 2, hasMore: true });
+    expect(body.data?.rewardModel).toMatchObject({
+      mode: "mvp_non_cash",
+      unit: "points",
+      cashEquivalent: false,
+      redemptionEnabled: false,
+      cashOutEnabled: false,
+      cryptoEnabled: false
+    });
     expect(body.data?.records).toHaveLength(1);
     expect(body.data?.records[0]).toMatchObject({
       transactionId: walletCredits[0]?.transactionId,
@@ -117,6 +126,14 @@ describe("admin balance transaction search", () => {
       amount: walletCredits[0]?.amount,
       balanceBefore: walletCredits[0]?.balanceBefore,
       balanceAfter: walletCredits[0]?.balanceAfter,
+      rewardModel: {
+        mode: "mvp_non_cash",
+        unit: "points",
+        cashEquivalent: false,
+        redemptionEnabled: false,
+        cashOutEnabled: false,
+        cryptoEnabled: false
+      },
       actor: "spin-service",
       source: sessionId,
       sessionId,

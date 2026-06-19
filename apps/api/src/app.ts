@@ -4,6 +4,7 @@ import helmet from "helmet";
 import { errorHandler, notFoundHandler } from "./middleware/error-handler.js";
 import { requestIdMiddleware } from "./middleware/request-id.js";
 import { createHealthRouter } from "./routes/health.routes.js";
+import { createRewardBoundaryRouter } from "./routes/reward-boundary.routes.js";
 import { createAdminAlertsRouter } from "./routes/admin-alerts.routes.js";
 import { createAdminAuditRouter } from "./routes/admin-audit.routes.js";
 import { createAdminBalanceTransactionsRouter } from "./routes/admin-balance-transactions.routes.js";
@@ -102,6 +103,7 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use(express.json({ limit: "1mb" }));
 
   app.use("/api", createHealthRouter());
+  app.use("/api", createRewardBoundaryRouter(adminAuditRepository));
   app.use("/api", createAdminAuditRouter(adminAuditRepository));
   app.use("/api", createAdminAlertsRouter(alertRepository, alertService));
   app.use("/api", createAdminBudgetProtectionRouter(budgetProtectionRepository, budgetProtectionEnabled));
@@ -111,7 +113,7 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use("/api", createAdminSpinLedgerRouter(spinService, adminAuditRepository));
   app.use("/api", createAdminMetricsRouter(metricsService));
   app.use("/api", createSessionsRouter(sessionService));
-  app.use("/api", createSpinsRouter(spinService));
+  app.use("/api", createSpinsRouter(spinService, adminAuditRepository));
   app.use(notFoundHandler);
   app.use(errorHandler);
 

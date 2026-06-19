@@ -21,6 +21,15 @@ export interface SessionResponse {
   balance: {
     points: number;
   };
+  rewardModel: {
+    mode: "mvp_non_cash";
+    unit: "points";
+    displayLabel: "Points";
+    cashEquivalent: false;
+    redemptionEnabled: false;
+    cashOutEnabled: false;
+    cryptoEnabled: false;
+  };
   session: {
     status: "active";
     createdAt: string;

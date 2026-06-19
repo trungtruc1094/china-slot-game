@@ -1,6 +1,7 @@
 import { ApiHttpError } from "../middleware/error-handler.js";
 import type { CreateSessionRequest, SessionResponse } from "../schemas/session.schema.js";
 import type { PlayerIdentityAdapter, PlayerRecord } from "./player-identity.js";
+import { getRewardModelMetadata } from "./reward-boundary.js";
 
 export interface SessionRecord {
   sessionId: string;
@@ -128,6 +129,7 @@ export class SessionService {
       balance: {
         points: starterBalancePoints
       },
+      rewardModel: getRewardModelMetadata(),
       session: {
         status: "active",
         createdAt: session.createdAt.toISOString(),

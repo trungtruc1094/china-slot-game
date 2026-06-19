@@ -13,6 +13,7 @@ import type { GameConfigurationProvider } from "./game-configuration-repository.
 import type { OperatorLimitRecord, OperatorLimitsProvider } from "./operator-limits-repository.js";
 import type { Clock, SessionService } from "./session-service.js";
 import type { WalletService, WalletTransactionRecord, WalletTransactionRequest } from "./wallet-service.js";
+import { getRewardModelMetadata, type RewardModelMetadata } from "./reward-boundary.js";
 
 export interface SpinResponse {
   spinId: string;
@@ -23,6 +24,7 @@ export interface SpinResponse {
   winBreakdown: WinBreakdown;
   payout: number;
   balanceAfter: number;
+  rewardModel: RewardModelMetadata;
   freeSpinState: {
     awarded: number;
     remaining: number;
@@ -151,6 +153,7 @@ export class SpinService {
       winBreakdown,
       payout,
       balanceAfter: 0,
+      rewardModel: getRewardModelMetadata(),
       freeSpinState: {
         awarded: winBreakdown.totalFreeSpins,
         remaining: winBreakdown.totalFreeSpins

@@ -9,6 +9,7 @@ export type AdminAuditSource =
   | "alerts"
   | "budget-protection"
   | "support-search"
+  | "reward-boundary"
   | "auth";
 export type AdminAuditOutcome = "succeeded" | "failed";
 

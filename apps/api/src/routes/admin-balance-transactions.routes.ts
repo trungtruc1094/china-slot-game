@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z, ZodError } from "zod";
 import type { AdminAuditRepository } from "../domain/admin-audit-repository.js";
+import { getRewardModelMetadata } from "../domain/reward-boundary.js";
 import type { WalletService, WalletTransactionRecord } from "../domain/wallet-service.js";
 import { requireAdminRole } from "../middleware/admin-auth.js";
 import { ApiHttpError } from "../middleware/error-handler.js";
@@ -59,6 +60,7 @@ export function createAdminBalanceTransactionsRouter(
       });
 
       response.status(200).json(okEnvelope({
+        rewardModel: getRewardModelMetadata(),
         records,
         page: {
           limit: query.limit,
@@ -147,6 +149,7 @@ function serializeTransaction(transaction: WalletTransactionRecord): Record<stri
     amount: transaction.amount,
     balanceBefore: transaction.balanceBefore,
     balanceAfter: transaction.balanceAfter,
+    rewardModel: getRewardModelMetadata(),
     actor: transaction.actor,
     source: transaction.source,
     sessionId: transaction.source,

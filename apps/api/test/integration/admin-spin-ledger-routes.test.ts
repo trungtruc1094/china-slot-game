@@ -102,12 +102,21 @@ describe("admin spin ledger search", () => {
       { headers: adminHeaders() }
     );
     const body = await response.json() as ApiEnvelope<{
+      rewardModel: Record<string, unknown>;
       records: Array<Record<string, unknown>>;
       page: Record<string, unknown>;
     }>;
 
     expect(response.status).toBe(200);
     expect(body.data?.page).toEqual({ limit: 1, offset: 1, total: 2, hasMore: false });
+    expect(body.data?.rewardModel).toMatchObject({
+      mode: "mvp_non_cash",
+      unit: "points",
+      cashEquivalent: false,
+      redemptionEnabled: false,
+      cashOutEnabled: false,
+      cryptoEnabled: false
+    });
     expect(body.data?.records).toHaveLength(1);
     expect(body.data?.records[0]).toMatchObject({
       spinId: "spin_1",
@@ -123,6 +132,14 @@ describe("admin spin ledger search", () => {
       payout: 5,
       balanceBefore: 1000,
       balanceAfter: 1004,
+      rewardModel: {
+        mode: "mvp_non_cash",
+        unit: "points",
+        cashEquivalent: false,
+        redemptionEnabled: false,
+        cashOutEnabled: false,
+        cryptoEnabled: false
+      },
       transactionTypes: ["debit", "credit"],
       acceptedAt: "2026-06-18T08:00:00.000Z"
     });

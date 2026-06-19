@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z, ZodError } from "zod";
 import type { AdminAuditRepository } from "../domain/admin-audit-repository.js";
+import { getRewardModelMetadata } from "../domain/reward-boundary.js";
 import type { SpinLedgerEntry, SpinService } from "../domain/spin-service.js";
 import type { WalletTransactionType } from "../domain/wallet-service.js";
 import { requireAdminRole } from "../middleware/admin-auth.js";
@@ -62,6 +63,7 @@ export function createAdminSpinLedgerRouter(
       });
 
       response.status(200).json(okEnvelope({
+        rewardModel: getRewardModelMetadata(),
         records,
         page: {
           limit: query.limit,
@@ -165,6 +167,7 @@ function serializeSpinLedgerEntry(entry: SpinLedgerEntry): Record<string, unknow
     payout: entry.payout,
     balanceBefore: firstTransaction?.balanceBefore ?? null,
     balanceAfter: lastTransaction?.balanceAfter ?? entry.balanceAfter,
+    rewardModel: getRewardModelMetadata(),
     transactionTypes: entry.walletTransactions.map((transaction) => transaction.type satisfies WalletTransactionType),
     acceptedAt: entry.acceptedAt.toISOString()
   };

@@ -76,6 +76,14 @@ describe("session routes", () => {
       sessionId: "sess_1",
       playerId: "player_1",
       balance: { points: 1000 },
+      rewardModel: {
+        mode: "mvp_non_cash",
+        unit: "points",
+        cashEquivalent: false,
+        redemptionEnabled: false,
+        cashOutEnabled: false,
+        cryptoEnabled: false
+      },
       session: {
         status: "active",
         createdAt: "2026-06-18T08:00:00.000Z",
