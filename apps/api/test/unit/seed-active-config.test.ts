@@ -11,11 +11,13 @@ class FixedClock implements Clock {
 }
 
 describe("seedActiveConfigForDeployment", () => {
+  const createRepository = (): InMemoryGameConfigurationRepository => new InMemoryGameConfigurationRepository(
+    new FixedClock(),
+    new InMemoryAdminAuditRepository(new FixedClock())
+  );
+
   it("creates and activates the deployment seed config", () => {
-    const repository = new InMemoryGameConfigurationRepository(
-      new FixedClock(),
-      new InMemoryAdminAuditRepository(new FixedClock())
-    );
+    const repository = createRepository();
 
     seedActiveConfigForDeployment(repository);
 
@@ -36,12 +38,21 @@ describe("seedActiveConfigForDeployment", () => {
   });
 
   it("does nothing when the seed draft already exists", () => {
-    const repository = new InMemoryGameConfigurationRepository(new FixedClock());
+    const repository = createRepository();
 
-    seedActiveConfigForDeployment(repository);
+    repository.createDraft({
+      id: "seed-fast-realish-94-draft",
+      config: seededActiveConfig,
+      actor: "test",
+      metadata: { reason: "Existing seed draft." }
+    });
+
     seedActiveConfigForDeployment(repository);
 
     expect(repository.list()).toHaveLength(1);
-    expect(repository.listSimulationRuns("seed-fast-realish-94-draft")).toHaveLength(1);
+    const existingDraft = repository.read("seed-fast-realish-94-draft");
+    expect(existingDraft).toMatchObject({ status: "draft" });
+    expect(existingDraft?.mathReportId).toBeUndefined();
+    expect(repository.listSimulationRuns("seed-fast-realish-94-draft")).toHaveLength(0);
   });
 });
