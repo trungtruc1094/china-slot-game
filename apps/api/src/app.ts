@@ -30,6 +30,7 @@ import { AlertService } from "./domain/alert-service.js";
 import { InMemoryBudgetProtectionRepository } from "./domain/budget-protection-repository.js";
 import { InMemoryAdminAuditRepository } from "./domain/admin-audit-repository.js";
 import { InMemoryRequestTraceRepository } from "./domain/request-trace-repository.js";
+import { seedActiveConfigForDeployment } from "./config/seed-active-config.js";
 
 export interface AppDependencies {
   clock?: Clock;
@@ -64,6 +65,9 @@ export function createApp(dependencies: AppDependencies = {}): Express {
     dependencies.clock ?? { now: () => new Date() },
     adminAuditRepository
   );
+  if (!dependencies.configRepository && process.env.SEED_ACTIVE_CONFIG === "true") {
+    seedActiveConfigForDeployment(configRepository);
+  }
   const operatorLimitsRepository = dependencies.operatorLimitsRepository ?? new InMemoryOperatorLimitsRepository(
     dependencies.clock ?? { now: () => new Date() },
     adminAuditRepository

@@ -6,6 +6,11 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
 jobs:
   quality-gates:
     name: Lint, Typecheck, Test, Coverage, Build
@@ -37,3 +42,48 @@ jobs:
 
       - name: Build all workspaces
         run: npm run build
+
+  deploy-pages:
+    name: Deploy static game to GitHub Pages
+    needs: quality-gates
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Write runtime API config
+        run: |
+          API_BASE_URL="${{ vars.CHINA_SLOT_API_BASE_URL }}"
+          if [ -z "$API_BASE_URL" ]; then
+            API_BASE_URL="http://127.0.0.1:3000"
+          fi
+          cat > js/runtime-config.js <<EOF
+          (function (globalScope) {
+              "use strict";
+
+              globalScope.CHINA_SLOT_API_BASE_URL = "$API_BASE_URL";
+          })(typeof window !== "undefined" ? window : globalThis);
+          EOF
+
+      - name: Prepare static game artifact
+        run: |
+          mkdir -p pages-dist
+          cp index.html pages-dist/
+          cp -R js png audio fonts pages-dist/
+          touch pages-dist/.nojekyll
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload static game
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: pages-dist
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

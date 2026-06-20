@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: china-slot-api
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start -w apps/api
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SEED_ACTIVE_CONFIG
+        value: "true"
+      - key: API_REQUEST_LOGS
+        value: "true"
+      - key: API_GAMEPLAY_LOGS
+        value: "true"

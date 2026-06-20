@@ -7,11 +7,11 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build --workspaces",
-    "lint": "npm run lint --workspaces --if-present",
-    "test": "npm run test --workspaces",
-    "test:coverage": "vitest run --coverage",
-    "typecheck": "npm run typecheck --workspaces"
+    "build": "npm run build -w @china-slot-game/game-math && npm run build -w @china-slot-game/api",
+    "lint": "npm run build -w @china-slot-game/game-math && npm run lint --workspaces --if-present",
+    "test": "npm run build -w @china-slot-game/game-math && npm run test --workspaces",
+    "test:coverage": "npm run build -w @china-slot-game/game-math && vitest run --coverage",
+    "typecheck": "npm run build -w @china-slot-game/game-math && npm run typecheck --workspaces"
   },
   "devDependencies": {
     "@types/node": "24.10.1",
