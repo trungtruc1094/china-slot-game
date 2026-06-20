@@ -15,6 +15,18 @@ export function createSpinsRouter(spinService: SpinService, adminAuditRepository
       rejectCashEquivalentSignals(request.body, request.requestId, adminAuditRepository);
       const parsedRequest = createSpinRequestSchema.parse(request.body);
       const spin = await spinService.spin({ ...parsedRequest, correlationId: request.requestId });
+      if (shouldLogGameplay()) {
+        console.info([
+          "[spin]",
+          `spinId=${spin.spinId}`,
+          `sessionId=${parsedRequest.sessionId}`,
+          `config=${spin.configVersionId}`,
+          `wager=${spin.wager.totalWager}`,
+          `payout=${spin.payout}`,
+          `balanceAfter=${spin.balanceAfter}`,
+          `requestId=${request.requestId}`
+        ].join(" "));
+      }
       adminAuditRepository?.record({
         actor: "spin-service",
         role: "system",
@@ -45,6 +57,10 @@ export function createSpinsRouter(spinService: SpinService, adminAuditRepository
   });
 
   return router;
+}
+
+function shouldLogGameplay(): boolean {
+  return process.env.NODE_ENV !== "test" && process.env.API_GAMEPLAY_LOGS !== "false";
 }
 
 function rejectCashEquivalentSignals(
