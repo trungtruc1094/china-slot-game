@@ -38,7 +38,11 @@
         }
 
         if (stored) {
-            return { provider: "guest", subject: stored };
+            return {
+                provider: "guest",
+                subject: stored,
+                expiresAt: createIdentityExpiry()
+            };
         }
 
         var subject = "browser-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2);
@@ -49,7 +53,15 @@
             // Storage is optional; keep the generated subject for this page session.
         }
 
-        return { provider: "guest", subject: subject };
+        return {
+            provider: "guest",
+            subject: subject,
+            expiresAt: createIdentityExpiry()
+        };
+    }
+
+    function createIdentityExpiry() {
+        return new Date(Date.now() + 60 * 60 * 1000).toISOString();
     }
 
     function createRequestId() {
