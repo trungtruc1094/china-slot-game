@@ -3,8 +3,15 @@ stepsCompleted: [1, 2, 3, 4]
 inputDocuments:
   - _bmad-output/planning-artifacts/prds/prd-china-slot-game-2026-06-01/prd.md
   - _bmad-output/planning-artifacts/prds/prd-china-slot-game-2026-06-01/addendum.md
+  - _bmad-output/planning-artifacts/prds/prd-china-slot-game-2026-06-01/database-persistence-addendum.md
   - _bmad-output/planning-artifacts/architecture.md
   - _bmad-output/project-context.md
+  - docs/project-overview.md
+  - docs/operations/retention-policy.md
+  - docs/operations/ci-quality-gates.md
+  - docs/operations/launch-readiness-checklist.md
+updatedAt: 2026-06-21
+status: complete
 ---
 
 # China Slot Game - Epic Breakdown
@@ -86,7 +93,7 @@ NFR12: Metrics clarity - Admin controls must distinguish theoretical game math f
 - Use strict TypeScript and pin the exact TypeScript version during implementation.
 - Use Express 5 for new TypeScript backend work unless dependency compatibility blocks it.
 - Use PostgreSQL as the authoritative data store, preferring PostgreSQL 18 for greenfield local/dev infrastructure where provider support allows it.
-- Decide Prisma versus plain SQL migrations before database implementation stories begin.
+- Use plain SQL migrations with `node-postgres` (`pg`) for the database persistence epic.
 - Keep the existing Phaser client as the presentation layer and add a production-mode backend adapter.
 - Create a canonical `packages/game-math` package used by backend spin execution, RTP calculation, simulations, and deterministic tests.
 - Ensure the game math package has no Express, database, or UI dependencies.
@@ -133,6 +140,107 @@ UX-DR5: Critical states such as balance, bet, win amount, errors, and disabled p
 
 UX-DR6: Local demo mode must be visually or operationally distinguishable from reward-bearing production mode for developers/operators.
 
+### Database Persistence Functional Requirements
+
+DP-FR1: Persist internal players and provider identity mappings so returning users resolve to the same stable internal player ID after restarts.
+
+DP-FR2: Persist sessions with create, resume, expire, lookup, and support-search behavior.
+
+DP-FR3: Persist one authoritative wallet per player and append-only wallet transaction records for non-cash game points.
+
+DP-FR4: Ensure wallet mutations are atomic, concurrency-safe, integer-based, and traceable by request or correlation ID.
+
+DP-FR5: Persist every accepted spin as an immutable durable spin ledger record with enough result detail for support explanation.
+
+DP-FR6: Commit spin idempotency, spin ledger, wallet debit, wallet credit, balance update, and related transaction records in one atomic database transaction.
+
+DP-FR7: Preserve spin idempotency by `sessionId` plus `clientSpinId`, including original-result retries and conflict errors for changed wager fingerprints.
+
+DP-FR8: Back existing game configuration drafts, activations, rollbacks, math reports, and simulation metadata with PostgreSQL repositories.
+
+DP-FR9: Persist operator limit versions and budget protection actions, and enforce limits safely under concurrent spins.
+
+DP-FR10: Persist metrics-related state, alert rules/history, admin audit events, and request traces required for launch operations and support search.
+
+DP-FR11: Add future-ready durable Tevi top-up/webhook idempotency records without implementing Tevi top-up, SDK bridge, webhook handling, or wallet crediting.
+
+DP-FR12: Recover production behavior from persisted state after API process restart, deployment restart, crash, or post-commit response delivery failure.
+
+DP-FR13: Provide repeatable SQL database migrations for CI and production deployment, including reconciliation of existing partial migrations.
+
+DP-FR14: Run persistence integration tests against an isolated PostgreSQL test database with migrated schema and data isolation.
+
+DP-FR15: Require `DATABASE_URL` or equivalent database connection secret in production/staging persistence mode and fail safe when unavailable.
+
+DP-FR16: Preserve existing Phaser client presentation behavior except for intentional API error or retry semantics required by persisted state.
+
+DP-FR17: Preserve the current non-cash reward boundary; persistence must not introduce cash-out, redemption, transferable value, or currency conversion behavior.
+
+### Database Persistence NonFunctional Requirements
+
+DP-NFR1: Data integrity must be enforced through database uniqueness, foreign keys, non-negative balance checks where applicable, valid status transitions, and immutable ledger/audit constraints where feasible.
+
+DP-NFR2: Wallet and accepted-spin flows must use ACID transactions and appropriate PostgreSQL isolation or locking for correctness.
+
+DP-NFR3: Persistence errors, lock contention, migration status, and database health must be observable through structured logs, traces, health checks, and operational metrics.
+
+DP-NFR4: Persistence must preserve game feel under expected launch traffic; exact latency targets should be validated during implementation.
+
+DP-NFR5: Admin/support workflows must search persisted records without direct database access.
+
+DP-NFR6: Database credentials must be supplied through environment secrets and PII-like provider data must be minimized and protected.
+
+DP-NFR7: Existing API contracts should remain stable unless changed intentionally for persistence safety.
+
+DP-NFR8: Persistence behavior must be verified with integration tests against PostgreSQL, not only unit tests or in-memory fakes.
+
+### Database Persistence Acceptance Criteria
+
+DP-AC1: Restarting the API does not lose players, sessions, wallets, wallet transactions, accepted spins, game configurations, operator limits, alerts, budget protection actions, admin audit events, request traces, or launch metrics history.
+
+DP-AC2: Duplicate spin retries with the same `sessionId` and `clientSpinId` return the original accepted result and do not double debit or double credit.
+
+DP-AC3: Duplicate spin retries with changed wager data return an idempotency conflict and do not mutate state.
+
+DP-AC4: Concurrent wallet updates for the same player cannot corrupt balances or produce inconsistent transaction history.
+
+DP-AC5: Failed spin ledger writes roll back wallet mutations.
+
+DP-AC6: Failed wallet mutations do not create accepted spin records or successful idempotency records.
+
+DP-AC7: A crash or restart after database commit but before HTTP response delivery can be recovered by retrying the same spin request and receiving the committed result.
+
+DP-AC8: A crash or restart before database commit leaves no partial accepted spin, wallet mutation, or success idempotency record.
+
+DP-AC9: Migrations can be applied from a clean database in CI and before production traffic uses the new schema.
+
+DP-AC10: Integration tests run against an isolated PostgreSQL test database.
+
+DP-AC11: Admin/support search works from persisted player, session, transaction, spin, config, limit, alert, audit, and trace records.
+
+DP-AC12: Active configuration, active operator limits, and active budget protection actions load from persisted state after restart.
+
+DP-AC13: Future Tevi top-up/webhook handling can be made idempotent using durable records before wallet crediting is implemented.
+
+DP-AC14: Production deployment fails safe when `DATABASE_URL` or schema readiness is missing.
+
+DP-AC15: Existing Phaser gameplay presentation remains unchanged except for intentional API error or retry semantics required by persistence.
+
+DP-AC16: No persistence change introduces cash-out, redemption, transferable value, or real-money reward behavior.
+
+### Database Persistence Architecture Requirements
+
+- Use PostgreSQL with plain SQL migrations and `node-postgres` (`pg`) for the persistence epic.
+- Add a production dependency composition boundary so production/staging startup constructs PostgreSQL-backed repositories and services instead of implicit in-memory defaults.
+- Preserve `createApp(dependencies)` as a testable Express composition function while requiring explicit in-memory dependency injection for unit/local test modes.
+- Add `apps/api/src/config/env.ts`, `apps/api/src/db/pool.ts`, `apps/api/src/db/transactions.ts`, `apps/api/src/composition/production-dependencies.ts`, and PostgreSQL repository implementations under `apps/api/src/repositories/postgres` or equivalent structure.
+- Define repository interfaces for players, sessions, wallets, spin ledger, spin idempotency, game configuration, operator limits, metrics, alerts, budget protection, admin audit, request traces, and future Tevi top-up idempotency.
+- Add or reconcile schema groups for `players`, `provider_identity_mappings`, `sessions`, `wallets`, `wallet_transactions`, `spins`, spin idempotency records, config/math/simulation records, operations state, audit/traces, and future provider top-up idempotency records.
+- Accepted spin handling must be one database transaction covering durable idempotency reservation/completion, session validation, active config/limit reads, wallet lock/update, wallet transaction inserts, spin ledger insert, transaction linking, and committed response payload storage.
+- Use ordered SQL migrations under `apps/api/db/migrations` with an applied-migrations table and scripts such as `db:migrate`, `db:check`, and `test:integration`.
+- Production readiness must distinguish API liveness from database/schema readiness.
+- CI must provision PostgreSQL before migration and persistence integration tests.
+
 ### FR Coverage Map
 
 FR1: Epic 2 - backend-authenticated game sessions.
@@ -171,6 +279,40 @@ FR17: Epic 5 - support search.
 
 FR18: Epic 5 and Epic 6 - audit trail and launch readiness.
 
+DP-FR1: Epic 7 - durable player and provider identity persistence.
+
+DP-FR2: Epic 7 - durable session create/resume/expire/search behavior.
+
+DP-FR3: Epic 7 - durable wallet and wallet transaction persistence.
+
+DP-FR4: Epic 7 - atomic and concurrency-safe wallet updates.
+
+DP-FR5: Epic 7 - durable accepted spin ledger persistence.
+
+DP-FR6: Epic 7 - atomic accepted spin transaction boundary.
+
+DP-FR7: Epic 7 - durable spin idempotency by session and client spin ID.
+
+DP-FR8: Epic 7 - PostgreSQL-backed game configuration, math report, and simulation persistence.
+
+DP-FR9: Epic 7 - persisted operator limits and budget protection state.
+
+DP-FR10: Epic 7 - persisted metrics, alerts, audit, and request trace state.
+
+DP-FR11: Epic 7 - future-ready Tevi top-up idempotency records without Tevi implementation.
+
+DP-FR12: Epic 7 - restart recovery from persisted production state.
+
+DP-FR13: Epic 7 - repeatable SQL migration requirements.
+
+DP-FR14: Epic 7 - isolated PostgreSQL test database requirements.
+
+DP-FR15: Epic 7 - production `DATABASE_URL`, schema readiness, and fail-safe startup behavior.
+
+DP-FR16: Epic 7 - unchanged Phaser client presentation except intentional persistence-safe API semantics.
+
+DP-FR17: Epic 7 - preserved non-cash reward boundary.
+
 ## Epic List
 
 ### Epic 1: Verified Slot Math Foundation
@@ -208,6 +350,12 @@ Operators and support users can access admin features, inspect spin and balance 
 The game can be safely deployed as a community reward mini game with non-cash reward boundaries, observability, retention rules, CI checks, and safe failure behavior.
 
 **FRs covered:** FR4, FR11, FR13, FR14, FR15, FR18
+
+### Epic 7: Production-Durable Gameplay and Operations Persistence
+
+Players, operators, and support users can rely on restart-safe PostgreSQL-backed state for gameplay, wallets, spin ledger, configuration, operational controls, audit, request traces, and future Tevi top-up idempotency before Tevi Mini App integration begins.
+
+**FRs covered:** DP-FR1, DP-FR2, DP-FR3, DP-FR4, DP-FR5, DP-FR6, DP-FR7, DP-FR8, DP-FR9, DP-FR10, DP-FR11, DP-FR12, DP-FR13, DP-FR14, DP-FR15, DP-FR16, DP-FR17
 
 ## Epic 1: Verified Slot Math Foundation
 
@@ -779,3 +927,192 @@ So that community deployment does not proceed with unresolved operational blocke
 **And** unresolved blockers are clearly marked
 **And** the checklist links to the relevant PRD, architecture, epics, and operational docs
 **And** launch is not marked ready while compliance boundary, reward model, player identity, or deterministic math matching remains unresolved
+
+## Epic 7: Production-Durable Gameplay and Operations Persistence
+
+Players, operators, and support users can rely on restart-safe PostgreSQL-backed state for gameplay, wallets, spin ledger, configuration, operational controls, audit, request traces, and future Tevi top-up idempotency before Tevi Mini App integration begins.
+
+### Story 7.1: Create PostgreSQL Runtime and Migration Harness
+
+As a developer,
+I want a PostgreSQL connection, schema readiness check, and SQL migration runner,
+So that production persistence can be introduced safely and repeatably.
+
+**Requirements:** DP-FR13, DP-FR14, DP-FR15, DP-NFR3, DP-NFR6, DP-NFR8, DP-AC9, DP-AC10, DP-AC14
+
+**Acceptance Criteria:**
+
+**Given** the API package is installed
+**When** the persistence harness is implemented
+**Then** `@china-slot-game/api` includes `pg` or an equivalent node-postgres dependency, a PostgreSQL pool module, a transaction helper, and a schema readiness check
+**And** ordered SQL migrations under `apps/api/db/migrations` are applied through a migration runner that records applied migrations
+**And** migration execution from an empty PostgreSQL database succeeds in an isolated test database
+**And** a failed migration blocks schema readiness and surfaces a structured error
+**And** production or `PERSISTENCE_MODE=postgres` startup fails when `DATABASE_URL` is missing or invalid
+**And** local/test modes can still inject explicit in-memory dependencies without pretending to be production
+
+### Story 7.2: Persist Players, Provider Identity Mappings, and Sessions
+
+As a returning player,
+I want my identity and active session to survive API restarts,
+So that gameplay continuity does not depend on process memory.
+
+**Requirements:** DP-FR1, DP-FR2, DP-FR12, DP-FR15, DP-NFR1, DP-NFR6, DP-NFR7, DP-AC1, DP-AC11, DP-AC12
+
+**Acceptance Criteria:**
+
+**Given** PostgreSQL persistence mode is enabled
+**When** a valid identity starts or resumes a session
+**Then** the API persists a stable internal player record, provider plus subject mapping, session ID, status, created time, expiration time, and relevant request metadata
+**And** repeated session creation for the same provider subject returns the same internal player ID
+**And** resume succeeds only for the same resolved player and an unexpired persisted session
+**And** expired sessions are rejected for gameplay but remain searchable for support/audit use
+**And** restarting the API does not lose active unexpired sessions or make expired sessions active
+**And** tests cover new player creation, existing provider mapping reuse, session resume, session expiration, restart recovery, and support search filters
+
+### Story 7.3: Persist Configuration Versions, Math Reports, and Simulation Runs
+
+As a host,
+I want configuration drafts, activations, rollbacks, math reports, and simulation runs stored durably,
+So that live economics and historical spin explanations survive restarts.
+
+**Requirements:** DP-FR8, DP-FR12, DP-FR13, DP-NFR1, DP-NFR3, DP-NFR8, DP-AC1, DP-AC9, DP-AC12
+
+**Acceptance Criteria:**
+
+**Given** existing configuration, math report, and simulation APIs
+**When** PostgreSQL-backed configuration persistence is implemented
+**Then** drafts, active versions, retired versions, rollback state, math reports, and simulation metadata are stored in PostgreSQL repositories
+**And** existing partial migrations for `game_config_versions` are reconciled with any missing math report and simulation persistence tables
+**And** draft configurations remain editable until activation and never affect live spins
+**And** activated versions are immutable for gameplay purposes except allowed retirement or rollback status transitions
+**And** rollback changes only future spins and preserves historical references
+**And** simulation persistence writes only simulation records and never mutates player wallets, sessions, or live spin ledger
+**And** tests cover draft lifecycle, activation, rollback, math report attachment, simulation storage, migration-from-empty behavior, and restart recovery of active config
+
+### Story 7.4: Persist Wallets and Wallet Transactions With Concurrency Safety
+
+As a player,
+I want my non-cash point balance to be durable and correct under concurrent requests,
+So that debits, credits, and adjustments cannot be lost or duplicated.
+
+**Requirements:** DP-FR3, DP-FR4, DP-FR12, DP-FR17, DP-NFR1, DP-NFR2, DP-NFR3, DP-NFR8, DP-AC1, DP-AC4, DP-AC5, DP-AC6, DP-AC16
+
+**Acceptance Criteria:**
+
+**Given** a player with a PostgreSQL-backed wallet
+**When** debits, credits, jackpot awards, free-spin awards, or adjustments are applied
+**Then** the wallet balance and append-only wallet transaction records are persisted with integer amounts, balance before, balance after, actor, source, timestamp, correlation ID when available, and metadata
+**And** wallet creation is idempotent and safe under concurrent first use
+**And** concurrent updates for the same player serialize through row-level locks, conditional atomic updates, or an equivalent PostgreSQL-enforced mechanism
+**And** insufficient balance fails without writing a wallet transaction or accepted spin record
+**And** failed transaction inserts roll back wallet balance changes
+**And** transaction history is searchable by player, transaction type, source/session, spin ID when present, and date range
+**And** tests cover debit, credit, adjustment, insufficient balance, concurrent updates, rollback after injected failure, restart recovery, and non-cash reward labels/metadata
+
+### Story 7.5: Persist Accepted Spins and Durable Spin Idempotency Atomically
+
+As a player,
+I want accepted spins and retries to be durable and idempotent,
+So that crashes, duplicate requests, or network retries cannot double debit or double credit me.
+
+**Requirements:** DP-FR5, DP-FR6, DP-FR7, DP-FR12, DP-FR16, DP-FR17, DP-NFR1, DP-NFR2, DP-NFR3, DP-NFR7, DP-NFR8, DP-AC1, DP-AC2, DP-AC3, DP-AC5, DP-AC6, DP-AC7, DP-AC8, DP-AC15, DP-AC16
+
+**Acceptance Criteria:**
+
+**Given** PostgreSQL-backed sessions, wallets, and active configuration exist
+**When** a valid spin request with `sessionId` and `clientSpinId` is accepted
+**Then** durable idempotency reservation/completion, session validation, wallet debit, wallet credit if any, wallet transaction inserts, spin ledger insert, transaction-to-spin linking, and committed response payload storage happen in one database transaction
+**And** the API returns an accepted spin response only after commit
+**And** the spin ledger stores spin ID, session ID, player ID, client spin ID, config version ID, wager, reel stops, visible window, win breakdown, payout, free-spin state, jackpot award amount, balance after, accepted timestamp, request/correlation identifiers, and wallet transaction references
+**And** duplicate retries with the same session, client spin ID, and wager fingerprint return the original accepted result without additional wallet mutations
+**And** duplicate retries with changed wager data return an idempotency conflict without mutating state
+**And** injected wallet failures prevent accepted spin and success idempotency records
+**And** injected ledger failures roll back wallet mutations and idempotency completion
+**And** restart after commit but before response delivery can be recovered by retrying the same spin request
+**And** restart before commit leaves no partial accepted spin, wallet mutation, or success idempotency record
+**And** existing Phaser presentation behavior remains unchanged except for intentional retry/conflict/error semantics
+
+### Story 7.6: Persist Operational Controls, Metrics, Alerts, Audit, and Request Traces
+
+As an operator or support user,
+I want limits, metrics, alerts, audits, and request traces to survive restarts,
+So that launch operations and incident review use one durable source of truth.
+
+**Requirements:** DP-FR9, DP-FR10, DP-FR12, DP-FR13, DP-NFR1, DP-NFR3, DP-NFR5, DP-NFR8, DP-AC1, DP-AC11, DP-AC12
+
+**Acceptance Criteria:**
+
+**Given** PostgreSQL persistence mode is enabled
+**When** operator limits, budget protection actions, alert rules/history, admin audit events, request traces, and metrics state are created or read
+**Then** those records are persisted through PostgreSQL-backed repositories
+**And** existing partial migrations for operator limits, metric buckets, alert rules/history, and budget protection are reconciled with runtime repository use
+**And** active operator limits and active budget protection actions load from persisted state after restart
+**And** spin validation evaluates persisted active limits and budget protection actions
+**And** budget and jackpot cap checks remain safe under concurrent spins
+**And** metrics are either derived from durable ledgers or stored in rebuildable buckets with ledger reconciliation as source of truth
+**And** admin/support search can retrieve persisted spin, wallet transaction, config, limit, alert, audit, and trace records
+**And** request traces include request ID, correlation ID where available, route/action context, status/outcome, duration, error code, and relevant player/session/spin/admin identifiers
+**And** tests cover restart recovery, search filters, active limit loading, active protection loading, alert persistence, audit persistence, request trace persistence, and metrics reconciliation
+
+### Story 7.7: Add Future Tevi Top-Up Idempotency Persistence
+
+As a future Tevi integration developer,
+I want durable provider top-up idempotency records available before webhook/top-up implementation,
+So that later payment-like retries can be made safe before wallet crediting is introduced.
+
+**Requirements:** DP-FR11, DP-FR12, DP-FR17, DP-NFR1, DP-NFR6, DP-NFR8, DP-AC1, DP-AC13, DP-AC16
+
+**Acceptance Criteria:**
+
+**Given** the persistence schema is migrated
+**When** future-ready top-up idempotency persistence is added
+**Then** the database can store provider name, provider event ID or token, normalized idempotency key, mapped player ID when known, status, amount or points metadata, raw provider metadata, first seen time, last seen time, completion time, and failure reason
+**And** provider event/token uniqueness is enforced durably
+**And** supported statuses include pending, completed, failed, ignored, or duplicate
+**And** repository operations can create, read, mark completed, mark failed, and detect duplicates without crediting a wallet
+**And** no Tevi SDK, Tevi identity, webhook handler, top-up processing, wallet crediting, cash-out, redemption, or real-money semantics are implemented in this story
+**And** tests cover unique provider event enforcement, duplicate detection, status transitions, restart recovery, and non-cash metadata language
+
+### Story 7.8: Wire Production PostgreSQL Dependencies and Fail-Safe Startup
+
+As an operator,
+I want production startup to use PostgreSQL-backed services or fail safely,
+So that reward-bearing play never runs on accidental in-memory state.
+
+**Requirements:** DP-FR12, DP-FR13, DP-FR15, DP-FR16, DP-FR17, DP-NFR3, DP-NFR6, DP-NFR7, DP-AC1, DP-AC12, DP-AC14, DP-AC15, DP-AC16
+
+**Acceptance Criteria:**
+
+**Given** the PostgreSQL repositories are implemented
+**When** the API starts in production or `PERSISTENCE_MODE=postgres`
+**Then** production dependency composition constructs PostgreSQL-backed repositories and services for player identity, sessions, wallets, spins, config, limits, metrics, alerts, budget protection, audit, request traces, and Tevi top-up idempotency
+**And** production startup fails when `DATABASE_URL` is missing, unreachable, or schema readiness fails
+**And** production startup does not silently fall back to in-memory repositories or process-local ledgers
+**And** in-memory dependencies remain available only through explicit test/local composition
+**And** `SEED_ACTIVE_CONFIG=true` cannot seed an in-memory active config in production persistence mode
+**And** liveness and readiness endpoints distinguish API process health from database/schema readiness
+**And** existing Phaser client behavior remains unchanged for successful persisted API responses
+**And** tests cover production dependency selection, missing database URL, database unavailable, schema not ready, in-memory local composition, and readiness responses
+
+### Story 7.9: Verify Persistence Recovery, Admin Search, and Quality Gates
+
+As a host,
+I want persistence recovery and launch gates verified end to end,
+So that the game is ready for Tevi planning only after durable state is proven.
+
+**Requirements:** DP-FR12, DP-FR13, DP-FR14, DP-FR15, DP-FR16, DP-FR17, DP-NFR3, DP-NFR5, DP-NFR8, DP-AC1, DP-AC2, DP-AC4, DP-AC7, DP-AC9, DP-AC10, DP-AC11, DP-AC12, DP-AC13, DP-AC14, DP-AC15, DP-AC16
+
+**Acceptance Criteria:**
+
+**Given** the persistence epic implementation is complete
+**When** the persistence verification suite runs
+**Then** CI can provision or connect to an isolated PostgreSQL database, apply migrations, run persistence integration tests, and report migration or database failures as a named gate
+**And** tests prove restart recovery for players, sessions, wallets, transactions, accepted spins, config history, active limits, active budget protection, alerts, audit events, request traces, metrics history, and future top-up idempotency records
+**And** tests prove duplicate spin retries do not double debit or double credit
+**And** tests prove concurrent wallet updates do not corrupt balances
+**And** tests prove admin/support search works from persisted records after restart
+**And** launch readiness documentation is updated to mark database persistence as required before Tevi integration
+**And** CI quality-gate documentation is updated to include migration and PostgreSQL integration checks
+**And** no cash-out, redemption, transferable value, or Tevi top-up implementation is introduced
+

@@ -3,6 +3,7 @@ stepsCompleted: [1, 2, 3, 4, 5, 6, 7, 8]
 inputDocuments:
   - _bmad-output/planning-artifacts/prds/prd-china-slot-game-2026-06-01/prd.md
   - _bmad-output/planning-artifacts/prds/prd-china-slot-game-2026-06-01/addendum.md
+  - _bmad-output/planning-artifacts/prds/prd-china-slot-game-2026-06-01/database-persistence-addendum.md
   - _bmad-output/project-context.md
   - docs/project-overview.md
 workflowType: architecture
@@ -12,6 +13,7 @@ date: 2026-06-01
 lastStep: 8
 status: complete
 completedAt: 2026-06-01
+updatedAt: 2026-06-21
 ---
 
 # Architecture Decision Document: China Slot Game
@@ -515,3 +517,233 @@ The architecture is ready for epics and stories, with these caveats:
 Status: ready for `bmad-create-epics-and-stories`.
 
 The architecture is sufficiently complete for downstream story generation. Implementation should begin with the shared game math package and deterministic tests before wiring production spin APIs, because correctness of RTP, ways calculation, scatter, jackpot, and payouts is the foundation for every later operational metric.
+
+## Database Persistence Architecture Update
+
+### Update Context
+
+This update incorporates the Database Persistence PRD addendum dated 2026-06-21. The original architecture correctly selected PostgreSQL as the authoritative data store and required balance updates, spin ledger writes, and transaction records to commit together. The implemented API now has the domain surface for sessions, wallets, spins, configurations, operator limits, alerts, budget protection, admin audit, and request tracing, but `apps/api/src/app.ts` still composes in-memory services by default.
+
+The persistence architecture must convert production API state from process memory to PostgreSQL before Tevi Mini App identity, Stars top-ups, SDK `topup()`, webhooks, or payment-like retry flows are implemented.
+
+### Technology Decision
+
+Use PostgreSQL with plain SQL migrations and `node-postgres` (`pg`) for the persistence epic.
+
+Rationale:
+
+- The repo already contains SQL migrations under `apps/api/db/migrations`.
+- Wallet and spin correctness require explicit transaction boundaries, row locking, uniqueness constraints, and failure injection tests that are easiest for implementation agents to reason about in SQL.
+- The current API package does not yet depend on Prisma or `pg`; adding `pg` is the smaller architectural move than introducing an ORM after SQL migration work has started.
+- Node.js 24 is an active LTS release, and PostgreSQL 18 is supported by the PostgreSQL project. Use PostgreSQL 18 where hosting supports it, with PostgreSQL 17+ acceptable for managed-provider compatibility.
+
+### Production Composition Boundary
+
+Preserve `createApp(dependencies)` as the testable Express composition function, but stop letting production startup rely on implicit in-memory defaults.
+
+Add a production dependency composition boundary:
+
+- `apps/api/src/config/env.ts` validates runtime mode, `DATABASE_URL`, migration requirements, and optional feature flags.
+- `apps/api/src/db/pool.ts` owns the PostgreSQL pool and connection health checks.
+- `apps/api/src/db/transactions.ts` exposes a small transaction helper that passes a transaction-scoped client through repository calls.
+- `apps/api/src/repositories/postgres/*` contains PostgreSQL-backed repository implementations.
+- `apps/api/src/composition/production-dependencies.ts` constructs production repositories and services.
+- `apps/api/src/main.ts` uses production dependency composition for production/staging runtime.
+- Tests and narrow local demos may still call `createApp({ ...inMemoryDependencies })` explicitly.
+
+Production mode rules:
+
+- If `NODE_ENV=production` or `PERSISTENCE_MODE=postgres`, missing or invalid `DATABASE_URL` fails startup.
+- Production startup must not silently fall back to `InMemoryPlayerIdentityAdapter`, `SessionService` with map-backed sessions, map-backed `WalletService`, `SpinService` in-memory ledger/idempotency, or in-memory admin repositories.
+- `SEED_ACTIVE_CONFIG=true` may seed only through an explicit database-aware seed path, never by mutating an in-memory active config during production startup.
+- Health endpoints distinguish liveness from readiness. Readiness fails when PostgreSQL is unavailable or schema readiness is not satisfied.
+
+### Repository Boundaries
+
+Move production persistence behind explicit repository/provider interfaces so domain services stop depending on process-local collections.
+
+Required repository boundaries:
+
+- `PlayerRepository`: creates/reads internal players and stable provider identity mappings.
+- `SessionRepository`: creates, resumes, expires, and searches persisted sessions.
+- `WalletRepository`: reads wallets, creates wallets idempotently, applies transaction-scoped balance updates, and lists wallet transactions.
+- `SpinLedgerRepository`: writes accepted spins, retrieves spin details/search results, and resolves original idempotent spin responses.
+- `SpinIdempotencyRepository`: reserves and completes `sessionId` plus `clientSpinId` keys with wager fingerprints and committed response payloads.
+- `GameConfigurationRepository`: persists drafts, activations, retirements, rollbacks, math reports, and simulation runs.
+- `OperatorLimitsRepository`: persists active/retired limit versions and provides transaction-safe limit reads for spin validation.
+- `MetricsRepository`: stores/rebuilds metric buckets where needed while keeping ledger-derived reconciliation possible.
+- `AlertRepository`: persists alert rules, alert history, acknowledgments, and resolutions.
+- `BudgetProtectionRepository`: persists active/reverted protection actions and audit events.
+- `AdminAuditRepository`: persists append-only admin audit events.
+- `RequestTraceRepository`: persists request traces needed for support and incident review.
+- `TeviTopupIdempotencyRepository`: stores future provider idempotency records without implementing Tevi crediting.
+
+Domain services should depend on these interfaces, not concrete PostgreSQL classes. In-memory implementations remain test doubles, not production defaults.
+
+### Schema Direction
+
+Use database snake_case naming and API camelCase payloads, consistent with the existing architecture.
+
+Core schema groups:
+
+- Identity: `players`, `provider_identity_mappings`.
+- Sessions: `sessions` with `active` and `expired` status history.
+- Wallets: `wallets`, `wallet_transactions`.
+- Spins: `spins`, `spin_wallet_transactions`, `spin_idempotency_keys` or equivalent uniqueness table.
+- Configuration: existing `game_config_versions`, plus required math report and simulation persistence if not already represented by migrations.
+- Operations: existing or reconciled `operator_limits`, `operator_metric_buckets`, `alert_rules`, `alert_history`, `budget_protection_actions`, `budget_protection_audit_events`.
+- Audit and traces: `admin_audit_events`, `request_traces`.
+- Future Tevi safety: `provider_topup_idempotency_records` or `tevi_topup_idempotency_records` with provider event/token uniqueness.
+
+Schema rules:
+
+- Store all balance, wager, payout, cap, jackpot, and top-up-like values as integer minor units.
+- Enforce uniqueness for provider mappings and spin idempotency keys in PostgreSQL.
+- Use foreign keys for historical explainability where records must remain linked, with delete behavior chosen to preserve audit history.
+- Activated config versions, accepted spins, wallet transactions, and admin audit events are append-first historical records. Corrections use compensating rows or explicit status transitions.
+- Store player-visible spin result payloads in enough detail to support later explanation without recomputing through changed code.
+
+Existing migrations `0001` through `0005` are partial production schema, not the complete persistence model. The persistence epic should add missing migrations and reconcile existing migration names/locations into the canonical migration runner.
+
+### Transaction Boundaries
+
+Accepted spin handling is the highest-integrity transaction in the system.
+
+The spin transaction must include:
+
+1. Resolve and lock or reserve the durable idempotency key for `sessionId` plus `clientSpinId`.
+2. Validate the session from persisted session state.
+3. Read active config and active operator/budget protection state from persisted records.
+4. Lock the player's wallet row or perform an equivalent conditional atomic update.
+5. Insert wallet debit and credit transaction rows with balance before/after values.
+6. Insert the accepted spin ledger row with config version, wager, stops, win breakdown, payout, balance after, and trace metadata.
+7. Link wallet transactions to the spin.
+8. Complete the idempotency record with the committed response payload.
+9. Commit before returning an accepted response.
+
+Rollback rules:
+
+- If wallet debit fails, no accepted spin or success idempotency record is written.
+- If wallet credit or transaction insert fails, the debit rolls back.
+- If spin ledger insert fails, wallet mutations and idempotency completion roll back.
+- If response delivery fails after commit, retry returns the committed result through durable idempotency lookup.
+
+Concurrent wallet updates for the same player must serialize through PostgreSQL row-level locks or an equivalent conditional update pattern. Implementation stories should include concurrency tests against PostgreSQL, not only in-memory service tests.
+
+### Migration Strategy
+
+Use ordered SQL migration files under `apps/api/db/migrations` and add a migration runner that records applied migrations in a schema migrations table.
+
+Migration requirements:
+
+- Migrations run from an empty database in CI.
+- Production deployment runs migrations before serving traffic that depends on the schema.
+- Failed migrations block deployment/startup rather than falling back to in-memory state.
+- Destructive rollback is not assumed for production ledger tables; forward-fix migrations are acceptable for append-only operational data.
+- Migration logs/status are visible in deployment output.
+
+Recommended scripts:
+
+- `npm run db:migrate -w @china-slot-game/api`
+- `npm run db:check -w @china-slot-game/api`
+- `npm run test:integration -w @china-slot-game/api`
+
+### Test Database Strategy
+
+Persistence behavior must be verified against PostgreSQL.
+
+Test setup rules:
+
+- Integration tests use an isolated `DATABASE_URL`, never production data.
+- Test setup applies all migrations from a clean state.
+- Test cases isolate data through schema reset, transaction rollback, or per-worker database/schema names.
+- CI provisions PostgreSQL before migration and persistence integration tests.
+- Concurrency, rollback, restart-recovery, idempotency, admin/support search, and schema-readiness tests run against PostgreSQL.
+
+Minimum persistence test coverage:
+
+- Restart does not lose players, sessions, wallets, transactions, spins, configs, limits, alerts, audits, traces, or future top-up idempotency records.
+- Duplicate spin retry returns the original accepted result and does not double debit or credit.
+- Changed-wager duplicate retry returns idempotency conflict.
+- Concurrent wallet updates cannot corrupt balances.
+- Injected ledger failure rolls back wallet mutations.
+- Injected wallet failure prevents accepted spin creation.
+- Production startup fails without `DATABASE_URL` when PostgreSQL persistence is required.
+
+### Admin, Metrics, Alerts, And Search
+
+Admin/support APIs must be backed by persisted records after this epic.
+
+- Spin search reads `spins` and related wallet/idempotency/request metadata.
+- Balance transaction search reads `wallet_transactions`.
+- Metrics either query durable ledgers directly or use rebuildable `operator_metric_buckets`; the ledger remains the reconciliation source of truth.
+- Alert history, budget protection actions, and admin audit events survive restarts and remain searchable.
+- Request traces include request ID, correlation ID when available, route/action context, status/outcome, duration, error code, and relevant player/session/spin/admin identifiers.
+
+### Tevi Readiness Boundary
+
+Add durable future-ready top-up idempotency records now, but do not implement Tevi top-up behavior in this epic.
+
+The record model must support:
+
+- Provider name.
+- Provider event ID or token.
+- Normalized idempotency key.
+- Player ID when known.
+- Status such as `pending`, `completed`, `failed`, `ignored`, or `duplicate`.
+- Amount/points metadata without implying redeemable value.
+- Raw provider metadata.
+- First seen, last seen, completed, and failed timestamps.
+- Failure reason/details.
+
+This table exists so a future Tevi webhook or SDK retry can be made idempotent before wallet crediting. It must not create cash-out, redemption, transferable value, or real-money reward semantics.
+
+### Updated Structure Additions
+
+Add or refine the API structure as follows:
+
+```text
+apps/api/
+├── db/
+│   ├── migrations/
+│   └── test-utils/
+├── src/
+│   ├── composition/
+│   │   ├── in-memory-dependencies.ts
+│   │   └── production-dependencies.ts
+│   ├── config/
+│   │   └── env.ts
+│   ├── db/
+│   │   ├── pool.ts
+│   │   ├── migrate.ts
+│   │   ├── schema-readiness.ts
+│   │   └── transactions.ts
+│   ├── repositories/
+│   │   ├── interfaces/
+│   │   ├── in-memory/
+│   │   └── postgres/
+│   └── test-support/
+│       ├── postgres-test-database.ts
+│       └── persistence-fixtures.ts
+└── test/
+  └── integration/
+    └── persistence/
+```
+
+The exact file split may evolve during implementation, but implementation agents must preserve these boundaries: production dependency composition, database connection/transaction utilities, repository interfaces, in-memory test doubles, PostgreSQL implementations, and PostgreSQL integration test support.
+
+### Persistence Update Validation
+
+The updated architecture covers the Database Persistence PRD addendum requirements:
+
+- Player/provider identity persistence: covered by identity schema and repository boundaries.
+- Session persistence: covered by `SessionRepository` and restart recovery requirements.
+- Wallet and transaction persistence: covered by wallet schema, repository, transaction, and concurrency rules.
+- Spin ledger and idempotency: covered by spin transaction and uniqueness requirements.
+- Config, math report, and simulation persistence: covered by reconciled configuration repositories and migrations.
+- Operator limits, metrics, alerts, budget protection, audit, and traces: covered by operations repositories and search/read models.
+- Tevi top-up idempotency readiness: covered by durable future-ready provider idempotency records.
+- Migration, test database, and production environment requirements: covered by migration runner, test DB strategy, and startup/readiness rules.
+- Phaser client behavior and non-cash reward boundary: unchanged from the original architecture.
+
+Updated readiness status: ready for `bmad-create-epics-and-stories` to create a dedicated Database Persistence epic and stories, followed by `bmad-check-implementation-readiness` before implementation resumes.

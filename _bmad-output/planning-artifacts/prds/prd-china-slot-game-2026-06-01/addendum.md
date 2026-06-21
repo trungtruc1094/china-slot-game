@@ -32,3 +32,7 @@ The host should control profitability through approved configuration, budget cap
 - Persist every game configuration version and store its ID on each spin record.
 - Design the client integration so the backend returns reel stops, win breakdown, balance, free-spin state, jackpot state, and display metadata.
 - Admin metric changes should use draft, simulate, approve, activate, and rollback states.
+
+## Related Addenda
+
+- `database-persistence-addendum.md` defines the production persistence requirements that must be completed before Tevi Mini App identity, top-up, SDK bridge, webhook, or payment-like retry flows are implemented.
