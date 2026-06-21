@@ -101,5 +101,5 @@ development_status:
   7-6-persist-operational-controls-metrics-alerts-audit-and-request-traces: done
   7-7-add-future-tevi-top-up-idempotency-persistence: done
   7-8-wire-production-postgresql-dependencies-and-fail-safe-startup: done
-  7-9-verify-persistence-recovery-admin-search-and-quality-gates: backlog
+  7-9-verify-persistence-recovery-admin-search-and-quality-gates: done
   epic-7-retrospective: optional
