@@ -98,7 +98,25 @@ export interface GameConfigurationProvider {
   getActiveConfig(): GameConfiguration | undefined;
 }
 
-export class InMemoryGameConfigurationRepository implements GameConfigurationProvider {
+export type MaybePromise<T> = T | Promise<T>;
+
+export interface GameConfigurationRepository {
+  createDraft(input: DraftConfigurationInput): MaybePromise<GameConfigurationRecord>;
+  updateDraft(input: UpdateDraftConfigurationInput): MaybePromise<GameConfigurationRecord>;
+  read(id: string): MaybePromise<GameConfigurationRecord | undefined>;
+  list(): MaybePromise<GameConfigurationRecord[]>;
+  activateDraft(input: ActivationInput): MaybePromise<GameConfigurationRecord>;
+  rollbackToVersion(input: RollbackInput): MaybePromise<GameConfigurationRecord>;
+  listAuditEvents(): MaybePromise<AdminAuditEventRecord[]>;
+  getActiveRecord(): MaybePromise<GameConfigurationRecord | undefined>;
+  attachMathReport(input: AttachMathReportInput): MaybePromise<MathReportRecord>;
+  getMathReportForDraft(draftId: string): MaybePromise<MathReportRecord | undefined>;
+  storeSimulationRun(input: StoreSimulationRunInput): MaybePromise<SimulationRunRecord>;
+  getSimulationRun(draftId: string, runId: string): MaybePromise<SimulationRunRecord | undefined>;
+  listSimulationRuns(draftId: string): MaybePromise<SimulationRunRecord[]>;
+}
+
+export class InMemoryGameConfigurationRepository implements GameConfigurationProvider, GameConfigurationRepository {
   private readonly records = new Map<string, GameConfigurationRecord>();
   private readonly mathReports = new Map<string, MathReportRecord>();
   private readonly simulationRuns = new Map<string, SimulationRunRecord>();

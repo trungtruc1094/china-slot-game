@@ -17,7 +17,7 @@ import { createAdminSpinLedgerRouter } from "./routes/admin-spin-ledger.routes.j
 import { createSessionsRouter } from "./routes/sessions.routes.js";
 import { createSpinsRouter } from "./routes/spins.routes.js";
 import { InMemoryPlayerIdentityAdapter } from "./domain/player-identity.js";
-import { InMemoryGameConfigurationRepository, type GameConfigurationProvider } from "./domain/game-configuration-repository.js";
+import { InMemoryGameConfigurationRepository, type GameConfigurationProvider, type GameConfigurationRepository } from "./domain/game-configuration-repository.js";
 import { MetricsService } from "./domain/metrics-service.js";
 import { InMemoryOperatorLimitsRepository } from "./domain/operator-limits-repository.js";
 import { SessionService, type Clock } from "./domain/session-service.js";
@@ -35,7 +35,7 @@ import { seedActiveConfigForDeployment } from "./config/seed-active-config.js";
 export interface AppDependencies {
   clock?: Clock;
   activeConfig?: GameConfiguration;
-  configRepository?: InMemoryGameConfigurationRepository;
+  configRepository?: GameConfigurationRepository & GameConfigurationProvider;
   operatorLimitsRepository?: InMemoryOperatorLimitsRepository;
   alertRepository?: InMemoryAlertRepository;
   budgetProtectionRepository?: InMemoryBudgetProtectionRepository;
@@ -62,12 +62,13 @@ export function createApp(dependencies: AppDependencies = {}): Express {
     dependencies.clock ?? { now: () => new Date() }
   );
   const requestTraceRepository = dependencies.requestTraceRepository ?? new InMemoryRequestTraceRepository();
-  const configRepository = dependencies.configRepository ?? new InMemoryGameConfigurationRepository(
+  const defaultConfigRepository = new InMemoryGameConfigurationRepository(
     dependencies.clock ?? { now: () => new Date() },
     adminAuditRepository
   );
+  const configRepository = dependencies.configRepository ?? defaultConfigRepository;
   if (!dependencies.configRepository && process.env.SEED_ACTIVE_CONFIG === "true") {
-    seedActiveConfigForDeployment(configRepository);
+    seedActiveConfigForDeployment(defaultConfigRepository);
   }
   const operatorLimitsRepository = dependencies.operatorLimitsRepository ?? new InMemoryOperatorLimitsRepository(
     dependencies.clock ?? { now: () => new Date() },

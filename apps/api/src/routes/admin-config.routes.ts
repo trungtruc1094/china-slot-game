@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { ZodError } from "zod";
 import { calculateRtpReport, runSimulation } from "@china-slot-game/game-math";
-import type { GameConfigurationRecord, InMemoryGameConfigurationRepository } from "../domain/game-configuration-repository.js";
+import type { GameConfigurationRecord, GameConfigurationRepository } from "../domain/game-configuration-repository.js";
 import { requireAdminRole } from "../middleware/admin-auth.js";
 import { ApiHttpError } from "../middleware/error-handler.js";
 import { okEnvelope } from "../schemas/api-envelope.js";
@@ -16,14 +16,14 @@ import {
 
 const maxSimulationDurationMs = 1_000;
 
-export function createAdminConfigRouter(configRepository: InMemoryGameConfigurationRepository): Router {
+export function createAdminConfigRouter(configRepository: GameConfigurationRepository): Router {
   const router = Router();
 
-  router.post("/admin/configs/drafts", (request, response, next) => {
+  router.post("/admin/configs/drafts", async (request, response, next) => {
     try {
       const { actor } = requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator"]);
       const parsedRequest = createDraftConfigRequestSchema.parse(request.body);
-      const draft = configRepository.createDraft({
+      const draft = await configRepository.createDraft({
         id: parsedRequest.id,
         config: parsedRequest.config,
         actor,
@@ -35,11 +35,11 @@ export function createAdminConfigRouter(configRepository: InMemoryGameConfigurat
     }
   });
 
-  router.put("/admin/configs/drafts/:id", (request, response, next) => {
+  router.put("/admin/configs/drafts/:id", async (request, response, next) => {
     try {
       const { actor } = requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator"]);
       const parsedRequest = updateDraftConfigRequestSchema.parse(request.body);
-      const draft = configRepository.updateDraft({
+      const draft = await configRepository.updateDraft({
         id: request.params.id ?? "",
         config: parsedRequest.config,
         actor,
@@ -51,10 +51,10 @@ export function createAdminConfigRouter(configRepository: InMemoryGameConfigurat
     }
   });
 
-  router.get("/admin/configs/drafts", (request, response, next) => {
+  router.get("/admin/configs/drafts", async (request, response, next) => {
     try {
       requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
-      const drafts = configRepository.list()
+      const drafts = (await configRepository.list())
         .filter((record) => record.status === "draft")
         .map((record) => serializeRecord(record));
       response.status(200).json(okEnvelope({ drafts }, request.requestId));
@@ -63,11 +63,11 @@ export function createAdminConfigRouter(configRepository: InMemoryGameConfigurat
     }
   });
 
-  router.post("/admin/configs/drafts/:id/math-report", (request, response, next) => {
+  router.post("/admin/configs/drafts/:id/math-report", async (request, response, next) => {
     try {
       const { actor } = requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator"]);
       const parsedRequest = attachMathReportRequestSchema.parse(request.body);
-      const draft = configRepository.read(request.params.id ?? "");
+      const draft = await configRepository.read(request.params.id ?? "");
       if (!draft || draft.status !== "draft") {
         throw new ApiHttpError(404, {
           code: "CONFIG_NOT_FOUND",
@@ -79,7 +79,7 @@ export function createAdminConfigRouter(configRepository: InMemoryGameConfigurat
         draft.config,
         parsedRequest.wager ? { wager: parsedRequest.wager } : {}
       );
-      const mathReport = configRepository.attachMathReport({
+      const mathReport = await configRepository.attachMathReport({
         draftId: draft.id,
         report,
         actor
@@ -90,10 +90,10 @@ export function createAdminConfigRouter(configRepository: InMemoryGameConfigurat
     }
   });
 
-  router.get("/admin/configs/drafts/:id/math-report", (request, response, next) => {
+  router.get("/admin/configs/drafts/:id/math-report", async (request, response, next) => {
     try {
       requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
-      const mathReport = configRepository.getMathReportForDraft(request.params.id ?? "");
+      const mathReport = await configRepository.getMathReportForDraft(request.params.id ?? "");
       if (!mathReport) {
         throw new ApiHttpError(404, {
           code: "MATH_REPORT_NOT_FOUND",
@@ -107,11 +107,11 @@ export function createAdminConfigRouter(configRepository: InMemoryGameConfigurat
     }
   });
 
-  router.post("/admin/configs/drafts/:id/simulations", (request, response, next) => {
+  router.post("/admin/configs/drafts/:id/simulations", async (request, response, next) => {
     try {
       const { actor } = requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator"]);
       const parsedRequest = runSimulationRequestSchema.parse(request.body);
-      const draft = configRepository.read(request.params.id ?? "");
+      const draft = await configRepository.read(request.params.id ?? "");
       if (!draft || draft.status !== "draft") {
         throw new ApiHttpError(404, {
           code: "CONFIG_NOT_FOUND",
@@ -119,7 +119,7 @@ export function createAdminConfigRouter(configRepository: InMemoryGameConfigurat
           details: { id: request.params.id }
         });
       }
-      const mathReport = configRepository.getMathReportForDraft(draft.id);
+      const mathReport = await configRepository.getMathReportForDraft(draft.id);
       if (!mathReport) {
         throw new ApiHttpError(404, {
           code: "MATH_REPORT_NOT_FOUND",
@@ -151,7 +151,7 @@ export function createAdminConfigRouter(configRepository: InMemoryGameConfigurat
           details: { durationMs, maxSimulationDurationMs }
         });
       }
-      const simulationRun = configRepository.storeSimulationRun({
+      const simulationRun = await configRepository.storeSimulationRun({
         draftId: draft.id,
         input: simulationInput,
         result,
@@ -163,10 +163,10 @@ export function createAdminConfigRouter(configRepository: InMemoryGameConfigurat
     }
   });
 
-  router.get("/admin/configs/drafts/:id/simulations", (request, response, next) => {
+  router.get("/admin/configs/drafts/:id/simulations", async (request, response, next) => {
     try {
       requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
-      const simulationRuns = configRepository.listSimulationRuns(request.params.id ?? "")
+      const simulationRuns = (await configRepository.listSimulationRuns(request.params.id ?? ""))
         .map((run) => serializeSimulationRun(run));
       response.status(200).json(okEnvelope({ simulationRuns }, request.requestId));
     } catch (error) {
@@ -174,10 +174,10 @@ export function createAdminConfigRouter(configRepository: InMemoryGameConfigurat
     }
   });
 
-  router.get("/admin/configs/drafts/:id/simulations/:runId", (request, response, next) => {
+  router.get("/admin/configs/drafts/:id/simulations/:runId", async (request, response, next) => {
     try {
       requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
-      const simulationRun = configRepository.getSimulationRun(request.params.id ?? "", request.params.runId ?? "");
+      const simulationRun = await configRepository.getSimulationRun(request.params.id ?? "", request.params.runId ?? "");
       if (!simulationRun) {
         throw new ApiHttpError(404, {
           code: "SIMULATION_NOT_FOUND",
@@ -191,11 +191,11 @@ export function createAdminConfigRouter(configRepository: InMemoryGameConfigurat
     }
   });
 
-  router.post("/admin/configs/drafts/:id/activate", (request, response, next) => {
+  router.post("/admin/configs/drafts/:id/activate", async (request, response, next) => {
     try {
       const { actor } = requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator"]);
       const parsedRequest = activateDraftRequestSchema.parse(request.body);
-      const draft = configRepository.read(request.params.id ?? "");
+      const draft = await configRepository.read(request.params.id ?? "");
       if (!draft || draft.status !== "draft") {
         throw new ApiHttpError(draft ? 409 : 404, {
           code: draft ? "CONFIG_STATUS_CONFLICT" : "CONFIG_NOT_FOUND",
@@ -203,7 +203,7 @@ export function createAdminConfigRouter(configRepository: InMemoryGameConfigurat
           details: { id: request.params.id, status: draft?.status }
         });
       }
-      const mathReport = configRepository.getMathReportForDraft(draft.id);
+      const mathReport = await configRepository.getMathReportForDraft(draft.id);
       if (!mathReport) {
         throw new ApiHttpError(404, {
           code: "MATH_REPORT_NOT_FOUND",
@@ -211,7 +211,7 @@ export function createAdminConfigRouter(configRepository: InMemoryGameConfigurat
           details: { id: draft.id }
         });
       }
-      const simulationRuns = configRepository.listSimulationRuns(draft.id);
+      const simulationRuns = await configRepository.listSimulationRuns(draft.id);
       if (simulationRuns.length === 0) {
         throw new ApiHttpError(404, {
           code: "SIMULATION_NOT_FOUND",
@@ -219,7 +219,7 @@ export function createAdminConfigRouter(configRepository: InMemoryGameConfigurat
           details: { id: draft.id }
         });
       }
-      const activeConfig = configRepository.activateDraft({
+      const activeConfig = await configRepository.activateDraft({
         id: draft.id,
         actor,
         ...(parsedRequest.reason ? { reason: parsedRequest.reason } : {})
@@ -230,11 +230,11 @@ export function createAdminConfigRouter(configRepository: InMemoryGameConfigurat
     }
   });
 
-  router.post("/admin/configs/rollback", (request, response, next) => {
+  router.post("/admin/configs/rollback", async (request, response, next) => {
     try {
       const { actor } = requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator"]);
       const parsedRequest = rollbackConfigRequestSchema.parse(request.body);
-      const activeConfig = configRepository.rollbackToVersion({
+      const activeConfig = await configRepository.rollbackToVersion({
         targetVersionId: parsedRequest.targetVersionId,
         actor,
         ...(parsedRequest.reason ? { reason: parsedRequest.reason } : {})
@@ -245,20 +245,20 @@ export function createAdminConfigRouter(configRepository: InMemoryGameConfigurat
     }
   });
 
-  router.get("/admin/configs/audit-events", (request, response, next) => {
+  router.get("/admin/configs/audit-events", async (request, response, next) => {
     try {
       requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
-      const auditEvents = configRepository.listAuditEvents().map((event) => serializeAuditEvent(event));
+      const auditEvents = (await configRepository.listAuditEvents()).map((event) => serializeAuditEvent(event));
       response.status(200).json(okEnvelope({ auditEvents }, request.requestId));
     } catch (error) {
       next(error);
     }
   });
 
-  router.get("/admin/configs/drafts/:id", (request, response, next) => {
+  router.get("/admin/configs/drafts/:id", async (request, response, next) => {
     try {
       requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
-      const record = configRepository.read(request.params.id ?? "");
+      const record = await configRepository.read(request.params.id ?? "");
       if (!record || record.status !== "draft") {
         throw new ApiHttpError(404, {
           code: "CONFIG_NOT_FOUND",
