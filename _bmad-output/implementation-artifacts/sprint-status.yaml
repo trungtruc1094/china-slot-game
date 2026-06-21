@@ -1,5 +1,5 @@
 # generated: 2026-06-21T16:01:14+0700
-# last_updated: 2026-06-21T16:01:14+0700
+# last_updated: 2026-06-21T23:09:50+0700
 # project: China Slot Game
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-06-21T16:01:14+0700"
-last_updated: "2026-06-21T16:01:14+0700"
+last_updated: "2026-06-21T23:09:50+0700"
 project: "China Slot Game"
 project_key: NOKEY
 tracking_system: file-system
@@ -92,7 +92,7 @@ development_status:
   6-6-produce-launch-readiness-checklist: done
   epic-6-retrospective: done
 
-  epic-7: in-progress
+  epic-7: done
   7-1-create-postgresql-runtime-and-migration-harness: done
   7-2-persist-players-provider-identity-mappings-and-sessions: done
   7-3-persist-configuration-versions-math-reports-and-simulation-runs: done
@@ -102,4 +102,4 @@ development_status:
   7-7-add-future-tevi-top-up-idempotency-persistence: done
   7-8-wire-production-postgresql-dependencies-and-fail-safe-startup: done
   7-9-verify-persistence-recovery-admin-search-and-quality-gates: done
-  epic-7-retrospective: optional
+  epic-7-retrospective: done
