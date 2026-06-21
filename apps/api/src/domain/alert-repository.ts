@@ -42,7 +42,16 @@ export interface AlertStateProvider {
   getAlertState(scopeId?: string): "none" | "active";
 }
 
-export class InMemoryAlertRepository implements AlertStateProvider {
+export interface AlertRepository extends AlertStateProvider {
+  upsertRule(input: Omit<AlertRuleRecord, "createdBy" | "updatedBy" | "createdAt" | "updatedAt"> & { actor: string }): AlertRuleRecord | Promise<AlertRuleRecord>;
+  listRules(scopeId?: string): AlertRuleRecord[] | Promise<AlertRuleRecord[]>;
+  appendEvent(input: Omit<AlertHistoryEventRecord, "id" | "createdAt">): AlertHistoryEventRecord | Promise<AlertHistoryEventRecord>;
+  acknowledge(alertId: string, actor: string, reason?: string): AlertHistoryEventRecord | Promise<AlertHistoryEventRecord>;
+  listHistory(scopeId?: string): AlertHistoryEventRecord[] | Promise<AlertHistoryEventRecord[]>;
+  hasPriorFiring(ruleId: string): boolean | Promise<boolean>;
+}
+
+export class InMemoryAlertRepository implements AlertRepository {
   private readonly rules = new Map<string, AlertRuleRecord>();
   private readonly history: AlertHistoryEventRecord[] = [];
 

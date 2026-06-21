@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { ZodError } from "zod";
 import { AlertService } from "../domain/alert-service.js";
-import type { AlertHistoryEventRecord, AlertRuleRecord, InMemoryAlertRepository } from "../domain/alert-repository.js";
+import type { AlertHistoryEventRecord, AlertRepository, AlertRuleRecord } from "../domain/alert-repository.js";
 import { requireAdminRole } from "../middleware/admin-auth.js";
 import { ApiHttpError } from "../middleware/error-handler.js";
 import { okEnvelope } from "../schemas/api-envelope.js";
@@ -12,41 +12,41 @@ import {
 } from "../schemas/alert.schema.js";
 
 export function createAdminAlertsRouter(
-  alertRepository: InMemoryAlertRepository,
+  alertRepository: AlertRepository,
   alertService: AlertService
 ): Router {
   const router = Router();
 
-  router.post("/admin/alert-rules", (request, response, next) => {
+  router.post("/admin/alert-rules", async (request, response, next) => {
     try {
       const { actor } = requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator"]);
       const parsedRequest = alertRuleRequestSchema.parse(request.body);
-      const alertRule = alertRepository.upsertRule({ ...parsedRequest, actor });
+      const alertRule = await alertRepository.upsertRule({ ...parsedRequest, actor });
       response.status(201).json(okEnvelope({ alertRule: serializeRule(alertRule) }, request.requestId));
     } catch (error) {
       next(normalizeAlertError(error, "INVALID_ALERT_RULE"));
     }
   });
 
-  router.get("/admin/alert-rules", (request, response, next) => {
+  router.get("/admin/alert-rules", async (request, response, next) => {
     try {
       requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
       const scopeId = typeof request.query.scopeId === "string" && request.query.scopeId.trim().length > 0
         ? request.query.scopeId.trim()
         : undefined;
       response.status(200).json(okEnvelope({
-        alertRules: alertRepository.listRules(scopeId).map((rule) => serializeRule(rule))
+        alertRules: (await alertRepository.listRules(scopeId)).map((rule) => serializeRule(rule))
       }, request.requestId));
     } catch (error) {
       next(error);
     }
   });
 
-  router.post("/admin/alerts/evaluate", (request, response, next) => {
+  router.post("/admin/alerts/evaluate", async (request, response, next) => {
     try {
       requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support"]);
       const parsedRequest = alertEvaluationRequestSchema.parse(request.body);
-      const alerts = alertService.evaluate({
+      const alerts = await alertService.evaluate({
         ...(parsedRequest.from ? { from: new Date(parsedRequest.from) } : {}),
         ...(parsedRequest.to ? { to: new Date(parsedRequest.to) } : {}),
         ...(parsedRequest.scopeId ? { scopeId: parsedRequest.scopeId } : {}),
@@ -58,25 +58,25 @@ export function createAdminAlertsRouter(
     }
   });
 
-  router.get("/admin/alerts", (request, response, next) => {
+  router.get("/admin/alerts", async (request, response, next) => {
     try {
       requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
       const scopeId = typeof request.query.scopeId === "string" && request.query.scopeId.trim().length > 0
         ? request.query.scopeId.trim()
         : undefined;
       response.status(200).json(okEnvelope({
-        alerts: alertRepository.listHistory(scopeId).map((alert) => serializeEvent(alert))
+        alerts: (await alertRepository.listHistory(scopeId)).map((alert) => serializeEvent(alert))
       }, request.requestId));
     } catch (error) {
       next(error);
     }
   });
 
-  router.post("/admin/alerts/:id/acknowledge", (request, response, next) => {
+  router.post("/admin/alerts/:id/acknowledge", async (request, response, next) => {
     try {
       const { actor } = requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support"]);
       const parsedRequest = acknowledgeAlertRequestSchema.parse(request.body);
-      const alert = alertRepository.acknowledge(request.params.id ?? "", actor, parsedRequest.reason);
+      const alert = await alertRepository.acknowledge(request.params.id ?? "", actor, parsedRequest.reason);
       response.status(200).json(okEnvelope({ alert: serializeEvent(alert) }, request.requestId));
     } catch (error) {
       next(normalizeAlertError(error, "INVALID_ALERT_ACKNOWLEDGMENT"));

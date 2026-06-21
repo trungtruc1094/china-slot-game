@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { ZodError } from "zod";
 import type {
-  InMemoryOperatorLimitsRepository,
+  OperatorLimitsRepository,
   OperatorLimitAuditEventRecord,
   OperatorLimitRecord
 } from "../domain/operator-limits-repository.js";
@@ -13,14 +13,14 @@ import {
   updateOperatorLimitsRequestSchema
 } from "../schemas/operator-limits.schema.js";
 
-export function createAdminOperatorLimitsRouter(operatorLimitsRepository: InMemoryOperatorLimitsRepository): Router {
+export function createAdminOperatorLimitsRouter(operatorLimitsRepository: OperatorLimitsRepository): Router {
   const router = Router();
 
-  router.post("/admin/operator-limits", (request, response, next) => {
+  router.post("/admin/operator-limits", async (request, response, next) => {
     try {
       const { actor } = requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator"]);
       const parsedRequest = createOperatorLimitsRequestSchema.parse(request.body);
-      const operatorLimits = operatorLimitsRepository.create({
+      const operatorLimits = await operatorLimitsRepository.create({
         scopeId: parsedRequest.scopeId,
         limits: parsedRequest.limits,
         actor,
@@ -32,11 +32,11 @@ export function createAdminOperatorLimitsRouter(operatorLimitsRepository: InMemo
     }
   });
 
-  router.put("/admin/operator-limits/:scopeId", (request, response, next) => {
+  router.put("/admin/operator-limits/:scopeId", async (request, response, next) => {
     try {
       const { actor } = requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator"]);
       const parsedRequest = updateOperatorLimitsRequestSchema.parse(request.body);
-      const operatorLimits = operatorLimitsRepository.update({
+      const operatorLimits = await operatorLimitsRepository.update({
         scopeId: request.params.scopeId ?? "",
         limits: parsedRequest.limits,
         actor,
@@ -48,7 +48,7 @@ export function createAdminOperatorLimitsRouter(operatorLimitsRepository: InMemo
     }
   });
 
-  router.get("/admin/operator-limits/active", (request, response, next) => {
+  router.get("/admin/operator-limits/active", async (request, response, next) => {
     try {
       requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
       const scopeId = typeof request.query.scopeId === "string" && request.query.scopeId.trim().length > 0
@@ -63,13 +63,13 @@ export function createAdminOperatorLimitsRouter(operatorLimitsRepository: InMemo
     }
   });
 
-  router.get("/admin/operator-limits", (request, response, next) => {
+  router.get("/admin/operator-limits", async (request, response, next) => {
     try {
       requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
       const scopeId = typeof request.query.scopeId === "string" && request.query.scopeId.trim().length > 0
         ? request.query.scopeId.trim()
         : undefined;
-      const operatorLimits = operatorLimitsRepository.list(scopeId)
+      const operatorLimits = (await operatorLimitsRepository.list(scopeId))
         .map((record) => serializeRecord(record));
       response.status(200).json(okEnvelope({ operatorLimits }, request.requestId));
     } catch (error) {
@@ -77,10 +77,10 @@ export function createAdminOperatorLimitsRouter(operatorLimitsRepository: InMemo
     }
   });
 
-  router.get("/admin/operator-limits/audit-events", (request, response, next) => {
+  router.get("/admin/operator-limits/audit-events", async (request, response, next) => {
     try {
       requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support", "viewer"]);
-      const auditEvents = operatorLimitsRepository.listAuditEvents()
+      const auditEvents = (await operatorLimitsRepository.listAuditEvents())
         .map((event) => serializeAuditEvent(event));
       response.status(200).json(okEnvelope({ auditEvents }, request.requestId));
     } catch (error) {

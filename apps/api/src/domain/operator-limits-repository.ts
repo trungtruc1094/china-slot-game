@@ -59,7 +59,14 @@ export interface OperatorLimitsProvider {
   getActiveLimits(scopeId?: string): OperatorLimitRecord | undefined;
 }
 
-export class InMemoryOperatorLimitsRepository implements OperatorLimitsProvider {
+export interface OperatorLimitsRepository extends OperatorLimitsProvider {
+  create(input: OperatorLimitInput): OperatorLimitRecord | Promise<OperatorLimitRecord>;
+  update(input: OperatorLimitInput): OperatorLimitRecord | Promise<OperatorLimitRecord>;
+  list(scopeId?: string): OperatorLimitRecord[] | Promise<OperatorLimitRecord[]>;
+  listAuditEvents(): OperatorLimitAuditEventRecord[] | Promise<OperatorLimitAuditEventRecord[]>;
+}
+
+export class InMemoryOperatorLimitsRepository implements OperatorLimitsRepository {
   private readonly records = new Map<string, OperatorLimitRecord>();
   private readonly auditEvents: OperatorLimitAuditEventRecord[] = [];
 

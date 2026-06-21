@@ -1,17 +1,17 @@
-import { InMemoryAlertRepository, type AlertHistoryEventRecord, type AlertMetric, type AlertRuleRecord } from "./alert-repository.js";
+import { type AlertHistoryEventRecord, type AlertMetric, type AlertRepository, type AlertRuleRecord } from "./alert-repository.js";
 import { MetricsService, type MetricsQuery, type OperatingMetrics } from "./metrics-service.js";
 
 export class AlertService {
   public constructor(
-    private readonly repository: InMemoryAlertRepository,
+    private readonly repository: AlertRepository,
     private readonly metricsService: MetricsService
   ) {}
 
-  public evaluate(query: MetricsQuery = {}): AlertHistoryEventRecord[] {
+  public async evaluate(query: MetricsQuery = {}): Promise<AlertHistoryEventRecord[]> {
     const metrics = this.metricsService.getMetrics(query);
     const scopeId = query.scopeId ?? "default";
     const events: AlertHistoryEventRecord[] = [];
-    for (const rule of this.repository.listRules(scopeId).filter((candidate) => candidate.enabled)) {
+    for (const rule of (await this.repository.listRules(scopeId)).filter((candidate) => candidate.enabled)) {
       const metricValue = valueForMetric(rule.metric, metrics);
       if (metricValue === null) {
         continue;
@@ -24,7 +24,7 @@ export class AlertService {
         scopeId
       ].join("|");
       if (isFiring(rule, metricValue)) {
-        events.push(this.repository.appendEvent({
+        events.push(await this.repository.appendEvent({
           ruleId: rule.id,
           scopeId,
           evaluationKey,
@@ -38,8 +38,8 @@ export class AlertService {
           suggestedAction: rule.suggestedAction,
           actor: "alert-service"
         }));
-      } else if (this.repository.hasPriorFiring(rule.id)) {
-        events.push(this.repository.appendEvent({
+      } else if (await this.repository.hasPriorFiring(rule.id)) {
+        events.push(await this.repository.appendEvent({
           ruleId: rule.id,
           scopeId,
           evaluationKey,

@@ -29,11 +29,11 @@ const adminAuditQuerySchema = z.object({
 export function createAdminAuditRouter(adminAuditRepository: AdminAuditRepository): Router {
   const router = Router();
 
-  router.get("/admin/audit-events", (request, response, next) => {
+  router.get("/admin/audit-events", async (request, response, next) => {
     try {
       requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support"]);
       const query = adminAuditQuerySchema.parse(request.query);
-      const matchingEvents = adminAuditRepository.list()
+      const matchingEvents = (await adminAuditRepository.list())
         .filter((event) => matchesQuery(event, query))
         .sort((left, right) => right.occurredAt.getTime() - left.occurredAt.getTime() || right.id.localeCompare(left.id));
       const events = matchingEvents

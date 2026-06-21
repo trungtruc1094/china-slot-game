@@ -44,8 +44,8 @@ export interface AdminAuditEventRecord extends Required<Omit<AdminAuditEventInpu
 }
 
 export interface AdminAuditRepository {
-  record(input: AdminAuditEventInput): AdminAuditEventRecord;
-  list(): AdminAuditEventRecord[];
+  record(input: AdminAuditEventInput): AdminAuditEventRecord | Promise<AdminAuditEventRecord>;
+  list(): AdminAuditEventRecord[] | Promise<AdminAuditEventRecord[]>;
 }
 
 export class InMemoryAdminAuditRepository implements AdminAuditRepository {

@@ -35,7 +35,21 @@ export interface BudgetProtectionProvider {
   listActiveActions(scopeId?: string): BudgetProtectionActionRecord[];
 }
 
-export class InMemoryBudgetProtectionRepository implements BudgetProtectionProvider {
+export interface BudgetProtectionRepository extends BudgetProtectionProvider {
+  apply(input: {
+    scopeId: string;
+    action: BudgetProtectionActionType;
+    actor: string;
+    reason: string;
+    parameters?: Record<string, unknown>;
+    metricState?: Record<string, unknown>;
+  }): BudgetProtectionActionRecord | Promise<BudgetProtectionActionRecord>;
+  revert(id: string, actor: string, reason: string): BudgetProtectionActionRecord | Promise<BudgetProtectionActionRecord>;
+  list(scopeId?: string): BudgetProtectionActionRecord[] | Promise<BudgetProtectionActionRecord[]>;
+  listAuditEvents(): BudgetProtectionAuditEventRecord[] | Promise<BudgetProtectionAuditEventRecord[]>;
+}
+
+export class InMemoryBudgetProtectionRepository implements BudgetProtectionRepository {
   private readonly actions = new Map<string, BudgetProtectionActionRecord>();
   private readonly auditEvents: BudgetProtectionAuditEventRecord[] = [];
 
