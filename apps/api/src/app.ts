@@ -23,7 +23,7 @@ import { InMemoryOperatorLimitsRepository } from "./domain/operator-limits-repos
 import { SessionService, type Clock } from "./domain/session-service.js";
 import { SpinService } from "./domain/spin-service.js";
 import type { SpinServiceOptions } from "./domain/spin-service.js";
-import { WalletService } from "./domain/wallet-service.js";
+import { WalletService, type WalletOperations } from "./domain/wallet-service.js";
 import type { GameConfiguration } from "@china-slot-game/game-math";
 import { InMemoryAlertRepository } from "./domain/alert-repository.js";
 import { AlertService } from "./domain/alert-service.js";
@@ -44,7 +44,7 @@ export interface AppDependencies {
   nextRandom?: () => number;
   failLedgerCommit?: SpinServiceOptions["failLedgerCommit"];
   sessionService?: SessionService;
-  walletService?: WalletService;
+  walletService?: WalletOperations;
   spinService?: SpinService;
   adminAuditRepository?: InMemoryAdminAuditRepository;
   requestTraceRepository?: InMemoryRequestTraceRepository;

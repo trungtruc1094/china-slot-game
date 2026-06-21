@@ -9,6 +9,7 @@ export interface WalletTransactionRequest {
   amount: number;
   actor: string;
   source: string;
+  correlationId?: string | null;
   metadata?: Record<string, unknown>;
 }
 
@@ -26,6 +27,7 @@ export interface WalletTransactionRecord {
   balanceAfter: number;
   actor: string;
   source: string;
+  correlationId: string | null;
   createdAt: string;
   metadata: Record<string, unknown>;
 }
@@ -44,13 +46,43 @@ export interface WalletTransactionBatchCommitOptions {
   afterBalanceCommit?: (result: WalletTransactionBatchResult) => void;
 }
 
+export interface WalletTransactionSearchFilters {
+  playerId?: string;
+  type?: WalletTransactionType;
+  source?: string;
+  spinId?: string;
+  createdFrom?: Date;
+  createdTo?: Date;
+  limit: number;
+  offset: number;
+}
+
+export interface WalletTransactionSearchResult {
+  records: WalletTransactionRecord[];
+  total: number;
+}
+
 export interface WalletServiceTestHooks {
   failAfterBalanceUpdate?: (request: WalletTransactionRequest) => boolean;
 }
 
+export type MaybePromise<T> = T | Promise<T>;
+
+export interface WalletOperations {
+  getWallet(playerId: string): MaybePromise<Wallet>;
+  getTransactions(playerId: string): MaybePromise<WalletTransactionRecord[]>;
+  listTransactions(): MaybePromise<WalletTransactionRecord[]>;
+  searchTransactions(filters: WalletTransactionSearchFilters): MaybePromise<WalletTransactionSearchResult>;
+  applyTransaction(request: WalletTransactionRequest): Promise<WalletTransactionResult>;
+  applyTransactionBatch(
+    requests: WalletTransactionRequest[],
+    commitOptions?: WalletTransactionBatchCommitOptions
+  ): Promise<WalletTransactionBatchResult>;
+}
+
 const starterBalance = 1000;
 
-export class WalletService {
+export class WalletService implements WalletOperations {
   private readonly walletsByPlayerId = new Map<string, Wallet>();
   private readonly transactionsByPlayerId = new Map<string, WalletTransactionRecord[]>();
   private readonly queuesByPlayerId = new Map<string, Promise<void>>();
@@ -71,6 +103,17 @@ export class WalletService {
 
   public listTransactions(): WalletTransactionRecord[] {
     return [...this.transactionsByPlayerId.values()].flatMap((transactions) => [...transactions]);
+  }
+
+  public searchTransactions(filters: WalletTransactionSearchFilters): WalletTransactionSearchResult {
+    const matchingTransactions = this.listTransactions()
+      .filter((transaction) => matchesSearchFilters(transaction, filters))
+      .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+
+    return {
+      records: matchingTransactions.slice(filters.offset, filters.offset + filters.limit),
+      total: matchingTransactions.length
+    };
   }
 
   public applyTransaction(request: WalletTransactionRequest): Promise<WalletTransactionResult> {
@@ -150,6 +193,7 @@ export class WalletService {
           balanceAfter,
           actor: request.actor,
           source: request.source,
+          correlationId: request.correlationId ?? metadataCorrelationId(request.metadata),
           createdAt: this.clock.now().toISOString(),
           metadata: request.metadata ?? {}
         };
@@ -253,4 +297,30 @@ export class WalletService {
     this.transactionsByPlayerId.set(playerId, transactions);
     return transactions;
   }
+}
+
+function metadataCorrelationId(metadata: Record<string, unknown> | undefined): string | null {
+  return typeof metadata?.correlationId === "string" ? metadata.correlationId : null;
+}
+
+function matchesSearchFilters(transaction: WalletTransactionRecord, filters: WalletTransactionSearchFilters): boolean {
+  if (filters.playerId && transaction.playerId !== filters.playerId) {
+    return false;
+  }
+  if (filters.source && transaction.source !== filters.source) {
+    return false;
+  }
+  if (filters.type && transaction.type !== filters.type) {
+    return false;
+  }
+  if (filters.spinId && transaction.metadata.spinId !== filters.spinId) {
+    return false;
+  }
+  if (filters.createdFrom && new Date(transaction.createdAt).getTime() < filters.createdFrom.getTime()) {
+    return false;
+  }
+  if (filters.createdTo && new Date(transaction.createdAt).getTime() > filters.createdTo.getTime()) {
+    return false;
+  }
+  return true;
 }

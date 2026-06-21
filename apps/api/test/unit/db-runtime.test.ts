@@ -5,7 +5,7 @@ describe("PostgreSQL migration runtime", () => {
   it("loads ordered reversible SQL migrations", async () => {
     const migrations = await loadMigrations();
 
-    expect(migrations.map((migration) => migration.version)).toEqual(["0001", "0002", "0003", "0004", "0005", "0006", "0007"]);
+    expect(migrations.map((migration) => migration.version)).toEqual(["0001", "0002", "0003", "0004", "0005", "0006", "0007", "0008"]);
     for (const migration of migrations) {
       expect(migration.upSql.length).toBeGreaterThan(0);
       expect(migration.downSql.length).toBeGreaterThan(0);

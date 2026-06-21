@@ -39,6 +39,7 @@ describe("WalletService", () => {
       balanceAfter: 750,
       actor: "spin-service",
       source: "spin:sess_1",
+      correlationId: null,
       createdAt: "2026-06-18T08:00:00.000Z",
       metadata: {}
     });

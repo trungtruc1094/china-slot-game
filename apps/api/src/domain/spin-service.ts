@@ -12,7 +12,7 @@ import type { BudgetProtectionActionRecord, BudgetProtectionProvider } from "./b
 import type { GameConfigurationProvider } from "./game-configuration-repository.js";
 import type { OperatorLimitRecord, OperatorLimitsProvider } from "./operator-limits-repository.js";
 import type { Clock, SessionService } from "./session-service.js";
-import type { WalletService, WalletTransactionRecord, WalletTransactionRequest } from "./wallet-service.js";
+import type { WalletOperations, WalletTransactionRecord, WalletTransactionRequest } from "./wallet-service.js";
 import { getRewardModelMetadata, type RewardModelMetadata } from "./reward-boundary.js";
 
 export interface SpinResponse {
@@ -67,7 +67,7 @@ export class SpinService {
 
   public constructor(
     private readonly sessions: SessionService,
-    private readonly wallets: WalletService,
+    private readonly wallets: WalletOperations,
     private readonly options: SpinServiceOptions = {},
     private readonly clock: Clock = { now: () => new Date() }
   ) {}
@@ -129,6 +129,7 @@ export class SpinService {
         amount: request.wager.totalWager,
         actor: "spin-service",
         source: request.sessionId,
+        correlationId: request.correlationId ?? null,
         metadata: { clientSpinId: request.clientSpinId, correlationId: request.correlationId ?? null }
       }
     ];
@@ -140,6 +141,7 @@ export class SpinService {
         amount: payout,
         actor: "spin-service",
         source: request.sessionId,
+        correlationId: request.correlationId ?? null,
         metadata: { clientSpinId: request.clientSpinId, correlationId: request.correlationId ?? null }
       });
     }

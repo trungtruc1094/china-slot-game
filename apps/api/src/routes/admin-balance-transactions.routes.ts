@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z, ZodError } from "zod";
 import type { AdminAuditRepository } from "../domain/admin-audit-repository.js";
 import { getRewardModelMetadata } from "../domain/reward-boundary.js";
-import type { WalletService, WalletTransactionRecord } from "../domain/wallet-service.js";
+import type { WalletOperations, WalletTransactionRecord } from "../domain/wallet-service.js";
 import { requireAdminRole } from "../middleware/admin-auth.js";
 import { ApiHttpError } from "../middleware/error-handler.js";
 import { okEnvelope } from "../schemas/api-envelope.js";
@@ -10,6 +10,7 @@ import { okEnvelope } from "../schemas/api-envelope.js";
 const balanceTransactionQuerySchema = z.object({
   playerId: z.string().trim().min(1).max(128).optional(),
   sessionId: z.string().trim().min(1).max(128).optional(),
+  spinId: z.string().trim().min(1).max(128).optional(),
   from: z.string().datetime({ offset: true }).optional(),
   to: z.string().datetime({ offset: true }).optional(),
   transactionType: z.enum(["debit", "credit", "free_spin_award", "jackpot_award", "adjustment"]).optional(),
@@ -26,21 +27,26 @@ const balanceTransactionQuerySchema = z.object({
 });
 
 export function createAdminBalanceTransactionsRouter(
-  walletService: WalletService,
+  walletService: WalletOperations,
   adminAuditRepository?: AdminAuditRepository
 ): Router {
   const router = Router();
 
-  router.get("/admin/balance-transactions", (request, response, next) => {
+  router.get("/admin/balance-transactions", async (request, response, next) => {
     try {
       const identity = requireAdminRole(request.header("x-admin-role"), request.header("x-admin-actor"), ["operator", "support"]);
       const query = balanceTransactionQuerySchema.parse(request.query);
-      const matchingTransactions = walletService.listTransactions()
-        .filter((transaction) => matchesQuery(transaction, query))
-        .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
-      const records = matchingTransactions
-        .slice(query.offset, query.offset + query.limit)
-        .map((transaction) => serializeTransaction(transaction));
+      const searchResult = await walletService.searchTransactions({
+        ...(query.playerId ? { playerId: query.playerId } : {}),
+        ...(query.sessionId ? { source: query.sessionId } : {}),
+        ...(query.spinId ? { spinId: query.spinId } : {}),
+        ...(query.transactionType ? { type: query.transactionType } : {}),
+        ...(query.from ? { createdFrom: new Date(query.from) } : {}),
+        ...(query.to ? { createdTo: new Date(query.to) } : {}),
+        limit: query.limit,
+        offset: query.offset
+      });
+      const records = searchResult.records.map((transaction) => serializeTransaction(transaction));
 
       adminAuditRepository?.record({
         actor: identity.actor,
@@ -55,7 +61,7 @@ export function createAdminBalanceTransactionsRouter(
         metadata: {
           filters: redactQuery(query),
           returned: records.length,
-          total: matchingTransactions.length
+          total: searchResult.total
         }
       });
 
@@ -65,8 +71,8 @@ export function createAdminBalanceTransactionsRouter(
         page: {
           limit: query.limit,
           offset: query.offset,
-          total: matchingTransactions.length,
-          hasMore: query.offset + query.limit < matchingTransactions.length
+          total: searchResult.total,
+          hasMore: query.offset + query.limit < searchResult.total
         }
       }, request.requestId));
     } catch (error) {
@@ -112,6 +118,7 @@ function redactQuery(query: ParsedBalanceTransactionQuery): Record<string, unkno
   return {
     hasPlayerId: Boolean(query.playerId),
     hasSessionId: Boolean(query.sessionId),
+    hasSpinId: Boolean(query.spinId),
     from: query.from ?? null,
     to: query.to ?? null,
     transactionType: query.transactionType ?? null,
@@ -121,25 +128,6 @@ function redactQuery(query: ParsedBalanceTransactionQuery): Record<string, unkno
 }
 
 type ParsedBalanceTransactionQuery = z.infer<typeof balanceTransactionQuerySchema>;
-
-function matchesQuery(transaction: WalletTransactionRecord, query: ParsedBalanceTransactionQuery): boolean {
-  if (query.playerId && transaction.playerId !== query.playerId) {
-    return false;
-  }
-  if (query.sessionId && transaction.source !== query.sessionId) {
-    return false;
-  }
-  if (query.transactionType && transaction.type !== query.transactionType) {
-    return false;
-  }
-  if (query.from && new Date(transaction.createdAt).getTime() < new Date(query.from).getTime()) {
-    return false;
-  }
-  if (query.to && new Date(transaction.createdAt).getTime() > new Date(query.to).getTime()) {
-    return false;
-  }
-  return true;
-}
 
 function serializeTransaction(transaction: WalletTransactionRecord): Record<string, unknown> {
   return {
@@ -152,6 +140,7 @@ function serializeTransaction(transaction: WalletTransactionRecord): Record<stri
     rewardModel: getRewardModelMetadata(),
     actor: transaction.actor,
     source: transaction.source,
+    correlationId: transaction.correlationId,
     sessionId: transaction.source,
     spinId: typeof transaction.metadata.spinId === "string" ? transaction.metadata.spinId : null,
     createdAt: transaction.createdAt,
