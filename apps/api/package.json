@@ -7,10 +7,14 @@
   "types": "./dist/main.d.ts",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "db:check": "tsx src/db/migrate.ts check",
+    "db:migrate": "tsx src/db/migrate.ts up",
+    "db:rollback": "tsx src/db/migrate.ts down",
     "dev": "tsx src/main.ts",
     "lint": "tsc --noEmit",
     "start": "node dist/main.js",
     "test": "vitest run",
+    "test:integration": "vitest run test/postgres",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -19,12 +23,14 @@
     "dotenv": "17.2.3",
     "express": "5.1.0",
     "helmet": "8.1.0",
+    "pg": "^8.22.0",
     "zod": "4.2.0"
   },
   "devDependencies": {
     "@types/cors": "2.8.19",
     "@types/express": "5.0.6",
     "@types/node": "24.10.1",
+    "@types/pg": "^8.20.0",
     "tsx": "4.21.0",
     "typescript": "6.0.3",
     "vitest": "4.1.9"

@@ -92,8 +92,8 @@ development_status:
   6-6-produce-launch-readiness-checklist: done
   epic-6-retrospective: done
 
-  epic-7: backlog
-  7-1-create-postgresql-runtime-and-migration-harness: backlog
+  epic-7: in-progress
+  7-1-create-postgresql-runtime-and-migration-harness: done
   7-2-persist-players-provider-identity-mappings-and-sessions: backlog
   7-3-persist-configuration-versions-math-reports-and-simulation-runs: backlog
   7-4-persist-wallets-and-wallet-transactions-with-concurrency-safety: backlog

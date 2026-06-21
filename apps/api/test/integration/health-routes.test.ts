@@ -63,6 +63,43 @@ describe("health and readiness routes", () => {
     });
   });
 
+  it("returns 503 when an injected readiness dependency fails", async () => {
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve();
+      });
+    });
+    server = createServer(createApp({
+      readinessCheck: async () => {
+        throw new Error("schema not ready");
+      }
+    }));
+    await new Promise<void>((resolve) => {
+      server.listen(0, "127.0.0.1", resolve);
+    });
+    const address = server.address() as AddressInfo;
+    baseUrl = `http://127.0.0.1:${address.port}`;
+
+    const response = await fetch(`${baseUrl}/api/ready`, {
+      headers: { "x-request-id": "req_ready_failed" }
+    });
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      data: null,
+      error: {
+        code: "READINESS_CHECK_FAILED",
+        message: "schema not ready",
+        details: {}
+      },
+      requestId: "req_ready_failed"
+    });
+  });
+
   it("returns stable error envelopes for missing routes", async () => {
     const response = await fetch(`${baseUrl}/api/missing`, {
       headers: { "x-request-id": "req_missing" }

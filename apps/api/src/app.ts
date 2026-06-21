@@ -48,6 +48,7 @@ export interface AppDependencies {
   spinService?: SpinService;
   adminAuditRepository?: InMemoryAdminAuditRepository;
   requestTraceRepository?: InMemoryRequestTraceRepository;
+  readinessCheck?: () => Promise<Record<string, "ready">>;
 }
 
 export function createApp(dependencies: AppDependencies = {}): Express {
@@ -111,7 +112,9 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use(requestTracingMiddleware(requestTraceRepository, dependencies.clock ?? { now: () => new Date() }));
   app.use(express.json({ limit: "1mb" }));
 
-  app.use("/api", createHealthRouter());
+  app.use("/api", createHealthRouter(
+    dependencies.readinessCheck ? { readinessCheck: dependencies.readinessCheck } : {}
+  ));
   app.use("/api", createRewardBoundaryRouter(adminAuditRepository));
   app.use("/api", createAdminAuditRouter(adminAuditRepository));
   app.use("/api", createAdminAlertsRouter(alertRepository, alertService));

@@ -15,6 +15,21 @@ jobs:
   quality-gates:
     name: Lint, Typecheck, Test, Coverage, Build
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          # CI-only test database credentials for the disposable service container.
+          POSTGRES_DB: china_slot_test
+          POSTGRES_USER: china_slot
+          POSTGRES_PASSWORD: china_slot_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U china_slot -d china_slot_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -35,7 +50,19 @@ jobs:
         run: npm run typecheck
 
       - name: Test API and game math
+        env:
+          TEST_DATABASE_URL: postgres://china_slot:china_slot_password@localhost:5432/china_slot_test
         run: npm test
+
+      - name: Run API PostgreSQL migrations
+        env:
+          DATABASE_URL: postgres://china_slot:china_slot_password@localhost:5432/china_slot_test
+        run: npm run db:migrate -w @china-slot-game/api
+
+      - name: Test API PostgreSQL integration suite
+        env:
+          TEST_DATABASE_URL: postgres://china_slot:china_slot_password@localhost:5432/china_slot_test
+        run: npm run test:integration -w @china-slot-game/api
 
       - name: Coverage thresholds 80/79 percent
         run: npm run test:coverage
