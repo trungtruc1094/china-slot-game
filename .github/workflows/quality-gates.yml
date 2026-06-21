@@ -59,7 +59,7 @@ jobs:
         run: |
           API_BASE_URL="${{ vars.CHINA_SLOT_API_BASE_URL }}"
           if [ -z "$API_BASE_URL" ]; then
-            API_BASE_URL="http://127.0.0.1:3000"
+            API_BASE_URL="https://china-slot-api.onrender.com"
           fi
           cat > js/runtime-config.js <<EOF
           (function (globalScope) {
