@@ -4,6 +4,7 @@ export interface ApiEnv {
   nodeEnv: string;
   port: number;
   persistenceMode: "memory" | "postgres";
+  budgetProtectionEnabled: boolean;
   databaseUrl?: string;
 }
 
@@ -30,7 +31,8 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): ApiEnv {
   const env: ApiEnv = {
     nodeEnv,
     port: parsedPort,
-    persistenceMode
+    persistenceMode,
+    budgetProtectionEnabled: source.BUDGET_PROTECTION_ENABLED !== "false"
   };
 
   if (databaseUrl) {

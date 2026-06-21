@@ -6,7 +6,8 @@ describe("loadEnv", () => {
     expect(loadEnv({})).toEqual({
       nodeEnv: "development",
       port: 3000,
-      persistenceMode: "memory"
+      persistenceMode: "memory",
+      budgetProtectionEnabled: true
     });
   });
 
@@ -14,7 +15,8 @@ describe("loadEnv", () => {
     expect(loadEnv({ NODE_ENV: "test", PORT: "4444" })).toEqual({
       nodeEnv: "test",
       port: 4444,
-      persistenceMode: "memory"
+      persistenceMode: "memory",
+      budgetProtectionEnabled: true
     });
   });
 
@@ -37,8 +39,15 @@ describe("loadEnv", () => {
       nodeEnv: "development",
       port: 3000,
       persistenceMode: "postgres",
+      budgetProtectionEnabled: true,
       databaseUrl: "postgres://user:pass@localhost:5432/china_slot_test"
     });
+  });
+
+  it("parses budget protection enablement", () => {
+    expect(loadEnv({ BUDGET_PROTECTION_ENABLED: "false" })).toMatchObject({ budgetProtectionEnabled: false });
+    expect(loadEnv({ BUDGET_PROTECTION_ENABLED: "true" })).toMatchObject({ budgetProtectionEnabled: true });
+    expect(loadEnv({})).toMatchObject({ budgetProtectionEnabled: true });
   });
 
   it("rejects unknown persistence modes", () => {

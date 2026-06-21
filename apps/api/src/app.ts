@@ -19,26 +19,26 @@ import { createSpinsRouter } from "./routes/spins.routes.js";
 import { InMemoryPlayerIdentityAdapter } from "./domain/player-identity.js";
 import { InMemoryGameConfigurationRepository, type GameConfigurationProvider, type GameConfigurationRepository } from "./domain/game-configuration-repository.js";
 import { MetricsService } from "./domain/metrics-service.js";
-import { InMemoryOperatorLimitsRepository } from "./domain/operator-limits-repository.js";
+import { InMemoryOperatorLimitsRepository, type OperatorLimitsRepository } from "./domain/operator-limits-repository.js";
 import { SessionService, type Clock } from "./domain/session-service.js";
 import { SpinService } from "./domain/spin-service.js";
 import type { SpinServiceOptions } from "./domain/spin-service.js";
 import { WalletService, type WalletOperations } from "./domain/wallet-service.js";
 import type { GameConfiguration } from "@china-slot-game/game-math";
-import { InMemoryAlertRepository } from "./domain/alert-repository.js";
+import { InMemoryAlertRepository, type AlertRepository } from "./domain/alert-repository.js";
 import { AlertService } from "./domain/alert-service.js";
-import { InMemoryBudgetProtectionRepository } from "./domain/budget-protection-repository.js";
-import { InMemoryAdminAuditRepository } from "./domain/admin-audit-repository.js";
-import { InMemoryRequestTraceRepository } from "./domain/request-trace-repository.js";
+import { InMemoryBudgetProtectionRepository, type BudgetProtectionRepository } from "./domain/budget-protection-repository.js";
+import { InMemoryAdminAuditRepository, type AdminAuditRepository } from "./domain/admin-audit-repository.js";
+import { InMemoryRequestTraceRepository, type RequestTraceRepository } from "./domain/request-trace-repository.js";
 import { seedActiveConfigForDeployment } from "./config/seed-active-config.js";
 
 export interface AppDependencies {
   clock?: Clock;
   activeConfig?: GameConfiguration;
   configRepository?: GameConfigurationRepository & GameConfigurationProvider;
-  operatorLimitsRepository?: InMemoryOperatorLimitsRepository;
-  alertRepository?: InMemoryAlertRepository;
-  budgetProtectionRepository?: InMemoryBudgetProtectionRepository;
+  operatorLimitsRepository?: OperatorLimitsRepository;
+  alertRepository?: AlertRepository;
+  budgetProtectionRepository?: BudgetProtectionRepository;
   budgetProtectionEnabled?: boolean;
   configProvider?: GameConfigurationProvider;
   nextRandom?: () => number;
@@ -46,8 +46,8 @@ export interface AppDependencies {
   sessionService?: SessionService;
   walletService?: WalletOperations;
   spinService?: SpinService;
-  adminAuditRepository?: InMemoryAdminAuditRepository;
-  requestTraceRepository?: InMemoryRequestTraceRepository;
+  adminAuditRepository?: AdminAuditRepository;
+  requestTraceRepository?: RequestTraceRepository;
   readinessCheck?: () => Promise<Record<string, "ready">>;
 }
 
