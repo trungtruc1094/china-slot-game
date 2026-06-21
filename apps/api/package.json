@@ -13,8 +13,8 @@
     "dev": "tsx src/main.ts",
     "lint": "tsc --noEmit",
     "start": "node dist/main.js",
-    "test": "vitest run",
-    "test:integration": "vitest run test/postgres",
+    "test": "vitest run --no-file-parallelism",
+    "test:integration": "vitest run test/postgres --no-file-parallelism",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

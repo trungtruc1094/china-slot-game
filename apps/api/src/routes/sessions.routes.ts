@@ -8,10 +8,10 @@ import type { SessionService } from "../domain/session-service.js";
 export function createSessionsRouter(sessionService: SessionService): Router {
   const router = Router();
 
-  router.post("/sessions", (request, response, next) => {
+  router.post("/sessions", async (request, response, next) => {
     try {
       const parsedRequest = createSessionRequestSchema.parse(request.body);
-      const result = sessionService.createOrResume(parsedRequest);
+      const result = await sessionService.createOrResume(parsedRequest);
       response.status(result.statusCode).json(okEnvelope(result.response, request.requestId));
     } catch (error) {
       if (error instanceof ZodError) {

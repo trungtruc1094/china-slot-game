@@ -12,6 +12,32 @@ export interface PlayerIdentityAdapter {
   resolve(input: SessionIdentityInput, now: Date): PlayerRecord;
 }
 
+export interface PlayerSessionRepository {
+  resolvePlayer(input: SessionIdentityInput, now: Date): Promise<PlayerRecord>;
+  createSession(playerId: string, now: Date, expiresAt: Date, metadata?: Record<string, unknown>): Promise<SessionRecordLike>;
+  findSessionForResume(sessionId: string, playerId: string, now: Date): Promise<SessionRecordLike | undefined>;
+  getActiveSession(sessionId: string, now: Date): Promise<SessionRecordLike | undefined>;
+  searchSessions(filters?: SessionSearchFilters): Promise<SessionRecordLike[]>;
+}
+
+export interface SessionRecordLike {
+  sessionId: string;
+  playerId: string;
+  status: "active" | "expired";
+  createdAt: Date;
+  expiresAt: Date;
+  requestMetadata?: Record<string, unknown>;
+}
+
+export interface SessionSearchFilters {
+  playerId?: string;
+  provider?: string;
+  subject?: string;
+  status?: "active" | "expired";
+  createdFrom?: Date;
+  createdTo?: Date;
+}
+
 export class InMemoryPlayerIdentityAdapter implements PlayerIdentityAdapter {
   private readonly playersByProvider = new Map<string, Map<string, PlayerRecord>>();
 
@@ -55,5 +81,77 @@ export class InMemoryPlayerIdentityAdapter implements PlayerIdentityAdapter {
     }
 
     return count;
+  }
+}
+
+export class InMemoryPlayerSessionRepository implements PlayerSessionRepository {
+  private readonly identityAdapter = new InMemoryPlayerIdentityAdapter();
+  private readonly sessionsById = new Map<string, SessionRecordLike>();
+
+  public async resolvePlayer(input: SessionIdentityInput, now: Date): Promise<PlayerRecord> {
+    return this.identityAdapter.resolve(input, now);
+  }
+
+  public async createSession(playerId: string, now: Date, expiresAt: Date, metadata: Record<string, unknown> = {}): Promise<SessionRecordLike> {
+    const session: SessionRecordLike = {
+      sessionId: `sess_${this.sessionsById.size + 1}`,
+      playerId,
+      status: "active",
+      createdAt: now,
+      expiresAt,
+      requestMetadata: metadata
+    };
+    this.sessionsById.set(session.sessionId, session);
+    return session;
+  }
+
+  public async findSessionForResume(sessionId: string, playerId: string, now: Date): Promise<SessionRecordLike | undefined> {
+    const session = this.sessionsById.get(sessionId);
+    if (!session || session.playerId !== playerId) {
+      return undefined;
+    }
+
+    return this.refreshExpiry(session, now);
+  }
+
+  public async getActiveSession(sessionId: string, now: Date): Promise<SessionRecordLike | undefined> {
+    const session = this.sessionsById.get(sessionId);
+    if (!session) {
+      return undefined;
+    }
+
+    return this.refreshExpiry(session, now);
+  }
+
+  public async searchSessions(filters: SessionSearchFilters = {}): Promise<SessionRecordLike[]> {
+    return [...this.sessionsById.values()].filter((session) => {
+      if (filters.playerId && session.playerId !== filters.playerId) {
+        return false;
+      }
+      if (filters.status && session.status !== filters.status) {
+        return false;
+      }
+      if (filters.createdFrom && session.createdAt < filters.createdFrom) {
+        return false;
+      }
+      if (filters.createdTo && session.createdAt > filters.createdTo) {
+        return false;
+      }
+      if (filters.provider && session.requestMetadata?.provider !== filters.provider) {
+        return false;
+      }
+      if (filters.subject && session.requestMetadata?.subject !== filters.subject) {
+        return false;
+      }
+      return true;
+    });
+  }
+
+  private refreshExpiry(session: SessionRecordLike, now: Date): SessionRecordLike {
+    if (session.expiresAt.getTime() <= now.getTime()) {
+      session.status = "expired";
+    }
+
+    return session;
   }
 }

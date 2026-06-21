@@ -109,7 +109,7 @@ export class SpinService {
 
     this.validateWager(config, request.wager);
 
-    const session = this.sessions.getActiveSession(request.sessionId);
+    const session = await this.sessions.getActiveSession(request.sessionId);
     this.validateBudgetProtection(request.wager);
     const activeLimits = this.options.operatorLimitsProvider?.getActiveLimits(this.options.operatorLimitsScopeId ?? "default");
     if (activeLimits) {

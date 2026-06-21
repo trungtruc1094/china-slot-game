@@ -1,6 +1,6 @@
 import { ApiHttpError } from "../middleware/error-handler.js";
 import type { CreateSessionRequest, SessionResponse } from "../schemas/session.schema.js";
-import type { PlayerIdentityAdapter, PlayerRecord } from "./player-identity.js";
+import { InMemoryPlayerSessionRepository, type PlayerIdentityAdapter, type PlayerRecord, type PlayerSessionRepository, type SessionSearchFilters } from "./player-identity.js";
 import { getRewardModelMetadata } from "./reward-boundary.js";
 
 export interface SessionRecord {
@@ -25,14 +25,18 @@ const sessionTtlMs = 60 * 60 * 1000;
 const starterBalancePoints = 1000;
 
 export class SessionService {
-  private readonly sessionsById = new Map<string, SessionRecord>();
+  private readonly repository: PlayerSessionRepository;
 
   public constructor(
-    private readonly identityAdapter: PlayerIdentityAdapter,
+    identityAdapterOrRepository: PlayerIdentityAdapter | PlayerSessionRepository,
     private readonly clock: Clock = new SystemClock()
-  ) {}
+  ) {
+    this.repository = isPlayerSessionRepository(identityAdapterOrRepository)
+      ? identityAdapterOrRepository
+      : new LegacyIdentitySessionRepository(identityAdapterOrRepository);
+  }
 
-  public createOrResume(request: CreateSessionRequest): { statusCode: 200 | 201; response: SessionResponse } {
+  public async createOrResume(request: CreateSessionRequest): Promise<{ statusCode: 200 | 201; response: SessionResponse }> {
     if (!request.identity) {
       throw new ApiHttpError(400, {
         code: "INVALID_IDENTITY",
@@ -42,8 +46,8 @@ export class SessionService {
     }
 
     const now = this.clock.now();
-    const player = this.identityAdapter.resolve(request.identity, now);
-    const session = request.resumeSessionId ? this.findSessionForResume(request.resumeSessionId, player, now) : undefined;
+    const player = await this.repository.resolvePlayer(request.identity, now);
+    const session = request.resumeSessionId ? await this.findSessionForResume(request.resumeSessionId, player, now) : undefined;
 
     if (session) {
       return {
@@ -52,16 +56,19 @@ export class SessionService {
       };
     }
 
-    const createdSession = this.createSession(player.playerId, now);
+    const createdSession = await this.createSession(player.playerId, now, {
+      provider: request.identity.provider,
+      subject: request.identity.subject
+    });
     return {
       statusCode: 201,
       response: this.toResponse(createdSession, false)
     };
   }
 
-  public getActiveSession(sessionId: string): SessionRecord {
+  public async getActiveSession(sessionId: string): Promise<SessionRecord> {
     const now = this.clock.now();
-    const session = this.sessionsById.get(sessionId);
+    const session = await this.repository.getActiveSession(sessionId, now);
 
     if (!session) {
       throw new ApiHttpError(401, {
@@ -71,8 +78,7 @@ export class SessionService {
       });
     }
 
-    if (this.isExpired(session, now)) {
-      session.status = "expired";
+    if (session.status === "expired" || this.isExpired(session, now)) {
       throw new ApiHttpError(401, {
         code: "SESSION_EXPIRED",
         message: "Session has expired. Start a new session to continue.",
@@ -83,8 +89,18 @@ export class SessionService {
     return session;
   }
 
-  private findSessionForResume(sessionId: string, player: PlayerRecord, now: Date): SessionRecord {
-    const session = this.sessionsById.get(sessionId);
+  public async searchSessions(filters: SessionSearchFilters = {}): Promise<SessionRecord[]> {
+    return (await this.repository.searchSessions(filters)).map((session) => ({
+      sessionId: session.sessionId,
+      playerId: session.playerId,
+      status: session.status,
+      createdAt: session.createdAt,
+      expiresAt: session.expiresAt
+    }));
+  }
+
+  private async findSessionForResume(sessionId: string, player: PlayerRecord, now: Date): Promise<SessionRecord> {
+    const session = await this.repository.findSessionForResume(sessionId, player.playerId, now);
 
     if (!session || session.playerId !== player.playerId) {
       throw new ApiHttpError(404, {
@@ -94,8 +110,7 @@ export class SessionService {
       });
     }
 
-    if (this.isExpired(session, now)) {
-      session.status = "expired";
+    if (session.status === "expired" || this.isExpired(session, now)) {
       throw new ApiHttpError(401, {
         code: "SESSION_EXPIRED",
         message: "Session has expired. Start a new session to continue.",
@@ -106,16 +121,15 @@ export class SessionService {
     return session;
   }
 
-  private createSession(playerId: string, now: Date): SessionRecord {
-    const session: SessionRecord = {
-      sessionId: `sess_${this.sessionsById.size + 1}`,
-      playerId,
-      status: "active",
-      createdAt: now,
-      expiresAt: new Date(now.getTime() + sessionTtlMs)
+  private async createSession(playerId: string, now: Date, metadata: Record<string, unknown>): Promise<SessionRecord> {
+    const session = await this.repository.createSession(playerId, now, new Date(now.getTime() + sessionTtlMs), metadata);
+    return {
+      sessionId: session.sessionId,
+      playerId: session.playerId,
+      status: session.status,
+      createdAt: session.createdAt,
+      expiresAt: session.expiresAt
     };
-    this.sessionsById.set(session.sessionId, session);
-    return session;
   }
 
   private isExpired(session: SessionRecord, now: Date): boolean {
@@ -138,4 +152,18 @@ export class SessionService {
       }
     };
   }
+}
+
+class LegacyIdentitySessionRepository extends InMemoryPlayerSessionRepository {
+  public constructor(private readonly legacyIdentityAdapter: PlayerIdentityAdapter) {
+    super();
+  }
+
+  public override async resolvePlayer(input: Parameters<PlayerIdentityAdapter["resolve"]>[0], now: Date): Promise<PlayerRecord> {
+    return this.legacyIdentityAdapter.resolve(input, now);
+  }
+}
+
+function isPlayerSessionRepository(value: PlayerIdentityAdapter | PlayerSessionRepository): value is PlayerSessionRepository {
+  return "resolvePlayer" in value;
 }
