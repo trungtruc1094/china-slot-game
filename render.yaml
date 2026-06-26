@@ -4,7 +4,7 @@ services:
     runtime: node
     plan: free
     buildCommand: npm ci --include=dev && npm run build
-    startCommand: npm run db:migrate -w @china-slot-game/api && npm start -w @china-slot-game/api
+    startCommand: export SEED_ACTIVE_CONFIG=false; npm run db:migrate -w @china-slot-game/api && npm start -w @china-slot-game/api
     healthCheckPath: /api/ready
     envVars:
       - key: NODE_VERSION
