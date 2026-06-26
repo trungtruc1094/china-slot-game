@@ -1,8 +1,14 @@
 import { calculateRtpReport, runSimulation, type GameConfiguration } from "@china-slot-game/game-math";
-import type { InMemoryGameConfigurationRepository } from "../domain/game-configuration-repository.js";
+import type { GameConfigurationRepository, InMemoryGameConfigurationRepository } from "../domain/game-configuration-repository.js";
 
 const seedDraftId = "seed-fast-realish-94-draft";
 const seedActor = "deployment-seed";
+const seedWager = { lineBet: 1, selectedWays: 243, totalWager: 243 };
+const seedSimulationInput = {
+  spinCount: 1000,
+  seed: "deployment-seed-smoke",
+  wager: seedWager
+};
 
 export const seededActiveConfig: GameConfiguration = {
   id: "current-client-config",
@@ -87,8 +93,7 @@ export function seedActiveConfigForDeployment(repository: InMemoryGameConfigurat
     metadata: { reason: "Seeded fast real-ish 94% RTP config for testing deployment." }
   });
 
-  const wager = { lineBet: 1, selectedWays: 243, totalWager: 243 };
-  const report = calculateRtpReport(seededActiveConfig, { wager });
+  const report = calculateRtpReport(seededActiveConfig, { wager: seedWager });
   repository.attachMathReport({
     draftId: seedDraftId,
     report,
@@ -98,15 +103,11 @@ export function seedActiveConfigForDeployment(repository: InMemoryGameConfigurat
   repository.storeSimulationRun({
     draftId: seedDraftId,
     input: {
-      spinCount: 1000,
-      seed: "deployment-seed-smoke",
-      wager,
+      ...seedSimulationInput,
       theoreticalRtp: report.theoreticalRtp
     },
     result: runSimulation(seededActiveConfig, {
-      spinCount: 1000,
-      seed: "deployment-seed-smoke",
-      wager,
+      ...seedSimulationInput,
       theoreticalRtp: report.theoreticalRtp
     }),
     actor: seedActor
@@ -119,4 +120,62 @@ export function seedActiveConfigForDeployment(repository: InMemoryGameConfigurat
   });
 
   console.info(`[seed] Active config seeded: ${seededActiveConfig.versionId} rtp=${report.theoreticalRtp}`);
+}
+
+export async function seedActiveConfigRepository(repository: GameConfigurationRepository): Promise<"seeded" | "skipped"> {
+  const activeRecord = await repository.getActiveRecord();
+  if (activeRecord) {
+    console.info(`[seed] Active config already present: ${activeRecord.versionId}`);
+    return "skipped";
+  }
+
+  let draft = await repository.read(seedDraftId);
+  if (!draft) {
+    draft = await repository.createDraft({
+      id: seedDraftId,
+      config: seededActiveConfig,
+      actor: seedActor,
+      metadata: { reason: "Seeded fast real-ish 94% RTP config for PostgreSQL deployment." }
+    });
+  }
+
+  if (draft.status !== "draft") {
+    console.info(`[seed] Seed config exists with status=${draft.status}; no active config was created.`);
+    return "skipped";
+  }
+
+  const report = calculateRtpReport(seededActiveConfig, { wager: seedWager });
+  const existingReport = await repository.getMathReportForDraft(seedDraftId);
+  if (!existingReport) {
+    await repository.attachMathReport({
+      draftId: seedDraftId,
+      report,
+      actor: seedActor
+    });
+  }
+
+  const simulationRuns = await repository.listSimulationRuns(seedDraftId);
+  if (simulationRuns.length === 0) {
+    await repository.storeSimulationRun({
+      draftId: seedDraftId,
+      input: {
+        ...seedSimulationInput,
+        theoreticalRtp: report.theoreticalRtp
+      },
+      result: runSimulation(seededActiveConfig, {
+        ...seedSimulationInput,
+        theoreticalRtp: report.theoreticalRtp
+      }),
+      actor: seedActor
+    });
+  }
+
+  await repository.activateDraft({
+    id: seedDraftId,
+    actor: seedActor,
+    reason: "Seed active config in PostgreSQL for deployment smoke play."
+  });
+
+  console.info(`[seed] Active config seeded: ${seededActiveConfig.versionId} rtp=${report.theoreticalRtp}`);
+  return "seeded";
 }

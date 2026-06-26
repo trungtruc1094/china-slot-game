@@ -1,6 +1,6 @@
 import type { GameConfiguration, RtpReport, SimulationResult } from "@china-slot-game/game-math";
 import { describe, expect, it, vi } from "vitest";
-import { seedActiveConfigForDeployment, seededActiveConfig } from "../../src/config/seed-active-config.js";
+import { seedActiveConfigForDeployment, seededActiveConfig, seedActiveConfigRepository } from "../../src/config/seed-active-config.js";
 import { InMemoryAdminAuditRepository } from "../../src/domain/admin-audit-repository.js";
 import { InMemoryGameConfigurationRepository } from "../../src/domain/game-configuration-repository.js";
 import type { Clock } from "../../src/domain/session-service.js";
@@ -100,5 +100,40 @@ describe("seedActiveConfigForDeployment", () => {
     expect(existingDraft).toMatchObject({ status: "draft" });
     expect(existingDraft?.mathReportId).toBeUndefined();
     expect(repository.listSimulationRuns("seed-fast-realish-94-draft")).toHaveLength(0);
+  });
+});
+
+describe("seedActiveConfigRepository", () => {
+  const createRepository = (): InMemoryGameConfigurationRepository => new InMemoryGameConfigurationRepository(
+    new FixedClock(),
+    new InMemoryAdminAuditRepository(new FixedClock())
+  );
+
+  it("creates and activates the deployment seed config when no active config exists", async () => {
+    const repository = createRepository();
+
+    const result = await seedActiveConfigRepository(repository);
+
+    expect(result).toBe("seeded");
+    expect(repository.getActiveRecord()).toMatchObject({
+      id: "seed-fast-realish-94-draft",
+      status: "active",
+      versionId: seededActiveConfig.versionId,
+      mathReportId: "math_report_1"
+    });
+    expect(repository.getMathReportForDraft("seed-fast-realish-94-draft")?.report).toMatchObject({
+      theoreticalRtp: 0.94016,
+      totalOutcomes: 3125
+    });
+    expect(repository.listSimulationRuns("seed-fast-realish-94-draft")).toHaveLength(1);
+  });
+
+  it("skips when an active config already exists", async () => {
+    const repository = createRepository();
+    await seedActiveConfigRepository(repository);
+
+    await expect(seedActiveConfigRepository(repository)).resolves.toBe("skipped");
+
+    expect(repository.list().filter((record) => record.status === "active")).toHaveLength(1);
   });
 });

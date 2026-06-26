@@ -4,7 +4,15 @@ services:
     runtime: node
     plan: free
     buildCommand: npm ci --include=dev && npm run build
-    startCommand: export SEED_ACTIVE_CONFIG=false; npm run db:migrate -w @china-slot-game/api && npm start -w @china-slot-game/api
+    startCommand: export SEED_ACTIVE_CONFIG=false; npm run db:migrate -w @china-slot-game/api && npm run db:seed-active-config -w @china-slot-game/api && npm start -w @china-slot-game/api
+    buildFilter:
+      paths:
+        - apps/api/**
+        - packages/game-math/**
+        - package.json
+        - package-lock.json
+        - .npmrc
+        - render.yaml
     healthCheckPath: /api/ready
     envVars:
       - key: NODE_VERSION

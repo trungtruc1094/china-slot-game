@@ -10,6 +10,7 @@
     "db:check": "tsx src/db/migrate.ts check",
     "db:migrate": "tsx src/db/migrate.ts up",
     "db:rollback": "tsx src/db/migrate.ts down",
+    "db:seed-active-config": "tsx src/config/seed-postgres-active-config.ts",
     "dev": "tsx src/main.ts",
     "lint": "tsc --noEmit",
     "start": "node dist/main.js",
