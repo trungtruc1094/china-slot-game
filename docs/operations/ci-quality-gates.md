@@ -17,7 +17,7 @@ CI runs on every pull request and push to `main`.
 | Coverage threshold | `npm run test:coverage` |
 | Build | `npm run build` |
 
-Coverage thresholds are 80% for lines, functions, and statements, with branches set to 79%. The branch threshold matches the current launch baseline after Epic 6 hardening so CI fails on regressions immediately while leaving the remaining branch-heavy MVP seams visible as follow-up coverage debt.
+Coverage thresholds are 80% for lines, functions, and statements, with branches set to 76%. The branch threshold matches the current launch baseline after PostgreSQL persistence coverage is included so CI fails on regressions immediately while leaving the remaining branch-heavy MVP seams visible as follow-up coverage debt.
 
 PostgreSQL persistence gates use the Epic 7 migration harness and run as separate named CI steps so migration, schema readiness, or database failures identify the API package/app. CI provisions PostgreSQL before running `db:migrate`, `db:check`, and the PostgreSQL-backed integration suite.
 

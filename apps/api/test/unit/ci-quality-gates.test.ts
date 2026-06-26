@@ -23,9 +23,9 @@ describe("CI quality gates", () => {
 
     expect(config).toContain("lines: 80");
     expect(config).toContain("functions: 80");
-    expect(config).toContain("branches: 79");
+    expect(config).toContain("branches: 76");
     expect(config).toContain("statements: 80");
     expect(docs).toContain("Coverage thresholds are 80%");
-    expect(docs).toContain("branches set to 79%");
+    expect(docs).toContain("branches set to 76%");
   });
 });

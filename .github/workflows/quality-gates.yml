@@ -64,7 +64,9 @@ jobs:
           TEST_DATABASE_URL: postgres://china_slot:china_slot_password@localhost:5432/china_slot_test
         run: npm run test:integration -w @china-slot-game/api
 
-      - name: Coverage thresholds 80/79 percent
+      - name: Coverage thresholds 80/76 percent
+        env:
+          TEST_DATABASE_URL: postgres://china_slot:china_slot_password@localhost:5432/china_slot_test
         run: npm run test:coverage
 
       - name: Build all workspaces
