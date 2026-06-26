@@ -4,14 +4,24 @@ services:
     runtime: node
     plan: free
     buildCommand: npm ci --include=dev && npm run build
-    startCommand: npm start -w apps/api
-    healthCheckPath: /api/health
+    startCommand: npm run db:migrate -w @china-slot-game/api && npm start -w @china-slot-game/api
+    healthCheckPath: /api/ready
     envVars:
       - key: NODE_ENV
         value: production
-      - key: SEED_ACTIVE_CONFIG
-        value: "true"
+      - key: PERSISTENCE_MODE
+        value: postgres
+      - key: DATABASE_URL
+        fromDatabase:
+          name: china-slot-db
+          property: connectionString
       - key: API_REQUEST_LOGS
         value: "true"
       - key: API_GAMEPLAY_LOGS
         value: "true"
+
+databases:
+  - name: china-slot-db
+    plan: free
+    databaseName: china_slot
+    user: china_slot
