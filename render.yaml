@@ -7,6 +7,8 @@ services:
     startCommand: npm run db:migrate -w @china-slot-game/api && npm start -w @china-slot-game/api
     healthCheckPath: /api/ready
     envVars:
+      - key: NODE_VERSION
+        value: 24.10.0
       - key: NODE_ENV
         value: production
       - key: PERSISTENCE_MODE
