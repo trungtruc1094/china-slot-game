@@ -1,9 +1,12 @@
 {
   "issues": [],
+  "warnings": [],
   "stats": {
     "domains": 4,
-    "flows": 12,
-    "steps": 59,
-    "edges": 76
+    "flows": 9,
+    "steps": 36,
+    "edges": 49,
+    "issues": 0,
+    "warnings": 0
   }
 }
