@@ -3,6 +3,7 @@ import type { AddressInfo } from "node:net";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../../src/app.js";
 import type { Clock } from "../../src/domain/session-service.js";
+import { WalletService } from "../../src/domain/wallet-service.js";
 import type { SessionResponse } from "../../src/schemas/session.schema.js";
 import type { ApiEnvelope } from "../../src/schemas/api-envelope.js";
 
@@ -17,10 +18,12 @@ class MutableClock implements Clock {
 let server: ReturnType<typeof createServer>;
 let baseUrl: string;
 let clock: MutableClock;
+let walletService: WalletService;
 
 beforeEach(async () => {
   clock = new MutableClock();
-  server = createServer(createApp({ clock }));
+  walletService = new WalletService(clock);
+  server = createServer(createApp({ clock, walletService }));
   await new Promise<void>((resolve) => {
     server.listen(0, "127.0.0.1", resolve);
   });
@@ -90,6 +93,26 @@ describe("session routes", () => {
         expiresAt: "2026-06-18T09:00:00.000Z",
         resumed: false
       }
+    });
+  });
+
+  it("returns the current server wallet balance on session start", async () => {
+    await walletService.applyTransaction({
+      playerId: "player_1",
+      type: "credit",
+      amount: 250,
+      actor: "test",
+      source: "session-route-test"
+    });
+
+    const response = await postSession({ identity: identity() });
+    const body = await response.json() as ApiEnvelope<SessionResponse>;
+
+    expect(response.status).toBe(201);
+    expect(body.error).toBeNull();
+    expect(body.data).toMatchObject({
+      playerId: "player_1",
+      balance: { points: 1250 }
     });
   });
 

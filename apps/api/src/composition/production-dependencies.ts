@@ -43,8 +43,8 @@ export async function createProductionDependencies(env: ApiEnv): Promise<Product
     const adminAuditRepository = new PostgresAdminAuditRepository(pool, clock);
     const requestTraceRepository = new PostgresRequestTraceRepository(pool);
     const playerSessionRepository = new PostgresPlayerSessionRepository(pool);
-    const sessionService = new SessionService(playerSessionRepository, clock);
     const walletRepository = new PostgresWalletRepository(pool, clock);
+    const sessionService = new SessionService(playerSessionRepository, clock, walletRepository);
     const configRepository = new PostgresGameConfigurationRepository(pool, clock, adminAuditRepository);
     const operatorLimitsRepository = new PostgresOperatorLimitsRepository(pool, clock, adminAuditRepository);
     const budgetProtectionRepository = new PostgresBudgetProtectionRepository(pool, clock, adminAuditRepository);

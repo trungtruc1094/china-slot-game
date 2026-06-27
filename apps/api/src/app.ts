@@ -53,11 +53,12 @@ export interface AppDependencies {
 
 export function createApp(dependencies: AppDependencies = {}): Express {
   const app = express();
+  const walletService = dependencies.walletService ?? new WalletService(dependencies.clock ?? { now: () => new Date() });
   const sessionService = dependencies.sessionService ?? new SessionService(
     new InMemoryPlayerIdentityAdapter(),
-    dependencies.clock
+    dependencies.clock,
+    walletService
   );
-  const walletService = dependencies.walletService ?? new WalletService(dependencies.clock ?? { now: () => new Date() });
   const adminAuditRepository = dependencies.adminAuditRepository ?? new InMemoryAdminAuditRepository(
     dependencies.clock ?? { now: () => new Date() }
   );

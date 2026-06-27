@@ -163,6 +163,7 @@
         var storage = settings.storage || globalScope.localStorage;
         var identity = settings.identity || createBrowserIdentity(storage);
         var session = null;
+        var sessionRequest = null;
         var status = mode === "production" ? "idle" : "demo";
 
         async function postJson(path, body) {
@@ -189,11 +190,18 @@
         async function startSession() {
             if (mode !== "production") return null;
             if (session && session.sessionId) return session;
+            if (sessionRequest) return sessionRequest;
 
             status = "pending";
-            session = await postJson("/api/sessions", { identity: identity });
-            status = "ready";
-            return session;
+            sessionRequest = postJson("/api/sessions", { identity: identity }).then(function (createdSession) {
+                session = createdSession;
+                status = "ready";
+                return session;
+            }).catch(function (error) {
+                sessionRequest = null;
+                throw error;
+            });
+            return sessionRequest;
         }
 
         async function spin(request) {

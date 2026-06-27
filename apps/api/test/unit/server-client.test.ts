@@ -11,6 +11,7 @@ interface ServerClientApi {
     identity: { provider: string; subject: string };
     fetch: (url: string, init: { method: string; headers: Record<string, string>; body: string }) => Promise<MockResponse>;
   }) => {
+    startSession: () => Promise<{ sessionId: string; playerId: string; balance?: { points: number } } | null>;
     spin: (request: { clientSpinId: string; wager: { lineBet: number; selectedWays: number; totalWager: number } }) => Promise<NormalizedSpinResult | SpinRetryState>;
     mode: "production" | "demo";
     status: string;
@@ -28,6 +29,7 @@ interface ServerClientApi {
 
 interface SlotGameCtor {
   prototype: {
+    initializeBackendSessionBalance: () => void;
     requestBackendSpin: () => void;
     handleBackendSpinRetry: (retryState: SpinRetryState) => void;
     createClientSpinId: () => string;
@@ -208,6 +210,47 @@ describe("browser server client render contract", () => {
           wager: { lineBet: 1, selectedWays: 243, totalWager: 243 }
         }
       }
+    ]);
+  });
+
+  it("reuses an in-flight backend session request", async () => {
+    const client = loadServerClient();
+    let sessionRequests = 0;
+    let resolveSession: (response: MockResponse) => void = () => undefined;
+    const fetchMock = async (url: string): Promise<MockResponse> => {
+      if (url.endsWith("/api/sessions")) {
+        sessionRequests += 1;
+        return new Promise((resolve) => {
+          resolveSession = resolve;
+        });
+      }
+
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ data: backendResult, error: null })
+      };
+    };
+
+    const backendClient = client.createBackendClient({
+      mode: "production",
+      apiBaseUrl: "https://api.example.test",
+      identity: { provider: "guest", subject: "browser-player" },
+      fetch: fetchMock
+    });
+
+    const firstSession = backendClient.startSession();
+    const secondSession = backendClient.startSession();
+    expect(sessionRequests).toBe(1);
+    resolveSession({
+      ok: true,
+      status: 200,
+      json: async () => ({ data: { sessionId: "sess_123", playerId: "player_123", balance: { points: 875 } }, error: null })
+    });
+
+    await expect(Promise.all([firstSession, secondSession])).resolves.toEqual([
+      { sessionId: "sess_123", playerId: "player_123", balance: { points: 875 } },
+      { sessionId: "sess_123", playerId: "player_123", balance: { points: 875 } }
     ]);
   });
 
@@ -520,6 +563,63 @@ describe("browser server client render contract", () => {
       message: "Reward-bearing play is paused while the backend is unavailable."
     });
     expect(calls).not.toContainEqual({ type: "runSlot" });
+  });
+
+  it("loads the backend session balance before the first production spin", async () => {
+    const SlotGame = loadSlotGame();
+    const calls: Array<Record<string, unknown>> = [];
+    const game = {
+      backendSpinStatus: "idle",
+      backendSpinPlan: null,
+      serverClient: {
+        mode: "production",
+        startSession: async () => ({ balance: { points: 875 } })
+      },
+      slotControls: {
+        creditSumText: { text: "100000" }
+      },
+      slotPlayer: {
+        setCoinsCount: (points: number) => calls.push({ type: "balance", points })
+      },
+      isBackendProductionMode: () => true
+    };
+
+    SlotGame.prototype.initializeBackendSessionBalance.call(game);
+    expect(game.slotControls.creditSumText.text).toBe(" ...");
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(game.backendSpinStatus).toBe("ready");
+    expect(calls).toEqual([{ type: "balance", points: 875 }]);
+  });
+
+  it("does not replace the demo balance from backend session startup", async () => {
+    const SlotGame = loadSlotGame();
+    const calls: Array<Record<string, unknown>> = [];
+    const game = {
+      backendSpinStatus: "demo",
+      serverClient: {
+        mode: "demo",
+        startSession: async () => {
+          calls.push({ type: "session" });
+          return { balance: { points: 875 } };
+        }
+      },
+      slotControls: {
+        creditSumText: { text: "100000" }
+      },
+      slotPlayer: {
+        setCoinsCount: (points: number) => calls.push({ type: "balance", points })
+      },
+      isBackendProductionMode: () => false
+    };
+
+    SlotGame.prototype.initializeBackendSessionBalance.call(game);
+    await Promise.resolve();
+
+    expect(game.backendSpinStatus).toBe("demo");
+    expect(game.slotControls.creditSumText.text).toBe("100000");
+    expect(calls).toEqual([]);
   });
 });
 

@@ -185,6 +185,7 @@ class SlotGame extends Phaser.Scene{
         // 6) controls
         slotConfig.createControls(this, this.slotControls);
         this.slotControls.init(slotConfig.selectedLines, true);
+        this.initializeBackendSessionBalance();
 
         // 7) state machine
         this.stateMachine = new StateMachine();
@@ -336,6 +337,28 @@ class SlotGame extends Phaser.Scene{
     isBackendProductionMode()
     {
         return this.serverClient !== null && this.serverClient.mode === "production";
+    }
+
+    initializeBackendSessionBalance()
+    {
+        if (!this.isBackendProductionMode()) return;
+
+        if (this.slotControls && this.slotControls.creditSumText != null) {
+            this.slotControls.creditSumText.text = ' ...';
+        }
+        this.backendSpinStatus = "pending";
+
+        this.serverClient.startSession().then((session) => {
+            var points = (session && session.balance) ? Number(session.balance.points) : NaN;
+            if (!Number.isFinite(points)) {
+                throw new Error("Session balance is invalid.");
+            }
+            this.slotPlayer.setCoinsCount(points);
+            this.backendSpinStatus = "ready";
+        }).catch((error) => {
+            this.backendSpinStatus = "retry";
+            this.backendSpinPlan = window.ChinaSlotServerClient ? window.ChinaSlotServerClient.buildRetryState(error) : null;
+        });
     }
 
     createClientSpinId()

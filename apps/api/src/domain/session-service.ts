@@ -24,12 +24,23 @@ export class SystemClock implements Clock {
 const sessionTtlMs = 60 * 60 * 1000;
 const starterBalancePoints = 1000;
 
+interface SessionWalletReader {
+  getWallet(playerId: string): { balance: number } | Promise<{ balance: number }>;
+}
+
+class StarterBalanceWalletReader implements SessionWalletReader {
+  public getWallet(playerId: string): { playerId: string; balance: number } {
+    return { playerId, balance: starterBalancePoints };
+  }
+}
+
 export class SessionService {
   private readonly repository: PlayerSessionRepository;
 
   public constructor(
     identityAdapterOrRepository: PlayerIdentityAdapter | PlayerSessionRepository,
-    private readonly clock: Clock = new SystemClock()
+    private readonly clock: Clock = new SystemClock(),
+    private readonly walletReader: SessionWalletReader = new StarterBalanceWalletReader()
   ) {
     this.repository = isPlayerSessionRepository(identityAdapterOrRepository)
       ? identityAdapterOrRepository
@@ -52,7 +63,7 @@ export class SessionService {
     if (session) {
       return {
         statusCode: 200,
-        response: this.toResponse(session, true)
+        response: await this.toResponse(session, true)
       };
     }
 
@@ -62,7 +73,7 @@ export class SessionService {
     });
     return {
       statusCode: 201,
-      response: this.toResponse(createdSession, false)
+      response: await this.toResponse(createdSession, false)
     };
   }
 
@@ -136,12 +147,14 @@ export class SessionService {
     return session.expiresAt.getTime() <= now.getTime();
   }
 
-  private toResponse(session: SessionRecord, resumed: boolean): SessionResponse {
+  private async toResponse(session: SessionRecord, resumed: boolean): Promise<SessionResponse> {
+    const wallet = await this.walletReader.getWallet(session.playerId);
+
     return {
       sessionId: session.sessionId,
       playerId: session.playerId,
       balance: {
-        points: starterBalancePoints
+        points: wallet.balance
       },
       rewardModel: getRewardModelMetadata(),
       session: {
