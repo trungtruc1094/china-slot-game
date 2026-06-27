@@ -84,10 +84,10 @@ var slotConfig3x5 = {
                 winLabel: { x: 420, y: 376, size: 38 },
                 winValue: { x: 420, y: 405, size: 78 },
                 jackpotValue: { x: 0, y: -413, size: 56 },
-                autoLabel1: { x: 147, y: 378, size: 56, letterSpacing: -10 },
-                autoLabel2: { x: 147, y: 416, size: 56 },
-                maxBetLabel1: { x: -150, y: 378, size: 56, letterSpacing: -10 },
-                maxBetLabel2: { x: -150, y: 416, size: 56 },
+                autoLabel1: { x: 130, y: 378, size: 56, letterSpacing: -10 },
+                autoLabel2: { x: 130, y: 416, size: 56 },
+                maxBetLabel1: { x: -130, y: 378, size: 56, letterSpacing: -10 },
+                maxBetLabel2: { x: -130, y: 416, size: 56 },
                 spinLabel: { x: 0, y: 365, size: 72 },
                 info: { x: 0, y: 600, size: 30 },
                 freeSpin: { x: 0, y: 560, size: 30 }
@@ -146,10 +146,10 @@ var slotConfig3x5 = {
                 winLabel: { x: -170, y: 700, size: 34 },
                 winValue: { x: -170, y: 730, size: 64 },
                 jackpotValue: { x: 0, y: -413, size: 54 },
-                autoLabel1: { x: 275, y: 875, size: 54, letterSpacing: -8 },
-                autoLabel2: { x: 275, y: 913, size: 54 },
-                maxBetLabel1: { x: -275, y: 875, size: 54, letterSpacing: -8 },
-                maxBetLabel2: { x: -275, y: 913, size: 54 },
+                autoLabel1: { x: 255, y: 875, size: 54, letterSpacing: -8 },
+                autoLabel2: { x: 255, y: 913, size: 54 },
+                maxBetLabel1: { x: -255, y: 875, size: 54, letterSpacing: -8 },
+                maxBetLabel2: { x: -255, y: 913, size: 54 },
                 spinLabel: { x: 0, y: 870, size: 76 },
                 info: { x: 0, y: 500, size: 30 },
                 freeSpin: { x: 0, y: 460, size: 30 }
@@ -960,7 +960,7 @@ var slotConfig3x5 = {
             console.log('menu click');
             slotControls.settingsButton.button.setVisible(!slotControls.settingsButton.button.visible);  
             slotControls.rulesButton.button.setVisible(!slotControls.rulesButton.button.visible); 
-            slotControls.slotInfoButton.button.setVisible(!slotControls.slotInfoButton.button.visible); 
+            // slotControls.slotInfoButton.button.setVisible(!slotControls.slotInfoButton.button.visible); 
             scene.soundController.playClip('button_click');}, this);
         slotControls.menuButton.button.setVisible(true); 
         slotControls.menuButton.setDepth(depth); 
@@ -1000,17 +1000,17 @@ var slotConfig3x5 = {
        slotControls.rulesButton.button.setVisible(false); 
        slotControls.rulesButton.setDepth(depth); 
 
-       // info button
-       slotControls.slotInfoButton = new SceneButton(scene, 'button_info', 'button_info_hover', false);   
-       slotControls.buttons.push(slotControls.slotInfoButton);
-    createButton(slotControls.slotInfoButton, controls.info);
-       slotControls.slotInfoButton.addClickEvent(()=>{
-            console.log('info click');
-           var pu = scene.guiController.showPopUp(this.createAboutPUHandler);
-           scene.soundController.playClip('button_click');
-       }, this);   
-       slotControls.slotInfoButton.button.setVisible(false); 
-       slotControls.slotInfoButton.setDepth(depth); 
+    // info button
+    // slotControls.slotInfoButton = new SceneButton(scene, 'button_info', 'button_info_hover', false);   
+    // slotControls.buttons.push(slotControls.slotInfoButton);
+    // createButton(slotControls.slotInfoButton, controls.info);
+    // slotControls.slotInfoButton.addClickEvent(()=>{
+    //      console.log('info click');
+    //     var pu = scene.guiController.showPopUp(this.createAboutPUHandler);
+    //     scene.soundController.playClip('button_click');
+    // }, this);   
+    // slotControls.slotInfoButton.button.setVisible(false); 
+    // slotControls.slotInfoButton.setDepth(depth); 
 
         // adding the text fields
         slotControls.linesText = addText(text.linesLabel, 'gameFont_2', 'LINES');
