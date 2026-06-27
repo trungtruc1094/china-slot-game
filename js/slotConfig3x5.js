@@ -29,6 +29,157 @@ var slotConfig3x5 = {
     localOffsetX: 0,                            // x offset from center for all scene objects
     localOffsetY: 70,                           // y offset from center for all scene objects
 
+    layoutMode: 'landscape',
+    layouts: {
+        landscape: {
+            localOffsetX: 0,
+            localOffsetY: 70,
+            symbolSizeY: 219,
+            reels: [
+                { offsetX: -424, offsetY: -25 },
+                { offsetX: -212, offsetY: -25 },
+                { offsetX: 0, offsetY: -25 },
+                { offsetX: 212, offsetY: -25 },
+                { offsetX: 424, offsetY: -25 }
+            ],
+            graphic: {
+                slot: { x: 0, y: -25, depth: -1 },
+                reelleftborder: { x: -538, y: -25 },
+                reelrightborder: { x: 538, y: -25 },
+                slotmasktop: { x: 0, y: -322 },
+                roof: { x: 0, y: -600 },
+                balk: { x: 0, y: -410 },
+                jackpottitle: { x: 0, y: -470 },
+                upstairs: { x: 0, y: 800 },
+                columnleft: { x: -610, y: 0 },
+                columnright: { x: 610, y: 0 },
+                lanternsleft: { x: -450, y: -650 },
+                lanternsright: { x: 440, y: -550 },
+                slotmaskbottom: { x: 0, y: 291 },
+                panels: {
+                    lines: { x: -740, y: 396 },
+                    totalBet: { x: -440, y: 396 },
+                    win: { x: 420, y: 396 },
+                    balance: { x: 720, y: 396 }
+                }
+            },
+            controls: {
+                totalBetMinus: { x: -550, y: 396 },
+                totalBetPlus: { x: -330, y: 396 },
+                maxBet: { x: -130, y: 396 },
+                autoSpin: { x: 130, y: 396 },
+                spin: { x: 0, y: 360 },
+                menu: { x: 860, y: -360 },
+                settings: { x: 860, y: -230 },
+                rules: { x: 860, y: -100 },
+                info: { x: 860, y: 30 }
+            },
+            text: {
+                linesLabel: { x: -740, y: 376, size: 38 },
+                linesValue: { x: -740, y: 405, size: 78 },
+                totalBetLabel: { x: -440, y: 376, size: 38 },
+                totalBetValue: { x: -440, y: 405, size: 78 },
+                balanceLabel: { x: 720, y: 376, size: 38 },
+                balanceValue: { x: 720, y: 405, size: 78 },
+                winLabel: { x: 420, y: 376, size: 38 },
+                winValue: { x: 420, y: 405, size: 78 },
+                jackpotValue: { x: 0, y: -413, size: 56 },
+                autoLabel1: { x: 147, y: 378, size: 56, letterSpacing: -10 },
+                autoLabel2: { x: 147, y: 416, size: 56 },
+                maxBetLabel1: { x: -150, y: 378, size: 56, letterSpacing: -10 },
+                maxBetLabel2: { x: -150, y: 416, size: 56 },
+                spinLabel: { x: 0, y: 365, size: 72 },
+                info: { x: 0, y: 600, size: 30 },
+                freeSpin: { x: 0, y: 560, size: 30 }
+            }
+        },
+        portrait: {
+            localOffsetX: 0,
+            localOffsetY: -300,
+            symbolSizeY: 219,
+            reels: [
+                { offsetX: -424, offsetY: -25 },
+                { offsetX: -212, offsetY: -25 },
+                { offsetX: 0, offsetY: -25 },
+                { offsetX: 212, offsetY: -25 },
+                { offsetX: 424, offsetY: -25 }
+            ],
+            graphic: {
+                slot: { x: 0, y: -25, depth: -1 },
+                reelleftborder: { x: -538, y: -25 },
+                reelrightborder: { x: 538, y: -25 },
+                slotmasktop: { x: 0, y: -322 },
+                roof: { x: 0, y: -610, scale: 0.76 },
+                balk: { x: 0, y: -405, scale: 0.86 },
+                jackpottitle: { x: 0, y: -470, scale: 1.12 },
+                upstairs: { x: 0, y: 830, scale: 0.86 },
+                columnleft: { x: -590, y: 10, scale: 0.86 },
+                columnright: { x: 590, y: 10, scale: 0.86 },
+                lanternsleft: { x: -430, y: -610, scale: 0.78 },
+                lanternsright: { x: 420, y: -560, scale: 0.78 },
+                slotmaskbottom: { x: 0, y: 291 },
+                panels: {
+                    lines: { x: -170, y: 565, scale: 0.86 },
+                    totalBet: { x: 170, y: 565, scale: 0.86 },
+                    win: { x: -170, y: 720, scale: 0.86 },
+                    balance: { x: 170, y: 720, scale: 0.86 }
+                }
+            },
+            controls: {
+                totalBetMinus: { x: 60, y: 565 },
+                totalBetPlus: { x: 280, y: 565 },
+                maxBet: { x: -255, y: 895, scale: 1.12 },
+                autoSpin: { x: 255, y: 895, scale: 1.12 },
+                spin: { x: 0, y: 865, scale: 1.16 },
+                menu: { x: 440, y: -520, scale: 0.9 },
+                settings: { x: 440, y: -390, scale: 0.9 },
+                rules: { x: 440, y: -260, scale: 0.9 },
+                info: { x: 440, y: -130, scale: 0.9 }
+            },
+            text: {
+                linesLabel: { x: -170, y: 545, size: 34 },
+                linesValue: { x: -170, y: 575, size: 64 },
+                totalBetLabel: { x: 170, y: 545, size: 34 },
+                totalBetValue: { x: 170, y: 575, size: 64 },
+                balanceLabel: { x: 170, y: 700, size: 34 },
+                balanceValue: { x: 170, y: 730, size: 64 },
+                winLabel: { x: -170, y: 700, size: 34 },
+                winValue: { x: -170, y: 730, size: 64 },
+                jackpotValue: { x: 0, y: -413, size: 54 },
+                autoLabel1: { x: 275, y: 875, size: 54, letterSpacing: -8 },
+                autoLabel2: { x: 275, y: 913, size: 54 },
+                maxBetLabel1: { x: -275, y: 875, size: 54, letterSpacing: -8 },
+                maxBetLabel2: { x: -275, y: 913, size: 54 },
+                spinLabel: { x: 0, y: 870, size: 76 },
+                info: { x: 0, y: 500, size: 30 },
+                freeSpin: { x: 0, y: 460, size: 30 }
+            }
+        }
+    },
+
+    applyLayout: function(layoutMode) {
+        var nextLayoutMode = this.layouts[layoutMode] ? layoutMode : 'landscape';
+        var layout = this.layouts[nextLayoutMode];
+
+        this.layoutMode = nextLayoutMode;
+        this.layout = layout;
+        this.localOffsetX = layout.localOffsetX;
+        this.localOffsetY = layout.localOffsetY;
+        this.symbolSizeY = layout.symbolSizeY;
+
+        for (var ri = 0; ri < layout.reels.length; ri++) {
+            this.reels[ri].offsetX = layout.reels[ri].offsetX;
+            this.reels[ri].offsetY = layout.reels[ri].offsetY;
+        }
+    },
+
+    addLayoutSprite: function(scene, spriteName, layoutData) {
+        var sprite = scene.addSpriteLocPos(spriteName, layoutData.x, layoutData.y);
+        if (layoutData.scale != null) sprite.setScale(layoutData.scale);
+        if (layoutData.depth != null) sprite.depth = layoutData.depth;
+        return sprite;
+    },
+
     
     fonts: [
         {
@@ -692,6 +843,7 @@ var slotConfig3x5 = {
         },
 
     createSlotGraphic: function(scene){
+        var graphic = this.layout.graphic;
         // scene.background =  scene.addSpriteLocPos('background', 0, 0); //?.setScale(1.5);
         // scene.background.depth = -5;
 
@@ -707,29 +859,28 @@ var slotConfig3x5 = {
             scene.rightLamp.on();
         */
        
-         scene.slot =  scene.addSpriteLocPos('slot', 0, 0 - 25); 
-         scene.slot.depth = -1;
+            scene.slot = this.addLayoutSprite(scene, 'slot', graphic.slot);
 
-         scene.slot =  scene.addSpriteLocPos('reelleftborder', -538, 0 - 25); 
-         scene.slot =  scene.addSpriteLocPos('reelrightborder',  538, 0 - 25); 
-         scene.slot =  scene.addSpriteLocPos('slotmasktop', 0, -297 - 25); 
+            scene.slot = this.addLayoutSprite(scene, 'reelleftborder', graphic.reelleftborder);
+            scene.slot = this.addLayoutSprite(scene, 'reelrightborder', graphic.reelrightborder);
+            scene.slot = this.addLayoutSprite(scene, 'slotmasktop', graphic.slotmasktop);
 
-         scene.slot =  scene.addSpriteLocPos('roof', 0, -600); 
-         scene.slot =  scene.addSpriteLocPos('balk', 0, -410); 
-         scene.slot =  scene.addSpriteLocPos('jackpottitle', 0, -470);     
-         scene.slot =  scene.addSpriteLocPos('upstairs', 0, 800); 
+            scene.slot = this.addLayoutSprite(scene, 'roof', graphic.roof);
+            scene.slot = this.addLayoutSprite(scene, 'balk', graphic.balk);
+            scene.slot = this.addLayoutSprite(scene, 'jackpottitle', graphic.jackpottitle);
+            scene.slot = this.addLayoutSprite(scene, 'upstairs', graphic.upstairs);
 
-         scene.slot =  scene.addSpriteLocPos('columnleft', -610, 0); 
-         scene.slot =  scene.addSpriteLocPos('columnright', 610, 0); 
-         scene.slot =  scene.addSpriteLocPos('lanternsleft', -450, -650); 
-         scene.slot =  scene.addSpriteLocPos('lanternsright', 440, -550); 
-         scene.slot =  scene.addSpriteLocPos('slotmaskbottom', 0, 316 - 25); 
+            scene.slot = this.addLayoutSprite(scene, 'columnleft', graphic.columnleft);
+            scene.slot = this.addLayoutSprite(scene, 'columnright', graphic.columnright);
+            scene.slot = this.addLayoutSprite(scene, 'lanternsleft', graphic.lanternsleft);
+            scene.slot = this.addLayoutSprite(scene, 'lanternsright', graphic.lanternsright);
+            scene.slot = this.addLayoutSprite(scene, 'slotmaskbottom', graphic.slotmaskbottom);
 
-         scene.linesPanel = scene.addSpriteLocPos('panel_lines', -740, 196 + 200); 
-         scene.totalbetPanel = scene.addSpriteLocPos('panel_totalbet', -440, 196 + 200); // -400
+            scene.linesPanel = this.addLayoutSprite(scene, 'panel_lines', graphic.panels.lines);
+            scene.totalbetPanel = this.addLayoutSprite(scene, 'panel_totalbet', graphic.panels.totalBet);
     
-         scene.balancePanel = scene.addSpriteLocPos('panel_balance', 720, 196 + 200); 
-         scene.winPanel = scene.addSpriteLocPos('panel_win', 420, 196 + 200); 
+            scene.balancePanel = this.addLayoutSprite(scene, 'panel_balance', graphic.panels.balance);
+            scene.winPanel = this.addLayoutSprite(scene, 'panel_win', graphic.panels.win);
     },
 
     createReels: function(scene) {
@@ -743,25 +894,39 @@ var slotConfig3x5 = {
 
     createControls: function(scene, slotControls) {
         let depth = 11;
+        var controls = this.layout.controls;
+        var text = this.layout.text;
+
+        function createButton(button, layoutData) {
+            button.create(layoutData.x, layoutData.y, 0.5, 0.5);
+            if (layoutData.scale != null) button.button.setScale(layoutData.scale);
+        }
+
+        function addText(layoutData, fontName, value) {
+            var bitmapText = scene.add.bitmapText(scene.centerX + layoutData.x, scene.centerY + layoutData.y, fontName, value, layoutData.size, 1).setOrigin(0.5);
+            if (layoutData.letterSpacing != null) bitmapText.setLetterSpacing(layoutData.letterSpacing);
+            bitmapText.depth = depth;
+            return bitmapText;
+        }
 
         // totalbet minus button
         slotControls.totalBetMinusButton = new SceneButton(scene, 'button_minus','button_minus_hover', false);   
         slotControls.buttons.push(slotControls.totalBetMinusButton);
-        slotControls.totalBetMinusButton.create(-440-110, 196 + 200, 0.5, 0.5);
+        createButton(slotControls.totalBetMinusButton, controls.totalBetMinus);
         slotControls.totalBetMinusButton.addClickEvent(slotControls.lineBetMinus_Click, slotControls);
         slotControls.totalBetMinusButton.setDepth(depth); 
 
         // totalbet plus button
         slotControls.totalBetPlusButton = new SceneButton(scene, 'button_plus','button_plus_hover', false);   
         slotControls.buttons.push(slotControls.totalBetPlusButton);
-        slotControls.totalBetPlusButton.create(-440 + 110, 196 + 200, 0.5, 0.5);
+        createButton(slotControls.totalBetPlusButton, controls.totalBetPlus);
         slotControls.totalBetPlusButton.addClickEvent(slotControls.lineBetPlus_Click, slotControls);
         slotControls.totalBetPlusButton.setDepth(depth); 
 
         // maxbet button
         slotControls.slotMaxBetButton = new SceneButton(scene, 'button_maxbet', 'button_maxbet_hover', false);   
         slotControls.buttons.push(slotControls.slotMaxBetButton);
-        slotControls.slotMaxBetButton.create(-130, 196 + 200, 0.5, 0.5);
+        createButton(slotControls.slotMaxBetButton, controls.maxBet);
         slotControls.slotMaxBetButton.addClickEvent(slotControls.maxBet_Click, slotControls);     
         slotControls.slotMaxBetButton.setDepth(depth); 
          
@@ -769,7 +934,7 @@ var slotConfig3x5 = {
         // autoSpin button
         slotControls.slotAutoSpinButton = new SceneButton(scene, 'button_autospin', 'button_autospin_hover', true); 
         slotControls.buttons.push(slotControls.slotAutoSpinButton);
-        slotControls.slotAutoSpinButton.create(130, 196 + 200, 0.5, 0.5);
+        createButton(slotControls.slotAutoSpinButton, controls.autoSpin);
         slotControls.slotAutoSpinButton.button.setVisible(true);   
         slotControls.changeAutoSpinModeEvent.add((autoSpin)=>
         {
@@ -783,14 +948,14 @@ var slotConfig3x5 = {
         // spin button
         slotControls.slotSpinButton = new SpinButton(scene, 'button_spin', 'button_spin_hover', false);   
         slotControls.buttons.push(slotControls.slotSpinButton);
-        slotControls.slotSpinButton.create(0, 160 + 200, 0.5, 0.5);    
+        createButton(slotControls.slotSpinButton, controls.spin);
         slotControls.slotSpinButton.clickEvent.add(scene.handleAnimation, scene);  
         slotControls.slotSpinButton.setDepth(depth); 
 
         // menu button
         slotControls.menuButton = new SceneButton(scene, 'button_menu', 'button_menu_hover', false);   
         slotControls.buttons.push(slotControls.menuButton);
-        slotControls.menuButton.create(860, -360, 0.5, 0.5);
+        createButton(slotControls.menuButton, controls.menu);
         slotControls.menuButton.addClickEvent(()=>{ 
             console.log('menu click');
             slotControls.settingsButton.button.setVisible(!slotControls.settingsButton.button.visible);  
@@ -803,7 +968,7 @@ var slotConfig3x5 = {
         // settings button
         slotControls.settingsButton = new SceneButton(scene, 'button_settings', 'button_settings_hover', false);   
         slotControls.buttons.push(slotControls.settingsButton);
-        slotControls.settingsButton.create(860, -230, 0.5, 0.5);
+        createButton(slotControls.settingsButton, controls.settings);
         slotControls.settingsButton.addClickEvent(()=>{ 
             console.log('settings click');
             var pu = scene.guiController.showPopUp(this.createSettingsPUHandler);
@@ -827,7 +992,7 @@ var slotConfig3x5 = {
        // rules button
        slotControls.rulesButton = new SceneButton(scene, 'button_rules', 'button_rules_hover', false);   
        slotControls.buttons.push(slotControls.rulesButton);
-       slotControls.rulesButton.create(860, -100, 0.5, 0.5);
+    createButton(slotControls.rulesButton, controls.rules);
        slotControls.rulesButton.addClickEvent(()=>{
            var pu = scene.guiController.showPopUp(this.createInfoPUHandler);
            scene.soundController.playClip('button_click');
@@ -838,7 +1003,7 @@ var slotConfig3x5 = {
        // info button
        slotControls.slotInfoButton = new SceneButton(scene, 'button_info', 'button_info_hover', false);   
        slotControls.buttons.push(slotControls.slotInfoButton);
-       slotControls.slotInfoButton.create(860, 30, 0.5, 0.5);
+    createButton(slotControls.slotInfoButton, controls.info);
        slotControls.slotInfoButton.addClickEvent(()=>{
             console.log('info click');
            var pu = scene.guiController.showPopUp(this.createAboutPUHandler);
@@ -848,71 +1013,53 @@ var slotConfig3x5 = {
        slotControls.slotInfoButton.setDepth(depth); 
 
         // adding the text fields
-        slotControls.linesText = scene.add.bitmapText(scene.centerX - 740, scene.centerY + 156 + 220, 'gameFont_2', 'LINES', 38, 1).setOrigin(0.5);
-        slotControls.linesText.depth = depth;
-        slotControls.linesCountText = scene.add.bitmapText(scene.centerX - 740, scene.centerY + 185 + 220, 'gameFont_1', slotControls.selectedLinesCount, 78, 1).setOrigin(0.5);
-        slotControls.linesCountText.depth = depth;
+        slotControls.linesText = addText(text.linesLabel, 'gameFont_2', 'LINES');
+        slotControls.linesCountText = addText(text.linesValue, 'gameFont_1', slotControls.selectedLinesCount);
         // todel slotControls.slotLinesLoopButton.pointerDownEvent.add(()=>{slotControls.linesCountText.setPosition(slotControls.linesCountText.x, scene.centerY + 212);});
         // todel slotControls.slotLinesLoopButton.pointerUpEvent.add(()=>{slotControls.linesCountText.setPosition(slotControls.linesCountText.x, scene.centerY + 200);});
  
 
-        slotControls.lineBetAmountText = scene.add.bitmapText(scene.centerX - 420, scene.centerY + 210 + 220, 'gameFont_1', slotControls.lineBet, 96, 1).setOrigin(0.5);
+        slotControls.lineBetAmountText = scene.add.bitmapText(scene.centerX + text.totalBetValue.x, scene.centerY + text.totalBetValue.y, 'gameFont_1', slotControls.lineBet, 96, 1).setOrigin(0.5);
         slotControls.lineBetAmountText.setVisible(false);
         slotControls.lineBetAmountText.depth = depth;
         // todel slotControls.slotLineBetLoopButton.pointerDownEvent.add(()=>{slotControls.lineBetAmountText.setPosition(slotControls.lineBetAmountText.x, scene.centerY + 212);});
         // todel slotControls.slotLineBetLoopButton.pointerUpEvent.add(()=>{slotControls.lineBetAmountText.setPosition(slotControls.lineBetAmountText.x, scene.centerY + 200);});
  
-        slotControls.totalBetText = scene.add.bitmapText(scene.centerX - 440, scene.centerY + 156 + 220, 'gameFont_2', 'TOTAL  BET', 38, 1).setOrigin(0.5);
-        slotControls.totalBetText.depth = depth;
+        slotControls.totalBetText = addText(text.totalBetLabel, 'gameFont_2', 'TOTAL  BET');
         // slotControls.totalBetText.tint = this.slotTextColor;
   
-        slotControls.totalBetSumText = scene.add.bitmapText(scene.centerX - 440, scene.centerY + 185 + 220, 'gameFont_1', slotControls.getTotalBet(), 78, 1).setOrigin(0.5);
-        slotControls.totalBetSumText.depth = depth;
+        slotControls.totalBetSumText = addText(text.totalBetValue, 'gameFont_1', slotControls.getTotalBet());
         // slotControls.totalBetSumText.tint = this.slotTextColor;
  
-        slotControls.creditText = scene.add.bitmapText(scene.centerX + 720, scene.centerY + 156 + 220, 'gameFont_2', 'BALANCE', 38, 1).setOrigin(0.5);
-        slotControls.creditText.depth = depth;
+        slotControls.creditText = addText(text.balanceLabel, 'gameFont_2', 'BALANCE');
         // slotControls.creditText.tint = this.slotTextColor;
 
-        slotControls.creditSumText = scene.add.bitmapText(scene.centerX + 720, scene.centerY + 185 + 220, 'gameFont_1', '' + scene.slotPlayer.coins, 78, 1).setOrigin(0.5);
-        slotControls.creditSumText.depth = depth;
+        slotControls.creditSumText = addText(text.balanceValue, 'gameFont_1', '' + scene.slotPlayer.coins);
         // slotControls.creditSumText.tint = this.slotTextColor;
          
-        slotControls.winText = scene.add.bitmapText(scene.centerX + 420, scene.centerY + 156 + 220, 'gameFont_2', 'YOUR  WIN', 38, 1).setOrigin(0.5);
-        slotControls.winText.depth = depth;
+        slotControls.winText = addText(text.winLabel, 'gameFont_2', 'YOUR  WIN');
 
-        slotControls.winAmountText = scene.add.bitmapText(scene.centerX + 420, scene.centerY + 185 + 220, 'gameFont_1', '0', 78, 1).setOrigin(0.5);
-        slotControls.winAmountText.depth = depth;
+        slotControls.winAmountText = addText(text.winValue, 'gameFont_1', '0');
         // slotControls.winAmountText.tint = this.slotTextColor;
         // slotControls.winAmountText.setVisible(false);
 
-        slotControls.jackpotAmountText = scene.add.bitmapText(scene.centerX + 0, scene.centerY - 633 + 220, 'gameFont_1', '0', 56, 1).setOrigin(0.5);
-        slotControls.jackpotAmountText.depth = depth;
+        slotControls.jackpotAmountText = addText(text.jackpotValue, 'gameFont_1', '0');
 
-        slotControls.autoSpinText = scene.add.bitmapText(scene.centerX + 147, scene.centerY + 178 + 200, 'gameFont_1', 'AUTO', 56, 1).setOrigin(0.5);
-        slotControls.autoSpinText.setLetterSpacing(-10);
-        slotControls.autoSpinText.depth = depth;
-        slotControls.autoSpinText1 = scene.add.bitmapText(scene.centerX + 147, scene.centerY + 216 + 200, 'gameFont_1', 'SPIN', 56, 1).setOrigin(0.5);
-        slotControls.autoSpinText1.depth = depth;
+        slotControls.autoSpinText = addText(text.autoLabel1, 'gameFont_1', 'AUTO');
+        slotControls.autoSpinText1 = addText(text.autoLabel2, 'gameFont_1', 'SPIN');
 
-        slotControls.maxBetText = scene.add.bitmapText(scene.centerX - 150, scene.centerY + 178 + 200, 'gameFont_1', 'MAX', 56, 1).setOrigin(0.5);
-        slotControls.maxBetText.setLetterSpacing(-10);
-        slotControls.maxBetText.depth = depth;
-        slotControls.maxBetText1 = scene.add.bitmapText(scene.centerX - 150, scene.centerY + 216 + 200, 'gameFont_1', 'BET', 56, 1).setOrigin(0.5);
-        slotControls.maxBetText1.depth = depth;
+        slotControls.maxBetText = addText(text.maxBetLabel1, 'gameFont_1', 'MAX');
+        slotControls.maxBetText1 = addText(text.maxBetLabel2, 'gameFont_1', 'BET');
         
-        slotControls.spinText = scene.add.bitmapText(scene.centerX - 0, scene.centerY + 165 + 200, 'gameFont_1', 'SPIN', 72, 1).setOrigin(0.5);
-        slotControls.spinText.depth = depth;
+        slotControls.spinText = addText(text.spinLabel, 'gameFont_1', 'SPIN');
 
-        slotControls.infoText = scene.add.bitmapText(scene.centerX, scene.centerY + 400 + 200, 'gameFont', 'info', 30, 1).setOrigin(0.5);
+        slotControls.infoText = addText(text.info, 'gameFont', 'info');
         slotControls.infoText.tint = this.slotTextColor;
         slotControls.infoText.setVisible(false);
-        slotControls.infoText.depth = depth;
 
-        slotControls.freeSpinCountText = scene.add.bitmapText(scene.centerX, scene.centerY + 360 + 200, 'gameFont_1', '9999', 30, 1).setOrigin(0.5);
+        slotControls.freeSpinCountText = addText(text.freeSpin, 'gameFont_1', '9999');
         slotControls.freeSpinCountText.tint = this.slotTextColor;
         slotControls.freeSpinCountText.setVisible(false);
-        slotControls.freeSpinCountText.depth = depth;
     },
 
     createInfoPUHandler: function(popup)

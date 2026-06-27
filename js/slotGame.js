@@ -2,15 +2,31 @@
 let slotGame;
 let slotConfig;
 let coinSpinAnim;
+let slotGameLayoutMode;
+let slotGameResizeTimer;
 
-// window loads event
-window.onload = function() {
+function getSlotGameLayoutMode()
+{
+    return window.innerWidth < window.innerHeight ? 'portrait' : 'landscape';
+}
+
+function getSlotGameDimensions(layoutMode)
+{
+    return layoutMode === 'portrait'
+        ? { width: 1080, height: 1920 }
+        : { width: 1920, height: 1080 };
+}
+
+function createSlotGame()
+{
+    slotGameLayoutMode = getSlotGameLayoutMode();
+    var gameDimensions = getSlotGameDimensions(slotGameLayoutMode);
 
     // phaser game configuration object
     var gameConfig = {    
         type: Phaser.WEBGL,             // render type
-        width: 1920,                    // game width, in pixels
-        height: 1080,                   // game height, in pixels
+        width: gameDimensions.width,     // game width, in pixels
+        height: gameDimensions.height,   // game height, in pixels
         transparent: true,              // without background 
         scene: [SlotGame],              // scenes used by the game  
         audio: 
@@ -27,6 +43,25 @@ window.onload = function() {
                                                             // scale  resize();  window.addEventListener("resize", resize, false); - not used
 }
 
+function handleSlotGameResize()
+{
+    var nextLayoutMode = getSlotGameLayoutMode();
+    if (nextLayoutMode === slotGameLayoutMode) return;
+
+    clearTimeout(slotGameResizeTimer);
+    slotGameResizeTimer = setTimeout(function () {
+        if (getSlotGameLayoutMode() === slotGameLayoutMode) return;
+        if (slotGame) slotGame.destroy(true);
+        createSlotGame();
+    }, 250);
+}
+
+// window loads event
+window.onload = function() {
+    createSlotGame();
+    window.addEventListener("resize", handleSlotGameResize, false);
+}
+
 // SlotGame scene
 class SlotGame extends Phaser.Scene{
   
@@ -38,6 +73,7 @@ class SlotGame extends Phaser.Scene{
     loadSceneConfig()
     {
         slotConfig = slotConfig3x5;
+        if (slotConfig.applyLayout) slotConfig.applyLayout(slotGameLayoutMode);
     }
 
     // method to be executed when the scene preloads
