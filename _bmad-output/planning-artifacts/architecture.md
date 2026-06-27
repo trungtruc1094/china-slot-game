@@ -4,6 +4,7 @@ inputDocuments:
   - _bmad-output/planning-artifacts/prds/prd-china-slot-game-2026-06-01/prd.md
   - _bmad-output/planning-artifacts/prds/prd-china-slot-game-2026-06-01/addendum.md
   - _bmad-output/planning-artifacts/prds/prd-china-slot-game-2026-06-01/database-persistence-addendum.md
+  - _bmad-output/planning-artifacts/prds/prd-china-slot-game-2026-06-01/tevi-integration-addendum.md
   - _bmad-output/project-context.md
   - docs/project-overview.md
 workflowType: architecture
@@ -13,7 +14,7 @@ date: 2026-06-01
 lastStep: 8
 status: complete
 completedAt: 2026-06-01
-updatedAt: 2026-06-21
+updatedAt: 2026-06-27
 ---
 
 # Architecture Decision Document: China Slot Game
@@ -682,7 +683,7 @@ Admin/support APIs must be backed by persisted records after this epic.
 
 ### Tevi Readiness Boundary
 
-Add durable future-ready top-up idempotency records now, but do not implement Tevi top-up behavior in this epic.
+The Database Persistence epic keeps the original readiness boundary: add durable future-ready provider top-up idempotency records, but do not implement Tevi top-up behavior, webhook wallet crediting, cashout, redemption, transferable value, or real-money reward semantics inside that epic.
 
 The record model must support:
 
@@ -691,12 +692,72 @@ The record model must support:
 - Normalized idempotency key.
 - Player ID when known.
 - Status such as `pending`, `completed`, `failed`, `ignored`, or `duplicate`.
-- Amount/points metadata without implying redeemable value.
+- Amount/points metadata without implying redeemable value during the persistence epic.
 - Raw provider metadata.
 - First seen, last seen, completed, and failed timestamps.
 - Failure reason/details.
 
-This table exists so a future Tevi webhook or SDK retry can be made idempotent before wallet crediting. It must not create cash-out, redemption, transferable value, or real-money reward semantics.
+The Tevi Mini App Integration PRD addendum dated 2026-06-27 intentionally advances this boundary for a later, separate Tevi integration path. In that path, the future-ready idempotency table becomes part of an implemented Stars wallet flow, but only after PostgreSQL persistence, schema readiness, and production dependency composition are complete.
+
+Architectural rules for the Tevi integration path:
+
+- Tevi mode is sandbox-first. Production Tevi exposure is blocked until legal review, permitted-jurisdiction geo-gating, age gate, KYC where available, responsible-gaming controls, deposit limits, self-exclusion, host float controls, security review, Tevi API key/secret approval, and production cutover approval are complete.
+- Tevi Stars are treated as real-money-style value for architecture, risk, audit, observability, retry, and rollback design, even though v1 does not implement fiat withdrawal, game-managed currency conversion, crypto withdrawal, or off-platform redemption.
+- Production Tevi mode uses Tevi Stars end to end: `1 Tevi Star = 1 in-game credit`; production users start at `0` Stars unless credited by Tevi top-up or an approved sandbox/admin fixture.
+- The existing `defaultCoins: 100000` behavior is sandbox/demo-only and must not apply to production Tevi players.
+- All Tevi balance, wager, payout, jackpot, free-spin win total, receipt, and cashout values are integer Star units and use integer storage at persistence boundaries.
+- The backend remains authoritative for Tevi authentication mapping, wager validation, RNG, win calculation, internal wallet balance, ledger, cashout dispatch status, reconciliation status, and host float guard decisions.
+- The client adds a thin `js/teviClient.js` adapter beside `js/serverClient.js` to load `https://static.tevicdn.com/helper_tevi.js`, detect `window.TeviJS`, obtain Tevi user app tokens, request backend top-up signatures, invoke SDK top-up, and expose Mini App UI affordances.
+- The client never signs deposit tokens, verifies webhooks, computes payouts, mutates production balances, or treats SDK top-up success as a wallet credit before webhook processing commits.
+
+Required Tevi backend boundaries:
+
+- `TeviAuthAdapter`: exchanges and verifies Tevi identity tokens, caches JWKS, validates RS256 JWTs, rejects invalid or wrong-app tokens, and maps Tevi `user_id` to internal `player_id` through provider identity mappings.
+- `TeviPaymentClient`: calls Tevi payment APIs with environment-supplied credentials only, issues or requests deposit tokens, dispatches cashout requests, and never logs full secrets, tokens, or signatures.
+- `TeviWebhookService`: receives `user_topup` webhooks, verifies `X-TEVI-SIGNATURE` before effects, normalizes idempotency keys, and coordinates atomic wallet crediting through PostgreSQL.
+- `TopupService`: validates integer Star amounts, deposit limits, user eligibility, and top-up metadata before returning backend-issued deposit tokens.
+- `CashoutDispatcher`: dispatches per-win cashout after the internal spin transaction commits, deriving the Tevi `Idempotency-Key` from the authoritative `spinId` and storing dispatch state for retry and reconciliation.
+- `CashoutReconciliationService`: tracks `pending`, `dispatched`, `succeeded`, `failed_retryable`, `failed_terminal`, and `reconciled` cashout states without corrupting the internal wallet ledger.
+- `TeviReceiptService`: sends basic Tevi Message receipts for completed top-ups and winning spin payouts; receipt failure is retryable and never rolls back wallet or cashout state.
+- `ComplianceGateService`: blocks production Tevi access when jurisdiction, age, KYC, responsible-gaming, deposit-limit, self-exclusion, API approval, or policy gates are not satisfied.
+- `HostFloatService` or budget-service extension: blocks spins whose maximum possible payout exceeds available host Stars float, alerts below configured float thresholds, and accounts for jackpot reserve and hard ceiling rules.
+
+Tevi API and route additions:
+
+- `POST /api/tevi/session` or an equivalent authenticated session route exchanges Tevi runtime identity for an internal player/session context using the existing `{data, error, requestId}` envelope.
+- `POST /api/v1/payments/top-up-signature` issues a backend-approved Tevi deposit token for an authenticated Tevi user and validated integer Star amount.
+- `POST /api/webhooks/tevi` receives Tevi webhooks, verifies signatures, records provider events, and credits wallets idempotently.
+- Existing `POST /api/spins` remains the authoritative spin entry point and must use Tevi/Stars wallet rules when the session is in Tevi mode.
+- Admin/support search must expose top-up idempotency records, wallet credits, cashout dispatch attempts, reconciliation status, Tevi message receipt status, float guard decisions, and compliance gate denials.
+
+Tevi persistence additions or refinements:
+
+- Provider identity mappings must include Tevi user identifiers and preserve historical auditability.
+- Top-up idempotency records must support both the readiness-only state from the persistence epic and the implemented states needed for webhook crediting.
+- Wallet credit from Tevi top-up must commit atomically with idempotency completion and wallet transaction rows.
+- Spin wins commit internally before Tevi cashout dispatch. Cashout failures, timeouts, or retryable errors must not roll back or rewrite the committed spin ledger.
+- Cashout dispatch records store Tevi user ID, spin ID, amount, idempotency key, payload fingerprint, dispatch status, attempt count, last error, and reconciliation timestamps.
+- Message receipt records store top-up or spin correlation, safe Tevi message metadata, dispatch status, and retry state.
+- Compliance, deposit-limit, self-exclusion, and host-float blocks are audit records, not transient logs only.
+
+Tevi transaction and retry rules:
+
+- Webhook signature verification happens before wallet mutation.
+- Duplicate `user_topup` webhook delivery returns the previously committed result and never double-credits.
+- Duplicate top-up webhook with conflicting payload is rejected or quarantined for operator review without wallet mutation.
+- Spin idempotency by `sessionId + clientSpinId` remains unchanged; duplicate spin retries return the committed internal result.
+- Per-win cashout is post-commit. The authoritative spin transaction must not call Tevi before commit.
+- Tevi cashout idempotency uses a UUIDv4-compatible key derived from `spinId`; reuse with different payload is treated as a conflict and escalated through reconciliation.
+
+Tevi readiness gates:
+
+- `PERSISTENCE_MODE=postgres`, valid `DATABASE_URL`, applied migrations, schema readiness, and required Tevi secrets are mandatory for Tevi mode startup.
+- The active Tevi game configuration must pass simulator validation before sandbox real-value testing and before production exposure; target RTP defaults to configurable `92%` until product changes it.
+- Host float, jackpot hard ceiling, jackpot reserve funding, maximum spin win cap, free-spin win cap, bet range, deposit limits, and self-exclusion rules are versioned configuration or operator settings, not hard-coded constants.
+- PostgreSQL integration tests must cover Tevi JWT/auth mapping, top-up signature issuance, webhook replay idempotency, wallet credit atomicity, server spin debit/win, post-commit cashout dispatch, cashout retry/reconciliation, message receipt failure isolation, float hard stops, and compliance gate denials.
+- Manual Check Rounds from the Tevi PRD addendum are required implementation-story exit criteria for sandbox launch, SDK top-up, webhook replay, spin debit/win, cashout idempotency, reconciliation, receipts, simulator validation, float guardrails, and production compliance gates.
+
+This updated boundary supersedes the old non-cash reward assumption only for the Tevi integration path. Non-Tevi deployments remain inside the original non-cash community reward boundary unless a separate PRD and architecture update changes them.
 
 ### Updated Structure Additions
 
