@@ -112,9 +112,9 @@ development_status:
   8-5-run-sdk-top-up-with-pending-wallet-state: backlog
   8-6-verify-tevi-webhooks-and-credit-stars-idempotently: backlog
   8-7-spin-with-server-owned-stars-wallet-and-ledger: backlog
-  8-8-dispatch-per-win-tevi-stars-cashout: backlog
+  8-8-request-manual-tevi-stars-cashout: backlog
   8-9-reconcile-cashout-failures-safely: backlog
-  8-10-send-basic-tevi-top-up-and-win-receipts: backlog
+  8-10-send-basic-tevi-top-up-and-cashout-receipts: backlog
   8-11-verify-rtp-and-sandbox-money-path-check-rounds: backlog
   epic-8-retrospective: optional
 

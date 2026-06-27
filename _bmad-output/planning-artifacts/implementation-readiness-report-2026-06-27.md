@@ -1,24 +1,26 @@
 ---
 stepsCompleted:
-  - step-01-document-discovery
-  - step-02-prd-analysis
-  - step-03-epic-coverage-validation
-  - step-04-ux-alignment
-  - step-05-epic-quality-review
-  - step-06-final-assessment
+	- step-01-document-discovery
+	- step-02-prd-analysis
+	- step-03-epic-coverage-validation
+	- step-04-ux-alignment
+	- step-05-epic-quality-review
+	- step-06-final-assessment
 includedFiles:
-  prd:
-    - _bmad-output/planning-artifacts/prds/prd-china-slot-game-2026-06-01/prd.md
-    - _bmad-output/planning-artifacts/prds/prd-china-slot-game-2026-06-01/addendum.md
-    - _bmad-output/planning-artifacts/prds/prd-china-slot-game-2026-06-01/database-persistence-addendum.md
-    - _bmad-output/planning-artifacts/prds/prd-china-slot-game-2026-06-01/tevi-integration-addendum.md
-    - _bmad-output/planning-artifacts/prds/prd-china-slot-game-2026-06-01/review-rubric.md
-  architecture:
-    - _bmad-output/planning-artifacts/architecture.md
-  epics:
-    - _bmad-output/planning-artifacts/epics.md
-  ux: []
-rerunReason: Post-correct-course validation using updated architecture and epics.
+	prd:
+		- _bmad-output/planning-artifacts/prds/prd-china-slot-game-2026-06-01/prd.md
+		- _bmad-output/planning-artifacts/prds/prd-china-slot-game-2026-06-01/addendum.md
+		- _bmad-output/planning-artifacts/prds/prd-china-slot-game-2026-06-01/database-persistence-addendum.md
+		- _bmad-output/planning-artifacts/prds/prd-china-slot-game-2026-06-01/tevi-integration-addendum.md
+		- _bmad-output/planning-artifacts/prds/prd-china-slot-game-2026-06-01/review-rubric.md
+	architecture:
+		- _bmad-output/planning-artifacts/architecture.md
+	epics:
+		- _bmad-output/planning-artifacts/epics.md
+	ux:
+		- _bmad-output/planning-artifacts/ux-designs/ux-China Slot Game-2026-06-27/DESIGN.md
+		- _bmad-output/planning-artifacts/ux-designs/ux-China Slot Game-2026-06-27/EXPERIENCE.md
+rerunReason: Manual Tevi deposit and cashout UX readiness validation.
 ---
 
 # Implementation Readiness Assessment Report
@@ -35,16 +37,16 @@ rerunReason: Post-correct-course validation using updated architecture and epics
 
 **Sharded Documents:**
 - Folder: `_bmad-output/planning-artifacts/prds/prd-china-slot-game-2026-06-01/`
-  - `prd.md` (21616 bytes, modified 2026-06-01 18:34:33)
-  - `addendum.md` (2347 bytes, modified 2026-06-21 14:55:53)
-  - `database-persistence-addendum.md` (21195 bytes, modified 2026-06-21 14:55:53)
-  - `tevi-integration-addendum.md` (34166 bytes, modified 2026-06-27 18:56:12)
-  - `review-rubric.md` (3594 bytes, modified 2026-06-01 18:35:13)
+	- `prd.md` (21616 bytes, modified 2026-06-01 18:34:33)
+	- `addendum.md` (2347 bytes, modified 2026-06-21 14:55:53)
+	- `database-persistence-addendum.md` (21195 bytes, modified 2026-06-21 14:55:53)
+	- `tevi-integration-addendum.md` (35888 bytes, modified 2026-06-27 21:43:30)
+	- `review-rubric.md` (3594 bytes, modified 2026-06-01 18:35:13)
 
 ### Architecture Files Found
 
 **Whole Documents:**
-- `_bmad-output/planning-artifacts/architecture.md` (45007 bytes, modified 2026-06-27 20:18:36)
+- `_bmad-output/planning-artifacts/architecture.md` (45856 bytes, modified 2026-06-27 21:43:30)
 
 **Sharded Documents:**
 - None found
@@ -52,7 +54,7 @@ rerunReason: Post-correct-course validation using updated architecture and epics
 ### Epics & Stories Files Found
 
 **Whole Documents:**
-- `_bmad-output/planning-artifacts/epics.md` (110148 bytes, modified 2026-06-27 20:19:11)
+- `_bmad-output/planning-artifacts/epics.md` (111100 bytes, modified 2026-06-27 21:43:30)
 
 **Sharded Documents:**
 - None found
@@ -60,16 +62,18 @@ rerunReason: Post-correct-course validation using updated architecture and epics
 ### UX Design Files Found
 
 **Whole Documents:**
-- None found
+- No file matched the shallow `*ux*.md` pattern directly.
 
-**Sharded Documents:**
-- None found
+**Sharded/Run Documents:**
+- Folder: `_bmad-output/planning-artifacts/ux-designs/ux-China Slot Game-2026-06-27/`
+	- `DESIGN.md` (9726 bytes, modified 2026-06-27 21:43:30)
+	- `EXPERIENCE.md` (17121 bytes, modified 2026-06-27 21:43:30)
 
 ### Discovery Issues
 
 - No duplicate whole/sharded document conflicts found.
-- Warning: no standalone UX design document was found. The updated epics include a Tevi UX State Inventory, but there is still no separate UX artifact.
 - Note: the PRD is in a sharded folder without an `index.md`; assessment will use the folder contents above, including the Tevi Mini App Integration PRD addendum.
+- Note: the UX work is in a BMad UX run folder rather than the shallow `*ux*.md` pattern; assessment will include `DESIGN.md` and `EXPERIENCE.md` as the UX artifacts.
 
 ## Step 2: PRD Analysis
 
@@ -125,15 +129,15 @@ TEVI-FR-5: Run SDK top-up through `window.TeviJS.topup()`; client obtains backen
 
 TEVI-FR-6: Verify Tevi `user_topup` webhooks using `X-TEVI-SIGNATURE` before effects and credit Stars wallet exactly once through durable idempotency records and atomic PostgreSQL wallet transactions.
 
-TEVI-FR-7: Use Stars wallet for balance, bets, and wins; UI labels say Stars, production starts at 0 unless top-up/admin sandbox fixture, bets are integer Stars, blocked states are clear, and free-spin state is server-owned.
+TEVI-FR-7: Use Stars wallet for balance, bets, and wins; UI labels say Stars, production starts at 0 unless top-up/admin sandbox fixture, bets are integer Stars, blocked states are clear, wins credit internal wallet, and free-spin state is server-owned.
 
 TEVI-FR-8: Keep server-authoritative spin and ledger using `packages/game-math`, idempotency by `sessionId + clientSpinId`, durable wallet/ledger/request trace writes before success, duplicate retry safety, and p95 spin target under 300ms excluding animation/cashout.
 
-TEVI-FR-9: Dispatch Tevi Stars cashout after every internally committed winning spin; idempotency key derives from authoritative `spinId`, Tevi cashout API uses `X-API-Key` and `Idempotency-Key`, and failures cannot corrupt internal ledger.
+TEVI-FR-9: Accept manual cashout requests for player-entered Star amounts and dispatch Tevi Stars cashout only after the internal cashout transaction commits; validate balance, limits, compliance, self-exclusion, host float, Tevi readiness, and derive idempotency from authoritative cashout request ID.
 
-TEVI-FR-10: Reconcile cashout failures so payout state is visible, retryable where safe, and auditable; terminal failures require operator review and state is visible in logs, DB, and admin/support search.
+TEVI-FR-10: Reconcile post-commit manual cashout failures so payout state is visible, retryable where safe, and auditable; terminal failures require operator review and state is visible in logs, DB, and admin/support search.
 
-TEVI-FR-11: Send Tevi Message receipts for completed top-ups and winning spin payouts; failures do not roll back wallet or cashout state and dispatch status is logged/retryable.
+TEVI-FR-11: Send Tevi Message receipts for completed top-ups and manual cashout payouts; failures do not roll back wallet or cashout state and dispatch status is logged/retryable.
 
 TEVI-FR-12: Validate RTP before real-value play with `packages/game-math` simulator; default target is configurable 92%, known math/config issues are fixed or neutralized, and production Tevi play is blocked until verified.
 
@@ -167,14 +171,15 @@ Total NFRs: 23 non-functional requirements extracted (7 baseline NFRs, 8 persist
 
 ### Additional Requirements
 
-- Required Tevi endpoint inventory includes `POST /api/v1/payments/top-up-signature`, `POST /api/v1/webhooks/tevi`, protected sessions, balance, spins, spin detail, and readiness endpoints.
+- Required Tevi endpoint inventory includes `POST /api/v1/payments/top-up-signature`, `POST /api/v1/webhooks/tevi`, protected sessions, balance, spins, spin detail, manual `POST /api/v1/payments/cashout-requests`, and readiness endpoints.
+- Manual cashout must be user-initiated after gameplay; wins credit the internal Stars wallet and the spin transaction must not call Tevi cashout.
 - Tevi Stars are end-to-end integer units for balance, wagers, wins, jackpot, free-spin totals, receipts, cashout, host float, and reserve accounting.
 - Phase 1 is sandbox-only; Phase 2 is production hardening/compliance; Phase 3 is polish/analytics/tuning.
 - Check Rounds must include changed files, commands, curl examples, manual Mini App actions, SQL/log inspection, pass/fail criteria, and idempotency or edge proof where relevant.
 
 ### PRD Completeness Assessment
 
-The PRD set remains complete enough for Epic 8-10 readiness validation. The post-correct-course focus is whether the updated architecture and epics now preserve the Tevi route, Check Round, UX-state, production-gate, and traceability requirements.
+The PRD set now clearly defines the manual deposit/play/cashout flow: deposits fund the internal wallet, spins debit/credit internal Stars, and cashout is a separate user-entered request with provider dispatch only after internal commit. The main readiness question is whether UX, architecture, epics, and sprint status all reflect that same separation.
 
 ## Step 3: Epic Coverage Validation
 
@@ -212,9 +217,9 @@ Tevi FR coverage:
 - TEVI-FR-6: Epic 8 and Epic 9 - verified webhook receipt, idempotent wallet crediting, replay safety, and production hardening.
 - TEVI-FR-7: Epic 8 and Epic 10 - Stars wallet accounting and Stars-focused player experience polish.
 - TEVI-FR-8: Epic 8 and Epic 9 - Tevi server-authoritative spin ledger, idempotency, and production reliability hardening.
-- TEVI-FR-9: Epic 8 and Epic 9 - post-commit per-win cashout dispatch and production cashout safety.
+- TEVI-FR-9: Epic 8 and Epic 9 - manual cashout request, post-commit provider dispatch, and production cashout safety.
 - TEVI-FR-10: Epic 8, Epic 9, and Epic 10 - cashout reconciliation, operator-grade production handling, and visible payout state polish.
-- TEVI-FR-11: Epic 8 and Epic 10 - basic receipts and richer notification polish.
+- TEVI-FR-11: Epic 8 and Epic 10 - top-up/manual cashout receipts and richer notification polish.
 - TEVI-FR-12: Epic 8, Epic 9, and Epic 10 - sandbox RTP validation, production exposure gate, and simulator-backed tuning.
 - TEVI-FR-13: Epic 9 and Epic 10 - host float guardrails, jackpot reserve rules, monitoring, and tuning visibility.
 - TEVI-FR-14: Epic 9 - production compliance gate.
@@ -250,18 +255,18 @@ Total FRs in epics: 49 of 49 top-level PRD FRs.
 | TEVI-FR-4 | Issue backend top-up signatures | Epic 8 | Covered |
 | TEVI-FR-5 | Run SDK top-up in Mini App | Epic 8 | Covered |
 | TEVI-FR-6 | Verify webhooks and credit wallets idempotently | Epic 8, Epic 9 | Covered |
-| TEVI-FR-7 | Use Stars wallet for balance, bets, and wins | Epic 8, Epic 10 | Covered |
+| TEVI-FR-7 | Use Stars wallet for balance, bets, wins, receipts | Epic 8, Epic 10 | Covered |
 | TEVI-FR-8 | Keep server-authoritative spin and ledger | Epic 8, Epic 9 | Covered |
-| TEVI-FR-9 | Dispatch per-win cashout after commit | Epic 8, Epic 9 | Covered |
-| TEVI-FR-10 | Reconcile cashout failures | Epic 8, Epic 9, Epic 10 | Covered |
-| TEVI-FR-11 | Send Tevi Message receipts | Epic 8, Epic 10 | Covered |
+| TEVI-FR-9 | Manual cashout request and post-commit dispatch | Epic 8, Epic 9 | Covered |
+| TEVI-FR-10 | Reconcile manual cashout failures | Epic 8, Epic 9, Epic 10 | Covered |
+| TEVI-FR-11 | Send top-up and manual cashout receipts | Epic 8, Epic 10 | Covered |
 | TEVI-FR-12 | Validate RTP before real-value play | Epic 8, Epic 9, Epic 10 | Covered |
 | TEVI-FR-13 | Enforce host float and budget guardrails | Epic 9, Epic 10 | Covered |
 | TEVI-FR-14 | Apply compliance gates before production | Epic 9 | Covered |
 
 ### Missing Requirements
 
-No top-level PRD functional requirements are missing from the epics. The corrected `epics.md` uses the PRD-compatible `TEVI-FR-#` ID style and keeps Epic 8-10 coverage complete for TEVI-FR-1 through TEVI-FR-14.
+No top-level PRD functional requirements are missing from the epics. Manual cashout is covered by Story 8.8, reconciliation by Story 8.9, receipts by Story 8.10, and final money-path verification by Story 8.11. Sprint status keys also reflect the renamed manual cashout stories.
 
 ### Coverage Statistics
 
@@ -275,30 +280,35 @@ No top-level PRD functional requirements are missing from the epics. The correct
 
 ### UX Document Status
 
-No standalone UX document was found under `_bmad-output/planning-artifacts` using the required whole or sharded UX search patterns.
+UX documentation found and included:
 
-UX is still implied because the product is a user-facing Phaser/Tevi Mini App with player top-up, balance, spin, cashout, receipt, compliance block, and operator/support flows. The corrected `epics.md` now includes both `UX-DR1` through `UX-DR13` and a dedicated `Tevi UX State Inventory` covering launch, identity, top-up, wallet/spin, cashout, receipt, compliance/responsible-value, and host-float/economy states.
+- `_bmad-output/planning-artifacts/ux-designs/ux-China Slot Game-2026-06-27/DESIGN.md`
+- `_bmad-output/planning-artifacts/ux-designs/ux-China Slot Game-2026-06-27/EXPERIENCE.md`
+
+Both UX spines are marked `status: final` and cite the Tevi PRD addendum, architecture, epics, sprint status, and screenshot import notes as sources.
 
 ### Alignment Issues
 
-No blocking UX-to-PRD or UX-to-architecture misalignment was found in the corrected artifacts.
+No blocking UX-to-PRD or UX-to-architecture misalignment was found.
 
-- PRD UX obligations are reflected in epics: Mini App launch, Tevi SDK affordances, Stars labels, top-up pending/credited/failed/retry states, server-owned balance, spin error states, cashout/reconciliation status, receipt status, compliance/self-exclusion/deposit/float block states, and sandbox/demo separation are captured in `UX-DR7` through `UX-DR13` plus the Tevi UX State Inventory.
-- Architecture supports the UX states: the Tevi Readiness Boundary includes `js/teviClient.js`, Tevi SDK loading, backend-issued top-up signatures, pending-until-webhook crediting, post-commit cashout dispatch, reconciliation states, receipt records, compliance gates, host float blocks, support/admin search, and Check Round requirements.
-- Endpoint UX verification is aligned: PRD, architecture, and epics now use `POST /api/v1/webhooks/tevi`, so manual Check Rounds and Tevi app registration have one webhook route.
+- UX matches PRD: EXPERIENCE.md models deposit-first/manual-cashout behavior, including wallet funding, internal Stars gameplay, manual cashout amount entry, backend dispatch after internal cashout commit, and no client-authoritative wallet changes.
+- UX matches architecture: EXPERIENCE.md requires server-authoritative cashout request validation, backend Tevi dispatch after internal commit, recoverable pending states, support references, and no provider secrets in UI; these match `CashoutRequestService`, `CashoutDispatcher`, reconciliation, and support/admin search boundaries.
+- UX matches epics: Story 8.4 through 8.11 cover top-up signature, SDK top-up, webhook credit, Stars gameplay, manual cashout request, reconciliation, receipts, and money-path verification. Epic 10 covers polish, richer receipts, payout/cashout visibility, analytics, and tuning.
+- UX covers required manual states: deposit presets/custom amount, cashout presets/custom amount, receive amount after fee, insufficient cashout balance, deposit/cashout limits, self-exclusion, Tevi unavailable, SDK unavailable, pending, success, retryable failure, terminal failure, and operator review.
+- UX covers accessibility: amount preset labels, numeric input semantics, receive field read-only announcement, disabled CTA reasons, close-button labels, live pending-state updates, touch target floor, focus order, reduced motion, and non-color-only errors.
 
 ### Warnings
 
-- Warning: no standalone UX specification or wireframe artifact exists. This is no longer a readiness blocker because `epics.md` now contains a Tevi UX State Inventory, but future design work should still convert that inventory into screens/copy if visual consistency becomes a risk.
-- Recommendation: when `_bmad-output/verification-playbook.md` is created, mirror the Tevi UX State Inventory there so every Check Round has shared UI-state expectations.
+- UX open questions remain around final min/max/preset values, whether the 1% withdrawal fee is fixed/configurable/Tevi-provided, Receive rounding policy, exact Cash Out entry point placement, support copy for compliance blocks, and whether pending cashout should reduce available balance immediately or show available/reserved split.
+- These open questions are not readiness blockers because the UX marks them explicitly and implementation stories can either resolve them during story creation or keep them as story-level assumptions until product policy is finalized.
 
 ## Step 5: Epic Quality Review
 
 ### Overall Structure Assessment
 
-Epics 8-10 now satisfy the main create-epics-and-stories standards for the Tevi planning scope.
+Epics 8-10 satisfy the main create-epics-and-stories standards after the manual cashout correction.
 
-- Epic 8 delivers a user-verifiable sandbox outcome: launch, authenticate, top up, receive webhook credit, spin, dispatch cashout, receive receipts, validate RTP, and complete Check Rounds.
+- Epic 8 delivers a user-verifiable sandbox outcome: launch, authenticate, top up, receive webhook credit, spin, request manual cashout, reconcile cashout, receive receipts, validate RTP, and complete Check Rounds.
 - Epic 9 delivers operator/compliance value: production exposure remains blocked until runtime, compliance, responsible-value, float, security, observability, and cutover gates pass.
 - Epic 10 delivers player/operator polish and tuning value after the core Tevi path is safe.
 
@@ -310,38 +320,34 @@ None found.
 
 ### Major Issues
 
-None found after the correct-course patch.
-
-Previously identified major issues have been resolved:
-
-- Per-story Check Round criteria now exist for Stories 9.1, 9.2, 9.3, 9.5, 9.6, 10.1, 10.2, 10.3, 10.4, and 10.5.
-- Story 8.6, architecture, and PRD now align on `POST /api/v1/webhooks/tevi`.
-- Story 9.1 now owns the shared production gate state model for later Epic 9 stories.
+None found.
 
 ### Minor Concerns
 
-- No standalone UX wireframe/spec artifact exists. This is mitigated by the Tevi UX State Inventory in `epics.md`, but should be mirrored into the future verification playbook.
-- Legacy Epic 7 remains infrastructure-heavy, but it is intentionally preserved completed scope and protects player/operator value through durable state, idempotency, and fail-safe startup.
+- Story 8.8 now has broader scope than the former automatic cashout dispatch story because it includes amount entry, validation, wallet debit/reservation, request persistence, provider dispatch, idempotency, and failure isolation. It is still independently completable, but story creation should watch sizing and may split UI and backend work if implementation estimates are high.
+- UX open questions around fee policy, cashout limits, rounding, and exact Cash Out entry point should be resolved during story creation or explicitly carried as story assumptions.
 
 ### Best Practices Compliance Checklist
 
 | Epic | Delivers User Value | Independent In Sequence | Story Sizing | No Forward Dependencies | AC Testability | Result |
 | ---- | ------------------- | ----------------------- | ------------ | ----------------------- | -------------- | ------ |
-| Epic 8 | Yes | Yes, assuming Epics 1-7 complete | Good | Yes | Strong, with Check Rounds | Pass |
+| Epic 8 | Yes | Yes, assuming Epics 1-7 complete | Good, with Story 8.8 sizing watch | Yes | Strong, with Check Rounds | Pass |
 | Epic 9 | Yes | Yes, after Epic 8 sandbox path | Good | Yes | Strong, with per-story Check Rounds and gate state ownership | Pass |
 | Epic 10 | Yes | Yes, after Epic 8/9 safety foundations | Good | Yes | Strong, with per-story Check Rounds | Pass |
 
 ### Quality Review Conclusion
 
-Epic 8-10 planning is now implementation-ready from an epic/story quality perspective. The previous defects were corrected without reopening or altering completed Epics 1-7.
+Epic 8-10 planning is implementation-ready from an epic/story quality perspective. Manual cashout is represented as a user-initiated request flow, not an automatic spin side effect, and completed Epics 1-7 remain preserved.
 
 ## Summary and Recommendations
 
 ### Overall Readiness Status
 
-READY for Phase 4 planning and story preparation.
+READY for Phase 4 story preparation.
 
-The corrected Tevi planning package is aligned across PRD, architecture, and epics. All 49 top-level PRD functional requirements are covered in epics, including all 14 Tevi FRs across Epics 8-10. Completed Epics 1-7 remain preserved and traceable.
+The manual Tevi deposit/cashout package is aligned across PRD, architecture, epics, UX, and sprint status. The product model is now explicit: players deposit Stars into the internal game wallet, play using internal Stars balance, wins credit the internal wallet, and players manually cash out a selected amount through a Cash Out UI. Tevi provider cashout happens only after the internal cashout request transaction commits.
+
+All 49 top-level PRD functional requirements are covered in epics, including all 14 Tevi FRs across Epics 8-10. Completed Epics 1-7 remain preserved and traceable.
 
 ### Critical Issues Requiring Immediate Action
 
@@ -349,20 +355,20 @@ None.
 
 ### Residual Warnings
 
-- No standalone UX wireframe/spec artifact exists. This is mitigated by the Tevi UX State Inventory in `epics.md`, so it is not a readiness blocker.
-- `_bmad-output/verification-playbook.md` is still a future deliverable. Epic 8-10 stories now require Check Rounds and should produce/playbook entries as implementation proceeds.
-- Legal/compliance approval remains a production gate, not a planning readiness blocker. Epic 9 explicitly keeps production blocked until those approvals and controls pass.
+- Story 8.8 is large enough to watch during story creation. It may remain one story if the implementation agent can keep the Check Round focused, but it may need splitting if estimate/risk is high.
+- UX leaves open questions for final deposit/cashout min/max values, preset values, 1% fee source, rounding policy, exact Cash Out entry placement, compliance block copy, and available/reserved balance display.
+- Legal/compliance approval remains a production gate handled by Epic 9, not a planning-readiness blocker.
 
 ### Recommended Next Steps
 
-1. Run `bmad-sprint-planning` to generate sprint status from the corrected epics.
-2. Start the story cycle with `bmad-create-story` for the first Epic 8 story when sprint planning identifies it as next.
-3. Preserve the Check Round discipline in Epic 8-10 implementation: do not continue past a story until its human verification round is accepted.
-4. When the verification playbook is created, mirror the Tevi UX State Inventory and route `POST /api/v1/webhooks/tevi` exactly.
+1. Create Story 8.1 with `bmad-create-story` and preserve the UX spine references in the story context.
+2. During Story 8.1 or the first payment UI story, decide whether the UX open questions should be resolved globally or carried as per-story assumptions.
+3. Before implementing Story 8.8, evaluate whether to split manual cashout UI and backend/request-dispatch mechanics into smaller stories.
+4. Keep `DESIGN.md` and `EXPERIENCE.md` as source artifacts for all Epic 8-10 story creation and Check Rounds.
 
 ### Final Note
 
-This rerun identified 0 critical issues and 0 major issues requiring planning correction. It records 3 residual warnings across UX documentation, verification-playbook timing, and production compliance gating. The artifacts are ready to proceed to Phase 4 planning while keeping production Tevi exposure blocked by Epic 9 controls.
+This assessment identified 0 critical issues and 0 major issues requiring planning correction. It records 3 residual warnings across Story 8.8 sizing, UX/product policy questions, and production compliance gating. The artifacts are ready to proceed to story creation while keeping production Tevi exposure blocked by Epic 9 controls.
 
 Assessor: GitHub Copilot  
 Assessment completed: 2026-06-27

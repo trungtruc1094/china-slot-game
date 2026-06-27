@@ -144,7 +144,7 @@ UX-DR6: Local demo mode must be visually or operationally distinguishable from r
 
 UX-DR7: Tevi Mini App mode must expose Tevi SDK launch affordances where available, including back/close controls and Mini App layout configuration.
 
-UX-DR8: Tevi mode must label balance, bet, win, jackpot, free-spin win totals, top-up receipts, and win receipts as Stars.
+UX-DR8: Tevi mode must label balance, bet, win, jackpot, free-spin win totals, top-up receipts, and cashout receipts as Stars.
 
 UX-DR9: Top-up UX must show pending, credited, failed, and retry states, and must not treat SDK top-up success as wallet credit until webhook processing commits.
 
@@ -152,7 +152,7 @@ UX-DR10: Tevi spin UX must show clear user-facing states for insufficient balanc
 
 UX-DR11: Cashout and reconciliation UX must expose payout pending, succeeded, retryable failure, terminal failure, and operator-review states where authorized.
 
-UX-DR12: Tevi receipt UX must make top-up and winning-spin receipt status visible without rolling back wallet or cashout state when message delivery fails.
+UX-DR12: Tevi receipt UX must make top-up and manual-cashout receipt status visible without rolling back wallet or cashout state when message delivery fails.
 
 UX-DR13: Sandbox/demo separation must be visible or operationally enforced so production Tevi players never receive the existing `defaultCoins:100000` seed behavior.
 
@@ -164,8 +164,8 @@ The Tevi implementation stories and Check Rounds must use this state inventory a
 - Identity states: unauthenticated, token exchange pending, authenticated, expired token, invalid token, wrong-app token, inactive user, and anonymous user blocked where policy requires it.
 - Top-up states: amount entry, deposit token requested, SDK confirmation open, SDK canceled, SDK failed, webhook pending, credited, duplicate webhook ignored, conflicting webhook quarantined, and retry available.
 - Wallet and spin states: Stars balance loaded, balance refresh pending, insufficient balance, wager out of range, spin pending, spin accepted, idempotent retry returned, idempotency conflict, win credited internally, no-win, free-spin state updated, jackpot state updated, and backend error.
-- Cashout states: not applicable for no-win, pending, dispatched, succeeded, failed retryable, failed terminal, unknown, reconciled, and operator review required.
-- Receipt states: top-up receipt pending/sent/failed retryable, win receipt pending/sent/failed retryable, and receipt status visible in support/admin search.
+- Cashout states: amount entry, validation pending, insufficient cashout balance, limit blocked, pending, dispatched, succeeded, failed retryable, failed terminal, unknown, reconciled, and operator review required.
+- Receipt states: top-up receipt pending/sent/failed retryable, cashout receipt pending/sent/failed retryable, and receipt status visible in support/admin search.
 - Compliance and responsible-value states: jurisdiction blocked, age gate blocked, KYC blocked, terms/privacy/responsible-gaming acknowledgment required, self-exclusion active, deposit limit reached, support/dispute flow unavailable, and production approval missing.
 - Host float and economy states: float alert threshold crossed, spin hard-stopped because maximum payout exceeds available float, jackpot reserve insufficient, jackpot ceiling reached, RTP validation missing, and tuning policy blocked.
 
@@ -290,11 +290,11 @@ TEVI-FR-7: Use Tevi Stars as the production wallet currency for balances, bets, 
 
 TEVI-FR-8: Keep every production Tevi spin server-authoritative using canonical `packages/game-math`, durable spin idempotency by `sessionId + clientSpinId`, and PostgreSQL wallet/ledger transactions.
 
-TEVI-FR-9: Dispatch a Tevi Stars cashout after internal spin commit for every winning spin, using a UUIDv4-compatible idempotency key derived from the authoritative `spinId`.
+TEVI-FR-9: Accept manual cashout requests for player-entered Star amounts and dispatch Tevi Stars cashout after the internal cashout transaction commits, using a UUIDv4-compatible idempotency key derived from the authoritative cashout request ID.
 
 TEVI-FR-10: Reconcile post-commit cashout failures so payout state is visible, retryable where safe, auditable, and never corrupts the internal wallet ledger.
 
-TEVI-FR-11: Send basic Tevi Message receipts for completed top-ups and winning spin payouts, with retryable message status that never rolls back wallet or cashout state.
+TEVI-FR-11: Send basic Tevi Message receipts for completed top-ups and manual cashout payouts, with retryable message status that never rolls back wallet or cashout state.
 
 TEVI-FR-12: Validate the active Tevi game configuration through the `packages/game-math` simulator before sandbox real-value testing and before production exposure.
 
@@ -326,13 +326,13 @@ TEVI-NFR8: Compliance - production deployment is treated as real-money-style gam
 - Tevi Stars are integer units end to end for balance, wager, payout, jackpot, free-spin win totals, receipts, cashout, host float, and reserve accounting.
 - Add `js/teviClient.js` beside `js/serverClient.js` to load `https://static.tevicdn.com/helper_tevi.js`, detect `window.TeviJS`, obtain Tevi user app tokens, request backend top-up signatures, invoke SDK top-up, and expose Mini App UI affordances.
 - The client must never sign deposit tokens, verify webhooks, compute payouts, mutate production balances, or treat SDK top-up success as a wallet credit before webhook processing commits.
-- Add backend boundaries for `TeviAuthAdapter`, `TeviPaymentClient`, `TeviWebhookService`, `TopupService`, `CashoutDispatcher`, `CashoutReconciliationService`, `TeviReceiptService`, `ComplianceGateService`, and host-float/budget-service extension.
+- Add backend boundaries for `TeviAuthAdapter`, `TeviPaymentClient`, `TeviWebhookService`, `TopupService`, `CashoutRequestService`, `CashoutDispatcher`, `CashoutReconciliationService`, `TeviReceiptService`, `ComplianceGateService`, and host-float/budget-service extension.
 - Add Tevi routes for authenticated session/token exchange, top-up signature issuance, webhook receipt, readiness, and support/admin search of Tevi money-path records.
 - Extend persistence for Tevi provider identity mappings, top-up signature issuance records, top-up idempotency records, wallet credits, spin ledger Star fields, cashout dispatch records, message receipt records, host float/budget records, and compliance gate records.
 - Wallet credit from Tevi top-up must commit atomically with idempotency completion and wallet transaction rows.
 - Spin wins commit internally before Tevi cashout dispatch; cashout failure, timeout, or retryable provider error must not roll back or rewrite the committed spin ledger.
 - Duplicate `user_topup` webhook delivery must return or preserve the previously committed result and never double-credit; conflicting duplicate payloads must be rejected or quarantined for operator review without wallet mutation.
-- Per-win cashout idempotency uses a UUIDv4-compatible key derived from `spinId`; reuse with a different payload is treated as conflict and escalated through reconciliation.
+- Manual cashout idempotency uses a UUIDv4-compatible key derived from cashout request ID; reuse with a different payload is treated as conflict and escalated through reconciliation.
 - Host float, jackpot hard ceiling, jackpot reserve funding, maximum spin win cap, free-spin win cap, bet range, deposit limits, and self-exclusion rules are versioned configuration or operator settings, not hard-coded constants.
 - PostgreSQL integration tests must cover Tevi JWT/auth mapping, top-up signature issuance, webhook replay idempotency, wallet credit atomicity, server spin debit/win, post-commit cashout dispatch, cashout retry/reconciliation, message receipt failure isolation, float hard stops, and compliance gate denials.
 - Manual Check Rounds are required implementation-story exit criteria for sandbox launch, SDK top-up, webhook replay, spin debit/win, cashout idempotency, reconciliation, receipts, simulator validation, float guardrails, and production compliance gates.
@@ -425,7 +425,7 @@ TEVI-FR-7: Epic 8 and Epic 10 - Stars wallet accounting and Stars-focused player
 
 TEVI-FR-8: Epic 8 and Epic 9 - Tevi server-authoritative spin ledger, idempotency, and production reliability hardening.
 
-TEVI-FR-9: Epic 8 and Epic 9 - post-commit per-win cashout dispatch and production cashout safety.
+TEVI-FR-9: Epic 8 and Epic 9 - manual cashout request, post-commit provider dispatch, and production cashout safety.
 
 TEVI-FR-10: Epic 8, Epic 9, and Epic 10 - cashout reconciliation, operator-grade production handling, and visible payout state polish.
 
@@ -483,7 +483,7 @@ Players, operators, and support users can rely on restart-safe PostgreSQL-backed
 
 ### Epic 8: Tevi Sandbox Stars Gameplay
 
-A Tevi sandbox user can launch the Mini App, authenticate through Tevi, top up Stars, receive idempotent webhook wallet credit, spin with server-authoritative Stars accounting, receive per-win cashout dispatch, receive basic receipts, and complete mandatory Check Rounds.
+A Tevi sandbox user can launch the Mini App, authenticate through Tevi, top up Stars, receive idempotent webhook wallet credit, spin with server-authoritative Stars accounting, manually cash out a selected Stars amount, receive basic receipts, and complete mandatory Check Rounds.
 
 **FRs covered:** TEVI-FR-1, TEVI-FR-2, TEVI-FR-3, TEVI-FR-4, TEVI-FR-5, TEVI-FR-6, TEVI-FR-7, TEVI-FR-8, TEVI-FR-9, TEVI-FR-10, TEVI-FR-11, TEVI-FR-12
 
@@ -1260,7 +1260,7 @@ So that the game is ready for Tevi planning only after durable state is proven.
 
 ## Epic 8: Tevi Sandbox Stars Gameplay
 
-A Tevi sandbox user can launch the Mini App, authenticate through Tevi, top up Stars, receive idempotent webhook wallet credit, spin with server-authoritative Stars accounting, receive per-win cashout dispatch, receive basic receipts, and complete mandatory Check Rounds.
+A Tevi sandbox user can launch the Mini App, authenticate through Tevi, top up Stars, receive idempotent webhook wallet credit, spin with server-authoritative Stars accounting, manually cash out a selected Stars amount, receive basic receipts, and complete mandatory Check Rounds.
 
 ### Story 8.1: Launch Tevi Mini App Sandbox Shell
 
@@ -1401,64 +1401,66 @@ So that wagers, wins, free-spin state, jackpot state, and balances are server-ow
 **And** wallet debit, win credit if any, spin ledger, wallet transactions, idempotency record, and request trace commit before returning success
 **And** duplicate retry with the same `sessionId`, `clientSpinId`, and wager fingerprint returns the original result without additional wallet mutation
 **And** conflicting retry returns an idempotency conflict without mutating state
-**And** the response includes Stars balance, wager, payout, free-spin state, jackpot state, cashout-pending indicator where relevant, and configuration version
+**And** the response includes Stars balance, wager, payout, free-spin state, jackpot state, updated withdrawable wallet balance, and configuration version
 **And** UI labels balance, bet, win, jackpot, free-spin totals, and errors as Stars in Tevi mode
 **And** the story ends with server spin debit/win Check Rounds covering curl, UI interaction, ledger SQL, idempotency retry proof, and expected response envelope.
 
-### Story 8.8: Dispatch Per-Win Tevi Stars Cashout
+### Story 8.8: Request Manual Tevi Stars Cashout
 
 As a winning player,
-I want each winning spin to trigger a Tevi Stars cashout after the game ledger commits,
-So that my external Tevi payout can be attempted without risking internal wallet correctness.
+I want to enter a Stars amount and request cashout from my game wallet,
+So that I can choose when and how much available balance to transfer back through Tevi.
 
 **Requirements:** TEVI-FR-9, TEVI-FR-10, TEVI-NFR1, TEVI-NFR2, TEVI-NFR3, TEVI-NFR6, TEVI-NFR7, UX-DR11
 
 **Acceptance Criteria:**
 
-**Given** an internally committed winning Tevi spin
-**When** post-commit payout dispatch runs
-**Then** it creates a cashout dispatch record linked to spin ID, internal player ID, Tevi user ID, amount, idempotency key, payload fingerprint, status, attempt count, and request ID
-**And** it derives a UUIDv4-compatible `Idempotency-Key` from the authoritative `spinId`
-**And** it calls Tevi `POST /api/v1/payments/cashout` with `X-API-Key`, `Idempotency-Key`, rewards payload, and description
-**And** the backend never calls Tevi cashout before the internal spin transaction commits
+**Given** an authenticated Tevi player has available internal Stars balance
+**When** the player submits a manual cashout amount through the game UI
+**Then** the backend validates integer Star amount, available wallet balance, cashout limits, compliance gates, self-exclusion state, host float, Tevi readiness, and player identity
+**And** rejected requests for insufficient balance, invalid amount, blocked eligibility, exceeded limits, or unavailable Tevi configuration do not mutate wallet, ledger, idempotency, or provider dispatch state
+**And** accepted requests create a cashout request record linked to internal player ID, Tevi user ID, requested amount, wallet debit or reservation, idempotency key, payload fingerprint, status, attempt count, and request ID
+**And** the cashout request transaction commits before any Tevi provider cashout call is attempted
+**And** it derives a UUIDv4-compatible `Idempotency-Key` from the authoritative cashout request ID
+**And** it calls Tevi `POST /api/v1/payments/cashout` with `X-API-Key`, `Idempotency-Key`, rewards payload, and description after internal commit
 **And** retry with the same idempotency key and payload does not double-payout
 **And** reuse of the same idempotency key with a changed payload records a conflict for reconciliation or operator review
-**And** internal wallet and spin ledger state remain correct when the Tevi cashout call fails, times out, or returns a retryable provider error
-**And** the story ends with per-win cashout and idempotency Check Rounds, including replay with the same `Idempotency-Key` and conflict behavior for changed payloads.
+**And** internal wallet, spin ledger, and cashout request state remain correct when the Tevi cashout call fails, times out, or returns a retryable provider error
+**And** the story ends with manual cashout amount-entry and idempotency Check Rounds, including insufficient-balance rejection, replay with the same `Idempotency-Key`, and conflict behavior for changed payloads.
 
 ### Story 8.9: Reconcile Cashout Failures Safely
 
 As an operator,
-I want failed or uncertain Tevi cashouts to be visible and safely retryable,
+I want failed or uncertain manual Tevi cashouts to be visible and safely retryable,
 So that payout incidents can be resolved without double-paying or corrupting the game ledger.
 
 **Requirements:** TEVI-FR-10, TEVI-NFR1, TEVI-NFR3, TEVI-NFR6, TEVI-NFR7, UX-DR11
 
 **Acceptance Criteria:**
 
-**Given** a cashout dispatch record in `pending`, `dispatched`, `failed_retryable`, `failed_terminal`, `unknown`, or equivalent state
+**Given** a manual cashout request record in `pending`, `dispatched`, `failed_retryable`, `failed_terminal`, `unknown`, or equivalent state
 **When** reconciliation runs or an operator or support user inspects payout status
 **Then** status, attempt count, provider response summary, last error, reconciliation state, related spin ID, related wallet transaction IDs, and request ID are visible
 **And** retryable failures can be retried with the original idempotency key and payload fingerprint
 **And** terminal failures require operator review and cannot silently mutate wallet or spin ledger state
-**And** a simulated provider timeout or failure leaves the internal spin ledger and internal Stars wallet correct
+**And** a simulated provider timeout or failure leaves the internal spin ledger, cashout request record, and internal Stars wallet correct
 **And** logs and database rows expose pass/fail criteria without full secrets, tokens, or signatures
 **And** the story ends with a simulated payout failure Check Round including logs, SQL, retry command, and expected state transitions.
 
-### Story 8.10: Send Basic Tevi Top-Up and Win Receipts
+### Story 8.10: Send Basic Tevi Top-Up and Cashout Receipts
 
 As a player,
-I want receipt messages for completed top-ups and winning spin payouts,
+I want receipt messages for completed top-ups and manual cashout payouts,
 So that I can confirm important Stars events outside the slot animation alone.
 
 **Requirements:** TEVI-FR-11, TEVI-NFR2, TEVI-NFR3, TEVI-NFR6, TEVI-NFR7, UX-DR12
 
 **Acceptance Criteria:**
 
-**Given** a completed top-up credit or winning spin cashout dispatch state
+**Given** a completed top-up credit or manual cashout dispatch state
 **When** receipt dispatch runs
 **Then** top-up receipts include credited Stars amount and correlation ID
-**And** win receipts include spin ID, win Stars amount, and cashout status
+**And** cashout receipts include cashout request ID, Stars amount, and cashout status
 **And** message dispatch records store message type, recipient, source event, status, attempt count, provider response summary, and retry state
 **And** message dispatch failures do not roll back wallet, spin, cashout, or reconciliation state
 **And** receipt status is visible through logs and support/admin search where authorized
@@ -1479,9 +1481,9 @@ So that sandbox rollout is evidence-backed and replayable.
 **When** final Epic 8 verification runs
 **Then** the `packages/game-math` simulator validates the active Tevi configuration against target RTP, hit rate, largest win, free-spin trigger frequency, jackpot trigger frequency, and max exposure tolerance
 **And** known math or configuration issues are fixed or explicitly neutralized before sandbox real-value testing
-**And** `_bmad-output/verification-playbook.md` records Check Rounds for sandbox launch, JWT verification, token exchange, top-up signature, SDK top-up, webhook replay, server spin debit/win, cashout idempotency, reconciliation, receipts, and RTP simulation
+**And** `_bmad-output/verification-playbook.md` records Check Rounds for sandbox launch, JWT verification, token exchange, top-up signature, SDK top-up, webhook replay, server spin debit/win, manual cashout amount entry, cashout idempotency, reconciliation, receipts, and RTP simulation
 **And** each Check Round includes changed files, exact commands, curl examples, UI steps, logs to watch, SQL to inspect, pass/fail criteria, and idempotency proof where relevant
-**And** PostgreSQL integration tests cover Tevi JWT/auth mapping, top-up signature issuance, webhook replay idempotency, wallet credit atomicity, server spin debit/win, post-commit cashout dispatch, cashout retry/reconciliation, and message receipt failure isolation
+**And** PostgreSQL integration tests cover Tevi JWT/auth mapping, top-up signature issuance, webhook replay idempotency, wallet credit atomicity, server spin debit/win, manual cashout request validation, post-commit cashout dispatch, cashout retry/reconciliation, and message receipt failure isolation
 **And** no production Tevi exposure is enabled by this epic
 **And** the story ends with Donnie acceptance of all Epic 8 Check Rounds.
 
@@ -1606,7 +1608,7 @@ So that incidents, disputes, and production operations can be investigated witho
 **Given** Tevi production-readiness observability is enabled
 **When** top-ups, wallet credits, spins, cashout dispatches, reconciliation actions, message sends, float guard decisions, and compliance gates occur
 **Then** each event records request ID, correlation ID where available, provider event ID where available, internal player/session/spin IDs where applicable, status, safe error code, and timestamp
-**And** support/admin search can query top-up idempotency records, wallet credits, spin ledger rows, cashout dispatch attempts, reconciliation status, message receipt status, float guard decisions, and compliance denials
+**And** support/admin search can query top-up idempotency records, wallet credits, spin ledger rows, manual cashout requests, cashout dispatch attempts, reconciliation status, message receipt status, float guard decisions, and compliance denials
 **And** retention policies are documented and implemented for Tevi-specific ledger, audit, trace, message, cashout, compliance, and guardrail records
 **And** dashboards or metrics expose money-path success/failure rates, webhook replay/conflict counts, cashout retry backlog, float threshold alerts, compliance denial counts, and p95 spin latency excluding cashout dispatch
 **And** sensitive fields are redacted in logs, search results, exports, and dashboards according to role
@@ -1666,7 +1668,7 @@ So that I can understand important Stars events without relying only on the game
 **Acceptance Criteria:**
 
 **Given** basic Tevi receipt dispatch exists
-**When** a top-up credit, winning spin payout, cashout success, cashout retryable failure, or cashout terminal failure occurs
+**When** a top-up credit, manual cashout success, cashout retryable failure, or cashout terminal failure occurs
 **Then** receipt content includes the event type, Stars amount, correlation ID or spin ID, safe status, and support reference where applicable
 **And** richer receipt templates avoid misleading fairness, guaranteed payout, fiat conversion, or off-platform redemption claims
 **And** notification dispatch status, retries, and failures remain visible in support/admin search
@@ -1707,7 +1709,7 @@ So that I can tune the Mini App and monitor real-value-style operations responsi
 
 **Given** Tevi sandbox or production-gated data is available
 **When** analytics are requested for a time window, configuration version, or campaign
-**Then** the system reports launch count, authenticated users, top-up starts, top-up completions, webhook failures, spin count, total wagered Stars, total won Stars, observed RTP, theoretical RTP, cashout success rate, cashout retry backlog, receipt success rate, float alerts, compliance denials, and self-exclusion/deposit-limit blocks
+**Then** the system reports launch count, authenticated users, top-up starts, top-up completions, webhook failures, spin count, total wagered Stars, total won Stars, manual cashout request count, manual cashout Stars amount, observed RTP, theoretical RTP, cashout success rate, cashout retry backlog, receipt success rate, float alerts, compliance denials, and self-exclusion/deposit-limit blocks
 **And** observed RTP remains clearly distinguished from theoretical RTP
 **And** analytics reconcile against durable ledger, wallet, cashout, message, and compliance records
 **And** dashboards or exports redact sensitive player/provider data according to role
