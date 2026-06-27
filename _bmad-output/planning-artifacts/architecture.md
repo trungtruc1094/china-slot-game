@@ -726,7 +726,7 @@ Tevi API and route additions:
 
 - `POST /api/tevi/session` or an equivalent authenticated session route exchanges Tevi runtime identity for an internal player/session context using the existing `{data, error, requestId}` envelope.
 - `POST /api/v1/payments/top-up-signature` issues a backend-approved Tevi deposit token for an authenticated Tevi user and validated integer Star amount.
-- `POST /api/webhooks/tevi` receives Tevi webhooks, verifies signatures, records provider events, and credits wallets idempotently.
+- `POST /api/v1/webhooks/tevi` receives Tevi webhooks, verifies signatures, records provider events, and credits wallets idempotently.
 - Existing `POST /api/spins` remains the authoritative spin entry point and must use Tevi/Stars wallet rules when the session is in Tevi mode.
 - Admin/support search must expose top-up idempotency records, wallet credits, cashout dispatch attempts, reconciliation status, Tevi message receipt status, float guard decisions, and compliance gate denials.
 

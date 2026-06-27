@@ -1,5 +1,5 @@
-# generated: 2026-06-21T16:01:14+0700
-# last_updated: 2026-06-21T23:09:50+0700
+# generated: 2026-06-27T21:00:32+0700
+# last_updated: 2026-06-27T21:00:32+0700
 # project: China Slot Game
 # project_key: NOKEY
 # tracking_system: file-system
@@ -34,8 +34,8 @@
 # - Developer typically creates next story after previous one is 'done' to incorporate learnings
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
-generated: "2026-06-21T16:01:14+0700"
-last_updated: "2026-06-21T23:09:50+0700"
+generated: "2026-06-27T21:00:32+0700"
+last_updated: "2026-06-27T21:00:32+0700"
 project: "China Slot Game"
 project_key: NOKEY
 tracking_system: file-system
@@ -103,3 +103,36 @@ development_status:
   7-8-wire-production-postgresql-dependencies-and-fail-safe-startup: done
   7-9-verify-persistence-recovery-admin-search-and-quality-gates: done
   epic-7-retrospective: done
+
+  epic-8: backlog
+  8-1-launch-tevi-mini-app-sandbox-shell: backlog
+  8-2-authenticate-tevi-users-and-map-player-identity: backlog
+  8-3-exchange-and-refresh-tevi-tokens: backlog
+  8-4-issue-backend-top-up-signatures: backlog
+  8-5-run-sdk-top-up-with-pending-wallet-state: backlog
+  8-6-verify-tevi-webhooks-and-credit-stars-idempotently: backlog
+  8-7-spin-with-server-owned-stars-wallet-and-ledger: backlog
+  8-8-dispatch-per-win-tevi-stars-cashout: backlog
+  8-9-reconcile-cashout-failures-safely: backlog
+  8-10-send-basic-tevi-top-up-and-win-receipts: backlog
+  8-11-verify-rtp-and-sandbox-money-path-check-rounds: backlog
+  epic-8-retrospective: optional
+
+  epic-9: backlog
+  9-1-fail-safe-tevi-production-startup-until-required-gates-pass: backlog
+  9-2-gate-production-access-by-jurisdiction-age-kyc-and-terms: backlog
+  9-3-enforce-deposit-limits-and-self-exclusion: backlog
+  9-4-enforce-host-float-jackpot-reserve-and-payout-exposure-hard-stops: backlog
+  9-5-harden-tevi-money-path-security-and-idempotency: backlog
+  9-6-add-tevi-observability-audit-retention-and-support-search: backlog
+  9-7-approve-production-cutover-and-rollback-playbook: backlog
+  epic-9-retrospective: optional
+
+  epic-10: backlog
+  10-1-polish-tevi-mini-app-launch-and-navigation-ux: backlog
+  10-2-add-richer-tevi-message-receipts-and-notification-preferences: backlog
+  10-3-surface-payout-cashout-and-reconciliation-status-clearly: backlog
+  10-4-add-tevi-funnel-economy-and-operational-analytics: backlog
+  10-5-tune-rtp-free-spins-jackpot-and-bet-defaults-with-simulator-evidence: backlog
+  10-6-complete-tevi-polish-and-tuning-verification: backlog
+  epic-10-retrospective: optional
