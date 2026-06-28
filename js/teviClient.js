@@ -2,6 +2,10 @@
     "use strict";
 
     var defaultSdkUrl = "https://static.tevicdn.com/helper_tevi.js";
+    var defaultAppId = "AZX29173";
+    var defaultChannelId = "2300210851";
+    var defaultAppUrl = "https://chinareel.pleagamehub.com/";
+    var defaultWebhookUrl = "https://china-slot-api.onrender.com/api/webhooks/tevi";
     var sdkScriptRequest = null;
     var debugPanelElement = null;
 
@@ -41,17 +45,18 @@
         var config = {
             enabled: overrides.enabled !== undefined ? overrides.enabled : configured.enabled,
             mode: overrides.mode || configured.mode,
-            environment: overrides.environment || configured.environment || "local",
-            appId: overrides.appId || configured.appId || globalScope.TEVI_APP_ID || "",
-            channelId: overrides.channelId || configured.channelId || globalScope.TEVI_CHANNEL_ID || "",
-            appUrl: overrides.appUrl || configured.appUrl || globalScope.TEVI_APP_URL || "",
-            webhookUrl: overrides.webhookUrl || configured.webhookUrl || globalScope.TEVI_WEBHOOK_URL || "",
+            environment: overrides.environment || configured.environment || "",
+            appId: overrides.appId || configured.appId || globalScope.TEVI_APP_ID || defaultAppId,
+            channelId: overrides.channelId || configured.channelId || globalScope.TEVI_CHANNEL_ID || defaultChannelId,
+            appUrl: overrides.appUrl || configured.appUrl || globalScope.TEVI_APP_URL || defaultAppUrl,
+            webhookUrl: overrides.webhookUrl || configured.webhookUrl || globalScope.TEVI_WEBHOOK_URL || defaultWebhookUrl,
             sdkUrl: overrides.sdkUrl || configured.sdkUrl || defaultSdkUrl
         };
+        var enabled = isExplicitTeviMode(config);
 
         return {
-            enabled: isExplicitTeviMode(config),
-            environment: asString(config.environment),
+            enabled: enabled,
+            environment: asString(enabled && config.environment === "local" ? "sandbox" : (config.environment || (enabled ? "sandbox" : "local"))),
             appId: asString(config.appId),
             channelId: asString(config.channelId),
             appUrl: asString(config.appUrl),

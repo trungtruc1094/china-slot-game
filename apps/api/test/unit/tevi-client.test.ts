@@ -143,9 +143,11 @@ describe("browser Tevi client", () => {
     expect(appendedPanels).toHaveLength(1);
     expect(appendedPanels[0]?.textContent).toContain("China Slot Tevi Debug");
     expect(appendedPanels[0]?.textContent).toContain("mode: tevi");
+    expect(appendedPanels[0]?.textContent).toContain("environment: sandbox");
     expect(appendedPanels[0]?.textContent).toContain("sdkAvailable: true");
     expect(appendedPanels[0]?.textContent).toContain("appId: AZX29173");
     expect(appendedPanels[0]?.textContent).toContain("channelId: 2300210851");
+    expect(appendedPanels[0]?.textContent).toContain("webhookUrl: https://china-slot-api.onrender.com/api/webhooks/tevi");
   });
 
   it("requests the Tevi SDK script only when explicit Tevi mode is active", async () => {
