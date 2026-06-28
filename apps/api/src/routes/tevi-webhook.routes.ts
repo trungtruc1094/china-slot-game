@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { errorEnvelope } from "../schemas/api-envelope.js";
 
+const maxChallengeLength = 1024;
+
 export function createTeviWebhookRouter(): Router {
   const router = Router();
 
@@ -9,6 +11,17 @@ export function createTeviWebhookRouter(): Router {
     const bodyChallenge = getChallenge(request.body?.challenge);
     const challenge = queryChallenge ?? bodyChallenge;
     if (challenge) {
+      if (challenge.length > maxChallengeLength) {
+        response.status(400).json(errorEnvelope({
+          code: "TEVI_WEBHOOK_CHALLENGE_TOO_LONG",
+          message: "Tevi webhook challenge exceeds the allowed length.",
+          details: {
+            maxLength: maxChallengeLength
+          }
+        }, request.requestId));
+        return;
+      }
+
       console.info("[tevi-webhook] challenge verification", {
         requestId: request.requestId,
         source: queryChallenge ? "query" : "body",

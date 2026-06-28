@@ -76,4 +76,28 @@ describe("Tevi webhook registration route", () => {
     });
     infoSpy.mockRestore();
   });
+
+  it("rejects oversized Tevi challenge values", async () => {
+    const response = await fetch(`${baseUrl}/api/webhooks/tevi`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-request-id": "req_tevi_challenge_too_long"
+      },
+      body: JSON.stringify({ challenge: "x".repeat(1025) })
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      data: null,
+      error: {
+        code: "TEVI_WEBHOOK_CHALLENGE_TOO_LONG",
+        message: "Tevi webhook challenge exceeds the allowed length.",
+        details: {
+          maxLength: 1024
+        }
+      },
+      requestId: "req_tevi_challenge_too_long"
+    });
+  });
 });

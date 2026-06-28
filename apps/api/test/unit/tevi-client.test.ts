@@ -186,6 +186,32 @@ describe("browser Tevi client", () => {
     expect(appendedScripts).toHaveLength(1);
   });
 
+  it("retries Tevi SDK script loading after a transient script error", async () => {
+    const appendedScripts: MockScriptElement[] = [];
+    const sandbox = loadRuntimeAndTeviClient({
+      window: { CHINA_SLOT_TEVI_MODE: true },
+      document: {
+        createElement: () => ({}),
+        querySelector: () => null,
+        head: {
+          appendChild: (element) => {
+            appendedScripts.push(element);
+            if (appendedScripts.length === 1) {
+              element.onerror?.();
+              return;
+            }
+            element.onload?.();
+          }
+        }
+      }
+    });
+    const api = sandbox.window.ChinaSlotTeviClient as TeviClientApi;
+
+    await expect(api.createFromWindow().initialize()).resolves.toMatchObject({ available: false, reason: "sdk-script-error" });
+    await expect(api.createFromWindow().initialize()).resolves.toMatchObject({ available: true, reason: "sdk-script-loaded" });
+    expect(appendedScripts).toHaveLength(2);
+  });
+
   it("reports SDK unavailable safely outside Tevi sandbox", async () => {
     const sandbox = loadRuntimeAndTeviClient({ window: { CHINA_SLOT_TEVI_MODE: true } });
     const api = sandbox.window.ChinaSlotTeviClient as TeviClientApi;

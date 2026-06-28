@@ -101,16 +101,25 @@
 
         if (sdkScriptRequest) return sdkScriptRequest;
 
-        sdkScriptRequest = new Promise(function (resolve) {
-            var script = browserDocument.createElement("script");
-            script.async = true;
-            script.src = config.sdkUrl;
-            script.onload = function () { resolve({ available: true, reason: "sdk-script-loaded" }); };
-            script.onerror = function () { resolve({ available: false, reason: "sdk-script-error" }); };
-            browserDocument.head.appendChild(script);
-        });
+        var script = browserDocument.createElement("script");
+        var resolveRequest;
+        var request;
 
-        return sdkScriptRequest;
+        request = new Promise(function (resolve) {
+            resolveRequest = resolve;
+        });
+        sdkScriptRequest = request;
+
+        script.async = true;
+        script.src = config.sdkUrl;
+        script.onload = function () { resolveRequest({ available: true, reason: "sdk-script-loaded" }); };
+        script.onerror = function () {
+            sdkScriptRequest = null;
+            resolveRequest({ available: false, reason: "sdk-script-error" });
+        };
+        browserDocument.head.appendChild(script);
+
+        return request;
     }
 
     function renderDebugPanel(client) {
