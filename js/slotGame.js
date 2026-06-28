@@ -196,14 +196,16 @@ class SlotGame extends Phaser.Scene{
 
 
         // 4) main objects
-        this.slotPlayer = new SlotPlayer(slotConfig.defaultCoins); // default coins
+        this.serverClient = (window.ChinaSlotServerClient) ? window.ChinaSlotServerClient.createFromWindow() : null;
+        this.teviClient = (window.ChinaSlotTeviClient) ? window.ChinaSlotTeviClient.createFromWindow() : null;
+        this.teviInitializationStatus = (this.teviClient && this.teviClient.isTeviMode()) ? "idle" : "local";
+        this.slotPlayer = new SlotPlayer(this.resolveInitialPlayerCoins(slotConfig.defaultCoins));
         this.reels = slotConfig.createReels(this);
         this.lineButtons = (slotConfig.createLineButtons) ? slotConfig.createLineButtons(this) : null;  // add line buttons - optional
         this.soundController = new SoundController(this);
         this.guiController = new GuiController(this);
         this.slotControls = new SlotControls(this, this.slotPlayer, slotConfig.lines, slotConfig.lineColor, slotConfig.lineBetMaxValue, slotConfig.jackpot.defaultAmount);
         this.winController = new WinController(this, this.slotControls.linesController, slotConfig.useScatter, slotConfig.scatter, slotConfig.jackpot, slotConfig.winShowTime);
-        this.serverClient = (window.ChinaSlotServerClient) ? window.ChinaSlotServerClient.createFromWindow() : null;
         this.backendSpinResult = null;
         this.backendSpinPlan = null;
         this.backendSpinPending = false;
@@ -221,6 +223,7 @@ class SlotGame extends Phaser.Scene{
         // 6) controls
         slotConfig.createControls(this, this.slotControls);
         this.slotControls.init(slotConfig.selectedLines, true);
+        this.initializeTeviMiniAppShell();
         this.initializeBackendSessionBalance();
 
         // 7) state machine
@@ -373,6 +376,27 @@ class SlotGame extends Phaser.Scene{
     isBackendProductionMode()
     {
         return this.serverClient !== null && this.serverClient.mode === "production";
+    }
+
+    resolveInitialPlayerCoins(defaultCoins)
+    {
+        if (this.isBackendProductionMode()) return 0;
+        if (this.teviClient && this.teviClient.isTeviMode && this.teviClient.isTeviMode()) return 0;
+        return defaultCoins;
+    }
+
+    initializeTeviMiniAppShell()
+    {
+        if (!this.teviClient || !this.teviClient.isTeviMode || !this.teviClient.isTeviMode()) return null;
+
+        this.teviInitializationStatus = "pending";
+        return this.teviClient.initialize().then((result) => {
+            this.teviInitializationStatus = result && result.available ? "ready" : "unavailable";
+            return result;
+        }).catch((_error) => {
+            this.teviInitializationStatus = "unavailable";
+            return null;
+        });
     }
 
     initializeBackendSessionBalance()
