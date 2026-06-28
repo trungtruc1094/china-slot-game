@@ -32,6 +32,8 @@ interface SlotGameCtor {
     initializeBackendSessionBalance: () => void;
     requestBackendSpin: () => void;
     handleBackendSpinRetry: (retryState: SpinRetryState) => void;
+    initializeTeviMiniAppShell: () => Promise<unknown> | null;
+    resolveInitialPlayerCoins: (defaultCoins: number) => number;
     createClientSpinId: () => string;
     createBackendWager: () => { lineBet: number; selectedWays: number; totalWager: number };
     runSlot: () => void;
@@ -620,6 +622,44 @@ describe("browser server client render contract", () => {
     expect(game.backendSpinStatus).toBe("demo");
     expect(game.slotControls.creditSumText.text).toBe("100000");
     expect(calls).toEqual([]);
+  });
+
+  it("starts Tevi and production reward-bearing modes with zero until backend balance arrives", () => {
+    const SlotGame = loadSlotGame();
+
+    expect(SlotGame.prototype.resolveInitialPlayerCoins.call({
+      isBackendProductionMode: () => true,
+      teviClient: null
+    }, 100000)).toBe(0);
+
+    expect(SlotGame.prototype.resolveInitialPlayerCoins.call({
+      isBackendProductionMode: () => false,
+      teviClient: { isTeviMode: () => true }
+    }, 100000)).toBe(0);
+
+    expect(SlotGame.prototype.resolveInitialPlayerCoins.call({
+      isBackendProductionMode: () => false,
+      teviClient: { isTeviMode: () => false }
+    }, 100000)).toBe(100000);
+  });
+
+  it("initializes Tevi Mini App shell affordances without throwing when SDK setup fails", async () => {
+    const SlotGame = loadSlotGame();
+    const calls: string[] = [];
+    const game = {
+      teviClient: {
+        isTeviMode: () => true,
+        initialize: async () => {
+          calls.push("initialize");
+          throw new Error("sdk unavailable");
+        }
+      },
+      teviInitializationStatus: "idle"
+    };
+
+    await expect(SlotGame.prototype.initializeTeviMiniAppShell.call(game)).resolves.toBeNull();
+    expect(calls).toEqual(["initialize"]);
+    expect(game.teviInitializationStatus).toBe("unavailable");
   });
 });
 

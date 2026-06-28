@@ -16,6 +16,7 @@ import { createAdminOperatorLimitsRouter } from "./routes/admin-operator-limits.
 import { createAdminSpinLedgerRouter } from "./routes/admin-spin-ledger.routes.js";
 import { createSessionsRouter } from "./routes/sessions.routes.js";
 import { createSpinsRouter } from "./routes/spins.routes.js";
+import { createTeviWebhookRouter } from "./routes/tevi-webhook.routes.js";
 import { InMemoryPlayerIdentityAdapter } from "./domain/player-identity.js";
 import { InMemoryGameConfigurationRepository, type GameConfigurationProvider, type GameConfigurationRepository } from "./domain/game-configuration-repository.js";
 import { MetricsService } from "./domain/metrics-service.js";
@@ -126,6 +127,7 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use("/api", createAdminOperatorLimitsRouter(operatorLimitsRepository));
   app.use("/api", createAdminSpinLedgerRouter(spinService, adminAuditRepository));
   app.use("/api", createAdminMetricsRouter(metricsService));
+  app.use("/api", createTeviWebhookRouter());
   app.use("/api", createSessionsRouter(sessionService));
   app.use("/api", createSpinsRouter(spinService, adminAuditRepository));
   app.use(notFoundHandler);
