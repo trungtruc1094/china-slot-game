@@ -7,7 +7,11 @@ describe("loadEnv", () => {
       nodeEnv: "development",
       port: 3000,
       persistenceMode: "memory",
-      budgetProtectionEnabled: true
+      budgetProtectionEnabled: true,
+      teviAuth: {
+        enabled: false,
+        allowAnonymousUsers: false
+      }
     });
   });
 
@@ -16,7 +20,11 @@ describe("loadEnv", () => {
       nodeEnv: "test",
       port: 4444,
       persistenceMode: "memory",
-      budgetProtectionEnabled: true
+      budgetProtectionEnabled: true,
+      teviAuth: {
+        enabled: false,
+        allowAnonymousUsers: false
+      }
     });
   });
 
@@ -40,7 +48,11 @@ describe("loadEnv", () => {
       port: 3000,
       persistenceMode: "postgres",
       budgetProtectionEnabled: true,
-      databaseUrl: "postgres://user:pass@localhost:5432/china_slot_test"
+      databaseUrl: "postgres://user:pass@localhost:5432/china_slot_test",
+      teviAuth: {
+        enabled: false,
+        allowAnonymousUsers: false
+      }
     });
   });
 
@@ -48,6 +60,49 @@ describe("loadEnv", () => {
     expect(loadEnv({ BUDGET_PROTECTION_ENABLED: "false" })).toMatchObject({ budgetProtectionEnabled: false });
     expect(loadEnv({ BUDGET_PROTECTION_ENABLED: "true" })).toMatchObject({ budgetProtectionEnabled: true });
     expect(loadEnv({})).toMatchObject({ budgetProtectionEnabled: true });
+  });
+
+  it("defaults Tevi auth to disabled with anonymous users blocked", () => {
+    expect(loadEnv({})).toMatchObject({
+      teviAuth: {
+        enabled: false,
+        allowAnonymousUsers: false
+      }
+    });
+  });
+
+  it("requires Tevi app and JWKS settings when Tevi auth mode is enabled", () => {
+    expect(() => loadEnv({ TEVI_AUTH_ENABLED: "true" })).toThrow("TEVI_APP_ID is required when Tevi auth is enabled");
+    expect(() => loadEnv({ TEVI_AUTH_ENABLED: "true", TEVI_APP_ID: "AZX29173" })).toThrow("TEVI_JWKS_URL is required when Tevi auth is enabled");
+  });
+
+  it("parses explicit Tevi auth configuration", () => {
+    expect(loadEnv({
+      TEVI_AUTH_ENABLED: "true",
+      TEVI_APP_ID: "AZX29173",
+      TEVI_JWKS_URL: "https://sandbox.tevi.example/api/v1/auth/jwks",
+      TEVI_ALLOW_ANONYMOUS_USERS: "true"
+    })).toMatchObject({
+      teviAuth: {
+        enabled: true,
+        appId: "AZX29173",
+        jwksUrl: "https://sandbox.tevi.example/api/v1/auth/jwks",
+        allowAnonymousUsers: true
+      }
+    });
+  });
+
+  it("rejects invalid Tevi JWKS URLs", () => {
+    expect(() => loadEnv({
+      TEVI_AUTH_ENABLED: "true",
+      TEVI_APP_ID: "AZX29173",
+      TEVI_JWKS_URL: "not-a-url"
+    })).toThrow("TEVI_JWKS_URL must be a valid HTTPS URL");
+    expect(() => loadEnv({
+      TEVI_AUTH_ENABLED: "true",
+      TEVI_APP_ID: "AZX29173",
+      TEVI_JWKS_URL: "http://sandbox.tevi.example/api/v1/auth/jwks"
+    })).toThrow("TEVI_JWKS_URL must be a valid HTTPS URL");
   });
 
   it("rejects unknown persistence modes", () => {

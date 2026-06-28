@@ -209,6 +209,10 @@ function env(overrides: Partial<ApiEnv>): ApiEnv {
     port: 0,
     persistenceMode: "memory",
     budgetProtectionEnabled: true,
+    teviAuth: {
+      enabled: false,
+      allowAnonymousUsers: false
+    },
     ...overrides
   };
 }

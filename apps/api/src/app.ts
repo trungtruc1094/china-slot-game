@@ -16,6 +16,7 @@ import { createAdminOperatorLimitsRouter } from "./routes/admin-operator-limits.
 import { createAdminSpinLedgerRouter } from "./routes/admin-spin-ledger.routes.js";
 import { createSessionsRouter } from "./routes/sessions.routes.js";
 import { createSpinsRouter } from "./routes/spins.routes.js";
+import { createTeviSessionRouter } from "./routes/tevi-session.routes.js";
 import { createTeviWebhookRouter } from "./routes/tevi-webhook.routes.js";
 import { InMemoryPlayerIdentityAdapter } from "./domain/player-identity.js";
 import { InMemoryGameConfigurationRepository, type GameConfigurationProvider, type GameConfigurationRepository } from "./domain/game-configuration-repository.js";
@@ -32,6 +33,7 @@ import { InMemoryBudgetProtectionRepository, type BudgetProtectionRepository } f
 import { InMemoryAdminAuditRepository, type AdminAuditRepository } from "./domain/admin-audit-repository.js";
 import { InMemoryRequestTraceRepository, type RequestTraceRepository } from "./domain/request-trace-repository.js";
 import { seedActiveConfigForDeployment } from "./config/seed-active-config.js";
+import type { TeviAuthVerifier } from "./domain/tevi-auth-adapter.js";
 
 export interface AppDependencies {
   clock?: Clock;
@@ -49,6 +51,7 @@ export interface AppDependencies {
   spinService?: SpinService;
   adminAuditRepository?: AdminAuditRepository;
   requestTraceRepository?: RequestTraceRepository;
+  teviAuthVerifier?: TeviAuthVerifier;
   readinessCheck?: () => Promise<Record<string, "ready">>;
 }
 
@@ -128,7 +131,12 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use("/api", createAdminSpinLedgerRouter(spinService, adminAuditRepository));
   app.use("/api", createAdminMetricsRouter(metricsService));
   app.use("/api", createTeviWebhookRouter());
-  app.use("/api", createSessionsRouter(sessionService));
+  if (dependencies.teviAuthVerifier) {
+    app.use("/api", createTeviSessionRouter(sessionService, dependencies.teviAuthVerifier));
+  }
+  app.use("/api", createSessionsRouter(sessionService, dependencies.teviAuthVerifier ? {
+    blockedIdentityProviders: ["tevi"]
+  } : {}));
   app.use("/api", createSpinsRouter(spinService, adminAuditRepository));
   app.use(notFoundHandler);
   app.use(errorHandler);

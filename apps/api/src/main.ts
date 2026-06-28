@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import { createApp } from "./app.js";
 import { loadEnv } from "./config/env.js";
 import { createProductionDependencies, shouldUsePostgresPersistence } from "./composition/production-dependencies.js";
+import { JoseTeviAuthVerifier } from "./domain/tevi-auth-adapter.js";
 
 const env = loadEnv();
 let productionDependencies: Awaited<ReturnType<typeof createProductionDependencies>> | undefined;
@@ -18,7 +19,10 @@ try {
   });
   process.exit(1);
 }
-const app = createApp(productionDependencies?.appDependencies);
+const appDependencies = productionDependencies?.appDependencies ?? {};
+const app = createApp(env.teviAuth.enabled
+  ? { ...appDependencies, teviAuthVerifier: new JoseTeviAuthVerifier(env.teviAuth) }
+  : appDependencies);
 const server = createServer(app);
 let shutdownStarted = false;
 

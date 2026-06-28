@@ -5,7 +5,22 @@ export interface ApiEnv {
   port: number;
   persistenceMode: "memory" | "postgres";
   budgetProtectionEnabled: boolean;
+  teviAuth: TeviAuthEnv;
   databaseUrl?: string;
+}
+
+export type TeviAuthEnv = TeviAuthDisabledEnv | TeviAuthEnabledEnv;
+
+export interface TeviAuthDisabledEnv {
+  enabled: false;
+  allowAnonymousUsers: false;
+}
+
+export interface TeviAuthEnabledEnv {
+  enabled: true;
+  appId: string;
+  jwksUrl: string;
+  allowAnonymousUsers: boolean;
 }
 
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): ApiEnv {
@@ -32,7 +47,8 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): ApiEnv {
     nodeEnv,
     port: parsedPort,
     persistenceMode,
-    budgetProtectionEnabled: source.BUDGET_PROTECTION_ENABLED !== "false"
+    budgetProtectionEnabled: source.BUDGET_PROTECTION_ENABLED !== "false",
+    teviAuth: parseTeviAuthEnv(source)
   };
 
   if (databaseUrl) {
@@ -40,6 +56,47 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): ApiEnv {
   }
 
   return env;
+}
+
+function parseTeviAuthEnv(source: NodeJS.ProcessEnv): TeviAuthEnv {
+  const enabled = source.TEVI_AUTH_ENABLED === "true" || Boolean(source.TEVI_APP_ID) || Boolean(source.TEVI_JWKS_URL);
+  if (!enabled) {
+    return {
+      enabled: false,
+      allowAnonymousUsers: false
+    };
+  }
+
+  const appId = source.TEVI_APP_ID?.trim();
+  if (!appId) {
+    throw new Error("TEVI_APP_ID is required when Tevi auth is enabled");
+  }
+
+  const jwksUrl = source.TEVI_JWKS_URL?.trim();
+  if (!jwksUrl) {
+    throw new Error("TEVI_JWKS_URL is required when Tevi auth is enabled");
+  }
+  validateTeviJwksUrl(jwksUrl);
+
+  return {
+    enabled: true,
+    appId,
+    jwksUrl,
+    allowAnonymousUsers: source.TEVI_ALLOW_ANONYMOUS_USERS === "true"
+  };
+}
+
+function validateTeviJwksUrl(rawUrl: string): void {
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(rawUrl);
+  } catch {
+    throw new Error("TEVI_JWKS_URL must be a valid HTTPS URL");
+  }
+
+  if (parsedUrl.protocol !== "https:" || !parsedUrl.hostname) {
+    throw new Error("TEVI_JWKS_URL must be a valid HTTPS URL");
+  }
 }
 
 function parsePersistenceMode(rawMode: string | undefined): ApiEnv["persistenceMode"] {
