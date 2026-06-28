@@ -51,6 +51,8 @@ interface MockScriptElement {
   src?: string;
   onload?: () => void;
   onerror?: () => void;
+  style?: Record<string, string>;
+  textContent?: string;
 }
 
 interface TeviSandbox {
@@ -60,6 +62,7 @@ interface TeviSandbox {
     createElement: (tagName: string) => MockScriptElement;
     querySelector: (selector: string) => MockScriptElement | null;
     head: { appendChild: (element: MockScriptElement) => void };
+    body?: { appendChild: (element: MockScriptElement) => void };
   };
   location?: { search: string };
   URLSearchParams: typeof URLSearchParams;
@@ -110,8 +113,39 @@ describe("browser Tevi client", () => {
     expect(api.resolveRuntimeConfig()).toMatchObject({
       enabled: false,
       environment: "local",
+      appId: "AZX29173",
+      channelId: "2300210851",
+      appUrl: "https://chinareel.pleagamehub.com/",
+      webhookUrl: "https://china-slot-api.onrender.com/api/webhooks/tevi",
       sdkUrl: "https://static.tevicdn.com/helper_tevi.js"
     });
+  });
+
+  it("renders a query-gated debug panel for mobile Tevi sandbox evidence", async () => {
+    const appendedPanels: MockScriptElement[] = [];
+    const sandbox = loadRuntimeAndTeviClient({
+      window: {
+        CHINA_SLOT_TEVI_MODE: true,
+        TeviJS: { showBackButton: () => undefined, showCloseButton: () => undefined, loadConfig: () => undefined }
+      },
+      location: { search: "?tevi=1&debugTevi=1" },
+      document: {
+        createElement: () => ({ style: {} }),
+        querySelector: () => null,
+        head: { appendChild: () => undefined },
+        body: { appendChild: (element) => appendedPanels.push(element) }
+      }
+    });
+    const api = sandbox.window.ChinaSlotTeviClient as TeviClientApi;
+
+    await api.createFromWindow().initialize();
+
+    expect(appendedPanels).toHaveLength(1);
+    expect(appendedPanels[0]?.textContent).toContain("China Slot Tevi Debug");
+    expect(appendedPanels[0]?.textContent).toContain("mode: tevi");
+    expect(appendedPanels[0]?.textContent).toContain("sdkAvailable: true");
+    expect(appendedPanels[0]?.textContent).toContain("appId: AZX29173");
+    expect(appendedPanels[0]?.textContent).toContain("channelId: 2300210851");
   });
 
   it("requests the Tevi SDK script only when explicit Tevi mode is active", async () => {

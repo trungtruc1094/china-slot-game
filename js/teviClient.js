@@ -3,6 +3,7 @@
 
     var defaultSdkUrl = "https://static.tevicdn.com/helper_tevi.js";
     var sdkScriptRequest = null;
+    var debugPanelElement = null;
 
     function getDocument() {
         if (globalScope.document) return globalScope.document;
@@ -11,8 +12,14 @@
     }
 
     function getQueryValue(name) {
-        if (!globalScope.location || !globalScope.location.search || typeof URLSearchParams === "undefined") return null;
-        return new URLSearchParams(globalScope.location.search).get(name);
+        var browserLocation = globalScope.location || (typeof location !== "undefined" ? location : null);
+        if (!browserLocation || !browserLocation.search || typeof URLSearchParams === "undefined") return null;
+        return new URLSearchParams(browserLocation.search).get(name);
+    }
+
+    function isQueryFlagEnabled(name) {
+        var value = getQueryValue(name);
+        return value === "1" || value === "true";
     }
 
     function asString(value) {
@@ -101,16 +108,58 @@
         return sdkScriptRequest;
     }
 
+    function renderDebugPanel(client) {
+        if (!isQueryFlagEnabled("debugTevi")) return;
+
+        var browserDocument = getDocument();
+        if (!browserDocument || !browserDocument.createElement || !browserDocument.body) return;
+
+        var existingPanel = debugPanelElement || (browserDocument.querySelector && browserDocument.querySelector("[data-china-slot-tevi-debug]"));
+        var panel = existingPanel || browserDocument.createElement("pre");
+        var state = client.getState();
+        panel.textContent = [
+            "China Slot Tevi Debug",
+            "mode: " + state.mode,
+            "environment: " + state.environment,
+            "sdkAvailable: " + state.sdkAvailable,
+            "appId: " + state.appId,
+            "channelId: " + state.channelId,
+            "appUrl: " + state.appUrl,
+            "webhookUrl: " + state.webhookUrl
+        ].join("\n");
+        panel.setAttribute && panel.setAttribute("data-china-slot-tevi-debug", "true");
+        panel.style.position = "fixed";
+        panel.style.left = "8px";
+        panel.style.bottom = "8px";
+        panel.style.zIndex = "999999";
+        panel.style.maxWidth = "calc(100vw - 16px)";
+        panel.style.padding = "8px";
+        panel.style.margin = "0";
+        panel.style.border = "1px solid #2dd4bf";
+        panel.style.borderRadius = "6px";
+        panel.style.background = "rgba(0, 0, 0, 0.82)";
+        panel.style.color = "#e6fffb";
+        panel.style.font = "12px monospace";
+        panel.style.whiteSpace = "pre-wrap";
+        panel.style.pointerEvents = "none";
+
+        if (!existingPanel) browserDocument.body.appendChild(panel);
+        debugPanelElement = panel;
+    }
+
     function createClient(options) {
         var config = resolveRuntimeConfig(options);
+        var client;
 
-        return {
+        client = {
             initialize: function () {
+                renderDebugPanel(client);
                 return loadSdkScript(config).then(function (result) {
                     if (!result.available) return result;
                     callSdkMethod("showBackButton");
                     callSdkMethod("showCloseButton");
                     callSdkMethod("loadConfig");
+                    renderDebugPanel(client);
                     return result;
                 });
             },
@@ -136,6 +185,8 @@
                 return callSdkMethod("close");
             }
         };
+
+        return client;
     }
 
     globalScope.ChinaSlotTeviClient = {

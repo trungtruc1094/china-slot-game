@@ -180,6 +180,13 @@ GitHub Copilot
 - GREEN: `npm --workspace @china-slot-game/api test -- test/integration/tevi-webhook-routes.test.ts` passed after adding safe structured logs.
 - `npm --workspace @china-slot-game/api run typecheck` passed after adding safe webhook request logs.
 - `npm --workspace @china-slot-game/api test -- test/integration/tevi-webhook-routes.test.ts test/unit/tevi-client.test.ts test/unit/server-client.test.ts` passed with 27 tests after adding safe webhook request logs.
+- Manual Tevi sandbox launch evidence: user opened China Slot Game inside the Android Tevi sandbox app; the Mini App opened as a bottom sheet, loaded the existing slot game, and Spin worked normally.
+- Backend gameplay evidence from Render logs during Tevi sandbox launch: production API recorded `/api/sessions` 201 responses, `/api/spins` 200 responses, and `[spin]` ledger lines with server-generated spin IDs, session IDs, wager `243`, payouts, and balance-after values.
+- RED: `npm --workspace @china-slot-game/api test -- test/unit/tevi-client.test.ts` failed before sandbox Tevi metadata defaults and the `debugTevi=1` evidence overlay existed.
+- GREEN: `npm --workspace @china-slot-game/api test -- test/unit/tevi-client.test.ts` passed after adding sandbox Tevi metadata defaults and the query-gated debug overlay.
+- `node --check js/runtime-config.js && node --check js/teviClient.js` passed after adding the debug overlay.
+- `npm --workspace @china-slot-game/api run typecheck` passed after adding the debug overlay.
+- `npm --workspace @china-slot-game/api test -- test/unit/tevi-client.test.ts test/unit/server-client.test.ts test/integration/tevi-webhook-routes.test.ts` passed with 28 tests after adding the debug overlay.
 
 ### Completion Notes List
 
@@ -191,7 +198,8 @@ GitHub Copilot
 - Added VM-based unit coverage for Tevi SDK conditional loading, SDK-unavailable behavior, safe helper wrappers, script ordering, metadata reporting, and backend-authoritative balance startup expectations.
 - Added `POST /api/webhooks/tevi` as a Story 8.1 registration-only endpoint. It echoes Tevi `challenge` values for sandbox URL verification and rejects non-challenge event payloads with `501 TEVI_WEBHOOK_PROCESSING_NOT_IMPLEMENTED` until later stories add `X-Tevi-Signature` verification and money-path processing.
 - Added safe structured webhook logs for challenge verification and rejected event payloads so Render can show that Tevi reached the API. Logs include request ID, challenge source/length, event name, and signature-header presence; they do not log payloads, challenge values, signatures, or secrets.
-- Check Round status: local/demo separation is verified by automated tests. Sandbox app/channel evidence provided: `TEVI_APP_ID=AZX29173`, app URL `https://chinareel.pleagamehub.com/`, Tevi channel ID `2300210851`, channel URL `https://sbx.tevi.dev/@chinaslotgame`. Production API challenge evidence confirms `https://china-slot-api.onrender.com/api/webhooks/tevi` is deployed and echoes Tevi challenge values. Remaining external evidence: Tevi portal save/verification with required webhook scopes and in-sandbox `window.TeviJS` console/manual evidence.
+- Added a query-gated mobile evidence overlay at `?tevi=1&debugTevi=1`. It displays Tevi mode, environment, SDK availability, app ID, channel ID, app URL, and webhook URL without requiring Android WebView DevTools access.
+- Check Round status: local/demo separation is verified by automated tests. Sandbox app/channel evidence provided: `TEVI_APP_ID=AZX29173`, app URL `https://chinareel.pleagamehub.com/`, Tevi channel ID `2300210851`, channel URL `https://sbx.tevi.dev/@chinaslotgame`. Production API challenge evidence confirms `https://china-slot-api.onrender.com/api/webhooks/tevi` is deployed and echoes Tevi challenge values. Manual Tevi sandbox launch evidence confirms the Android sandbox app opens the Mini App bottom sheet, the existing slot game loads, and backend session/spin logs are recorded during play. Remaining external evidence: Tevi portal save/verification with required webhook scopes and screenshot from `https://chinareel.pleagamehub.com/?tevi=1&debugTevi=1` launched inside Tevi sandbox showing the debug overlay.
 
 ### File List
 
@@ -216,5 +224,7 @@ GitHub Copilot
 - 2026-06-28: Reviewed Tevi webhook docs and tightened non-challenge webhook behavior to fail closed until signature verification is implemented in a later story.
 - 2026-06-28: Recorded deployed production API webhook challenge verification for `https://china-slot-api.onrender.com/api/webhooks/tevi`; portal save/scopes and sandbox SDK console evidence remain pending.
 - 2026-06-28: Added safe structured Tevi webhook request logs for Render visibility without logging payloads, challenge values, signatures, or secrets.
+- 2026-06-28: Recorded manual Tevi sandbox Mini App launch evidence and Render backend session/spin log evidence; explicit `window.TeviJS` console evidence remains pending if obtainable.
+- 2026-06-28: Added query-gated Tevi debug overlay for mobile sandbox evidence when Android WebView DevTools is unavailable.
 
 ## QA Results
