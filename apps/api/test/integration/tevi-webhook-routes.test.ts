@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "../../src/app.js";
 
 let server: ReturnType<typeof createServer>;
@@ -29,6 +29,7 @@ afterEach(async () => {
 
 describe("Tevi webhook registration route", () => {
   it("echoes the Tevi challenge parameter for sandbox URL verification", async () => {
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => undefined);
     const response = await fetch(`${baseUrl}/api/webhooks/tevi?challenge=tevi_sandbox_challenge`, {
       method: "POST",
       headers: { "x-request-id": "req_tevi_challenge" }
@@ -37,16 +38,23 @@ describe("Tevi webhook registration route", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("text/plain");
     await expect(response.text()).resolves.toBe("tevi_sandbox_challenge");
+    expect(infoSpy).toHaveBeenCalledWith("[tevi-webhook] challenge verification", {
+      requestId: "req_tevi_challenge",
+      source: "query",
+      challengeLength: "tevi_sandbox_challenge".length
+    });
+    infoSpy.mockRestore();
   });
 
   it("rejects non-challenge webhook posts until signature verification is implemented", async () => {
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => undefined);
     const response = await fetch(`${baseUrl}/api/webhooks/tevi`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
         "x-request-id": "req_tevi_placeholder"
       },
-      body: JSON.stringify({ type: "topup", eventId: "evt_story_8_1_placeholder" })
+      body: JSON.stringify({ event: "user_topup", id: "evt_story_8_1_placeholder" })
     });
 
     expect(response.status).toBe(501);
@@ -61,5 +69,11 @@ describe("Tevi webhook registration route", () => {
       },
       requestId: "req_tevi_placeholder"
     });
+    expect(infoSpy).toHaveBeenCalledWith("[tevi-webhook] event rejected before signature verification", {
+      requestId: "req_tevi_placeholder",
+      event: "user_topup",
+      hasSignatureHeader: false
+    });
+    infoSpy.mockRestore();
   });
 });

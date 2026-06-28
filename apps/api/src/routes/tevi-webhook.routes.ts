@@ -5,11 +5,24 @@ export function createTeviWebhookRouter(): Router {
   const router = Router();
 
   router.post("/webhooks/tevi", (request, response) => {
-    const challenge = getChallenge(request.query.challenge) ?? getChallenge(request.body?.challenge);
+    const queryChallenge = getChallenge(request.query.challenge);
+    const bodyChallenge = getChallenge(request.body?.challenge);
+    const challenge = queryChallenge ?? bodyChallenge;
     if (challenge) {
+      console.info("[tevi-webhook] challenge verification", {
+        requestId: request.requestId,
+        source: queryChallenge ? "query" : "body",
+        challengeLength: challenge.length
+      });
       response.type("text/plain").send(challenge);
       return;
     }
+
+    console.info("[tevi-webhook] event rejected before signature verification", {
+      requestId: request.requestId,
+      event: getEventName(request.body),
+      hasSignatureHeader: typeof request.header("X-Tevi-Signature") === "string"
+    });
 
     response.status(501).json(errorEnvelope({
       code: "TEVI_WEBHOOK_PROCESSING_NOT_IMPLEMENTED",
@@ -27,4 +40,11 @@ function getChallenge(value: unknown): string | null {
   if (typeof value === "string" && value.length > 0) return value;
   if (Array.isArray(value) && typeof value[0] === "string" && value[0].length > 0) return value[0];
   return null;
+}
+
+function getEventName(body: unknown): string {
+  if (typeof body === "object" && body !== null && "event" in body && typeof body.event === "string") {
+    return body.event;
+  }
+  return "unknown";
 }

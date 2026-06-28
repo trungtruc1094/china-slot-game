@@ -175,6 +175,11 @@ GitHub Copilot
 - GREEN: `npm --workspace @china-slot-game/api test -- test/integration/tevi-webhook-routes.test.ts` passed after fail-closed route update.
 - `npm --workspace @china-slot-game/api run typecheck` passed after the Tevi docs correction.
 - `npm --workspace @china-slot-game/api test -- test/integration/tevi-webhook-routes.test.ts test/unit/tevi-client.test.ts test/unit/server-client.test.ts` passed with 27 tests after the Tevi docs correction.
+- Production API webhook challenge check: `curl -i -X POST "https://china-slot-api.onrender.com/api/webhooks/tevi?challenge=tevi_test"` returned HTTP 200 `text/plain` body `tevi_test` with response request ID `req_b93337c8-8079-47ce-930d-1105f4b22a13`.
+- RED: `npm --workspace @china-slot-game/api test -- test/integration/tevi-webhook-routes.test.ts` failed before safe webhook request logs existed.
+- GREEN: `npm --workspace @china-slot-game/api test -- test/integration/tevi-webhook-routes.test.ts` passed after adding safe structured logs.
+- `npm --workspace @china-slot-game/api run typecheck` passed after adding safe webhook request logs.
+- `npm --workspace @china-slot-game/api test -- test/integration/tevi-webhook-routes.test.ts test/unit/tevi-client.test.ts test/unit/server-client.test.ts` passed with 27 tests after adding safe webhook request logs.
 
 ### Completion Notes List
 
@@ -185,7 +190,8 @@ GitHub Copilot
 - Preserved local visual demo balance while making production/Tevi reward-bearing startup begin at `0` until backend session balance is available, preventing `defaultCoins:100000` from becoming a real Tevi balance.
 - Added VM-based unit coverage for Tevi SDK conditional loading, SDK-unavailable behavior, safe helper wrappers, script ordering, metadata reporting, and backend-authoritative balance startup expectations.
 - Added `POST /api/webhooks/tevi` as a Story 8.1 registration-only endpoint. It echoes Tevi `challenge` values for sandbox URL verification and rejects non-challenge event payloads with `501 TEVI_WEBHOOK_PROCESSING_NOT_IMPLEMENTED` until later stories add `X-Tevi-Signature` verification and money-path processing.
-- Check Round status: local/demo separation is verified by automated tests. Sandbox app/channel evidence provided: `TEVI_APP_ID=AZX29173`, app URL `https://chinareel.pleagamehub.com/`, Tevi channel ID `2300210851`, channel URL `https://sbx.tevi.dev/@chinaslotgame`. Sandbox webhook URL to register: `https://china-slot-api.onrender.com/api/webhooks/tevi`. Remaining external evidence: portal save/verification with required webhook scopes and in-sandbox `window.TeviJS` console/manual evidence.
+- Added safe structured webhook logs for challenge verification and rejected event payloads so Render can show that Tevi reached the API. Logs include request ID, challenge source/length, event name, and signature-header presence; they do not log payloads, challenge values, signatures, or secrets.
+- Check Round status: local/demo separation is verified by automated tests. Sandbox app/channel evidence provided: `TEVI_APP_ID=AZX29173`, app URL `https://chinareel.pleagamehub.com/`, Tevi channel ID `2300210851`, channel URL `https://sbx.tevi.dev/@chinaslotgame`. Production API challenge evidence confirms `https://china-slot-api.onrender.com/api/webhooks/tevi` is deployed and echoes Tevi challenge values. Remaining external evidence: Tevi portal save/verification with required webhook scopes and in-sandbox `window.TeviJS` console/manual evidence.
 
 ### File List
 
@@ -208,5 +214,7 @@ GitHub Copilot
 - 2026-06-28: Recorded provided Tevi sandbox app ID, app URL, channel ID, and channel URL; webhook registration/scopes and SDK sandbox console evidence remain pending.
 - 2026-06-28: Added verification-only Tevi sandbox webhook registration endpoint at `POST /api/webhooks/tevi`; portal save/scopes and sandbox SDK console evidence remain pending.
 - 2026-06-28: Reviewed Tevi webhook docs and tightened non-challenge webhook behavior to fail closed until signature verification is implemented in a later story.
+- 2026-06-28: Recorded deployed production API webhook challenge verification for `https://china-slot-api.onrender.com/api/webhooks/tevi`; portal save/scopes and sandbox SDK console evidence remain pending.
+- 2026-06-28: Added safe structured Tevi webhook request logs for Render visibility without logging payloads, challenge values, signatures, or secrets.
 
 ## QA Results
