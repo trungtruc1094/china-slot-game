@@ -99,8 +99,21 @@ async function postTeviSession(token?: string): Promise<Response> {
   });
 }
 
+async function postTeviSessionWithAuthorization(authorization: string): Promise<Response> {
+  return fetch(`${baseUrl}/api/tevi/session`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-request-id": "req_tevi_auth_test",
+      authorization
+    },
+    body: JSON.stringify({})
+  });
+}
+
 describe("Tevi authenticated routes", () => {
   it("rejects missing bearer tokens with the standard envelope", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const response = await postTeviSession();
 
     expect(response.status).toBe(401);
@@ -113,6 +126,21 @@ describe("Tevi authenticated routes", () => {
       },
       requestId: "req_tevi_auth_test"
     });
+    expect(warnSpy).toHaveBeenCalledWith("[tevi-auth] authentication rejected", {
+      requestId: "req_tevi_auth_test",
+      provider: "tevi",
+      reasonCode: "TOKEN_MISSING",
+      appIdMatched: undefined
+    });
+    warnSpy.mockRestore();
+  });
+
+  it("accepts bearer auth schemes case-insensitively", async () => {
+    const response = await postTeviSessionWithAuthorization("bearer valid-same-user");
+    const body = await response.json() as ApiEnvelope<SessionResponse>;
+
+    expect(response.status).toBe(201);
+    expect(body.data?.playerId).toMatch(/^player_/);
   });
 
   it("rejects invalid bearer tokens without creating Tevi sessions", async () => {

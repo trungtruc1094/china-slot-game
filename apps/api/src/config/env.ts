@@ -59,7 +59,8 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): ApiEnv {
 }
 
 function parseTeviAuthEnv(source: NodeJS.ProcessEnv): TeviAuthEnv {
-  const enabled = source.TEVI_AUTH_ENABLED === "true" || Boolean(source.TEVI_APP_ID) || Boolean(source.TEVI_JWKS_URL);
+  const explicitlyDisabled = source.TEVI_AUTH_ENABLED === "false";
+  const enabled = !explicitlyDisabled && (source.TEVI_AUTH_ENABLED === "true" || Boolean(source.TEVI_APP_ID) || Boolean(source.TEVI_JWKS_URL));
   if (!enabled) {
     return {
       enabled: false,

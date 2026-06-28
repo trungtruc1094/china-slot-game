@@ -76,6 +76,21 @@ describe("JoseTeviAuthVerifier", () => {
     });
   });
 
+  it("rejects missing Tevi app claims as invalid tokens", async () => {
+    const token = await signTeviToken({
+      user_id: "tevi-user-1",
+      user_is_active: true,
+      user_anonymous: false
+    });
+
+    await expect(verifier.verify(token)).resolves.toMatchObject({
+      ok: false,
+      statusCode: 401,
+      errorCode: "TEVI_TOKEN_INVALID",
+      reasonCode: "APP_ID_MISSING"
+    });
+  });
+
   it("rejects inactive Tevi users", async () => {
     const token = await signTeviToken({
       user_id: "tevi-user-1",
@@ -108,6 +123,21 @@ describe("JoseTeviAuthVerifier", () => {
     });
   });
 
+  it("rejects missing Tevi anonymity claims", async () => {
+    const token = await signTeviToken({
+      user_id: "tevi-user-1",
+      user_is_active: true,
+      app_id: appId
+    });
+
+    await expect(verifier.verify(token)).resolves.toMatchObject({
+      ok: false,
+      statusCode: 401,
+      errorCode: "TEVI_TOKEN_INVALID",
+      reasonCode: "USER_ANONYMITY_MISSING"
+    });
+  });
+
   it("rejects malformed tokens", async () => {
     await expect(verifier.verify("not-a-jwt")).resolves.toMatchObject({
       ok: false,
@@ -134,6 +164,69 @@ describe("JoseTeviAuthVerifier", () => {
       statusCode: 401,
       errorCode: "TEVI_TOKEN_INVALID",
       reasonCode: "TOKEN_ALGORITHM_REJECTED"
+    });
+  });
+
+  it("rejects not-yet-valid tokens with a safe diagnostic code", async () => {
+    const token = await new SignJWT({
+      user_id: "tevi-user-1",
+      user_is_active: true,
+      user_anonymous: false,
+      app_id: appId
+    })
+      .setProtectedHeader({ alg: "RS256", kid: "test-key" })
+      .setIssuedAt(Math.floor(now.getTime() / 1000))
+      .setNotBefore(Math.floor(new Date("2026-06-28T12:30:00.000Z").getTime() / 1000))
+      .setExpirationTime(Math.floor(new Date("2026-06-28T13:00:00.000Z").getTime() / 1000))
+      .sign(privateKey);
+
+    await expect(verifier.verify(token)).resolves.toMatchObject({
+      ok: false,
+      statusCode: 401,
+      errorCode: "TEVI_TOKEN_INVALID",
+      reasonCode: "TOKEN_NOT_YET_VALID"
+    });
+  });
+
+  it("maps JWKS failures to safe verifier rejection", async () => {
+    const jwksFailureVerifier = new JoseTeviAuthVerifier({
+      appId,
+      jwksUrl: "https://sandbox.tevi.example/api/v1/auth/jwks",
+      allowAnonymousUsers: false,
+      jwks: async () => {
+        throw new Error("jwks unavailable");
+      },
+      currentDate: now
+    });
+    const token = await signTeviToken({
+      user_id: "tevi-user-1",
+      user_is_active: true,
+      user_anonymous: false,
+      app_id: appId
+    });
+
+    await expect(jwksFailureVerifier.verify(token)).resolves.toMatchObject({
+      ok: false,
+      statusCode: 401,
+      errorCode: "TEVI_TOKEN_INVALID",
+      reasonCode: "TOKEN_VERIFICATION_FAILED"
+    });
+  });
+
+  it("rejects unusable token expiry ranges", async () => {
+    const token = await signTeviToken({
+      user_id: "tevi-user-1",
+      user_is_active: true,
+      user_anonymous: false,
+      app_id: appId,
+      exp: Number.MAX_SAFE_INTEGER + 1
+    });
+
+    await expect(verifier.verify(token)).resolves.toMatchObject({
+      ok: false,
+      statusCode: 401,
+      errorCode: "TEVI_TOKEN_INVALID",
+      reasonCode: "TOKEN_EXPIRY_INVALID"
     });
   });
 

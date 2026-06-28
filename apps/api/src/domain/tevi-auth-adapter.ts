@@ -21,10 +21,14 @@ export type TeviAuthFailureReason =
   | "TOKEN_ALGORITHM_REJECTED"
   | "TOKEN_VERIFICATION_FAILED"
   | "APP_ID_MISMATCH"
+  | "APP_ID_MISSING"
   | "USER_ID_MISSING"
   | "USER_INACTIVE"
+  | "USER_ANONYMITY_MISSING"
   | "ANONYMOUS_USER_BLOCKED"
-  | "TOKEN_EXPIRY_MISSING";
+  | "TOKEN_EXPIRY_MISSING"
+  | "TOKEN_EXPIRY_INVALID"
+  | "TOKEN_NOT_YET_VALID";
 
 export type TeviAuthResult = TeviAuthSuccess | TeviAuthFailure;
 
@@ -88,6 +92,10 @@ export class JoseTeviAuthVerifier implements TeviAuthVerifier {
       return mapJoseError(error);
     }
 
+    if (typeof payload.app_id !== "string" || payload.app_id.trim().length === 0) {
+      return tokenInvalid("APP_ID_MISSING");
+    }
+
     if (payload.app_id !== this.options.appId) {
       return {
         ok: false,
@@ -106,7 +114,11 @@ export class JoseTeviAuthVerifier implements TeviAuthVerifier {
       };
     }
 
-    if (payload.user_anonymous === true && !this.options.allowAnonymousUsers) {
+    if (typeof payload.user_anonymous !== "boolean") {
+      return tokenInvalid("USER_ANONYMITY_MISSING");
+    }
+
+    if (payload.user_anonymous && !this.options.allowAnonymousUsers) {
       return {
         ok: false,
         statusCode: 403,
@@ -123,10 +135,19 @@ export class JoseTeviAuthVerifier implements TeviAuthVerifier {
       return tokenInvalid("TOKEN_EXPIRY_MISSING");
     }
 
+    if (!Number.isSafeInteger(payload.exp)) {
+      return tokenInvalid("TOKEN_EXPIRY_INVALID");
+    }
+
+    const expiresAt = new Date(payload.exp * 1000);
+    if (Number.isNaN(expiresAt.getTime())) {
+      return tokenInvalid("TOKEN_EXPIRY_INVALID");
+    }
+
     const context: TeviAuthContext = {
       provider: "tevi",
       subject: payload.user_id.trim(),
-      expiresAt: new Date(payload.exp * 1000).toISOString()
+      expiresAt: expiresAt.toISOString()
     };
     if (typeof payload.user_name === "string" && payload.user_name.trim().length > 0) {
       context.displayName = payload.user_name.trim();
@@ -156,11 +177,21 @@ function mapJoseError(error: unknown): TeviAuthFailure {
     return tokenInvalid("TOKEN_ALGORITHM_REJECTED");
   }
 
+  if (code === "ERR_JWT_CLAIM_VALIDATION_FAILED" && getJoseClaim(error) === "nbf") {
+    return tokenInvalid("TOKEN_NOT_YET_VALID");
+  }
+
   if (code === "ERR_JWS_INVALID" || code === "ERR_JWT_INVALID") {
     return tokenInvalid("TOKEN_MALFORMED");
   }
 
   return tokenInvalid("TOKEN_VERIFICATION_FAILED");
+}
+
+function getJoseClaim(error: unknown): string | undefined {
+  return typeof error === "object" && error !== null && "claim" in error && typeof error.claim === "string"
+    ? error.claim
+    : undefined;
 }
 
 function tokenInvalid(reasonCode: TeviAuthFailureReason): TeviAuthFailure {

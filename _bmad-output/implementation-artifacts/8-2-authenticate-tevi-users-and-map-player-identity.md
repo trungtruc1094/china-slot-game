@@ -4,7 +4,7 @@ baseline_commit: 5f69b4f
 
 # Story 8.2: Authenticate Tevi Users and Map Player Identity
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -277,3 +277,14 @@ GitHub Copilot
 - 2026-06-28: Full validation gate passed and story marked ready for review.
 
 ## QA Results
+
+### Review Findings
+
+- [x] [Review][Patch] Require `user_anonymous` to be an explicit boolean decision claim [apps/api/src/domain/tevi-auth-adapter.ts]
+- [x] [Review][Patch] Guard token expiry conversion against invalid numeric ranges [apps/api/src/domain/tevi-auth-adapter.ts]
+- [x] [Review][Patch] Honor explicit `TEVI_AUTH_ENABLED=false` over leftover Tevi env vars [apps/api/src/config/env.ts]
+- [x] [Review][Patch] Parse bearer auth scheme case-insensitively [apps/api/src/middleware/tevi-auth.ts]
+- [x] [Review][Patch] Add JWKS fetch failure coverage for safe verifier rejection [apps/api/test/unit/tevi-auth-adapter.test.ts]
+- [x] [Review][Patch] Add not-yet-valid JWT coverage and safe reason mapping [apps/api/src/domain/tevi-auth-adapter.ts]
+- [x] [Review][Patch] Log missing bearer token rejections with request ID and safe reason [apps/api/src/middleware/tevi-auth.ts]
+- [x] [Review][Patch] Treat missing or malformed `app_id` as invalid token, not wrong app [apps/api/src/domain/tevi-auth-adapter.ts]

@@ -92,6 +92,19 @@ describe("loadEnv", () => {
     });
   });
 
+  it("lets an explicit Tevi auth disabled flag override leftover Tevi settings", () => {
+    expect(loadEnv({
+      TEVI_AUTH_ENABLED: "false",
+      TEVI_APP_ID: "AZX29173",
+      TEVI_JWKS_URL: "https://sandbox.tevi.example/api/v1/auth/jwks"
+    })).toMatchObject({
+      teviAuth: {
+        enabled: false,
+        allowAnonymousUsers: false
+      }
+    });
+  });
+
   it("rejects invalid Tevi JWKS URLs", () => {
     expect(() => loadEnv({
       TEVI_AUTH_ENABLED: "true",

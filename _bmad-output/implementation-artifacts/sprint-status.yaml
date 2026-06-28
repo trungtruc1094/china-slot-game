@@ -1,5 +1,5 @@
 # generated: 2026-06-27T21:00:32+0700
-# last_updated: 2026-06-28T22:11:27+0700
+# last_updated: 2026-06-28T23:10:30+0700
 # project: China Slot Game
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-06-27T21:00:32+0700"
-last_updated: "2026-06-28T22:11:27+0700"
+last_updated: "2026-06-28T23:10:30+0700"
 project: "China Slot Game"
 project_key: NOKEY
 tracking_system: file-system
@@ -106,7 +106,7 @@ development_status:
 
   epic-8: in-progress
   8-1-launch-tevi-mini-app-sandbox-shell: done
-  8-2-authenticate-tevi-users-and-map-player-identity: review
+  8-2-authenticate-tevi-users-and-map-player-identity: done
   8-3-exchange-and-refresh-tevi-tokens: backlog
   8-4-issue-backend-top-up-signatures: backlog
   8-5-run-sdk-top-up-with-pending-wallet-state: backlog

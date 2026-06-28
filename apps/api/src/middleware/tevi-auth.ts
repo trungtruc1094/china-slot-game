@@ -2,7 +2,7 @@ import type { NextFunction, Request, RequestHandler, Response } from "express";
 import { ApiHttpError } from "./error-handler.js";
 import type { TeviAuthContext, TeviAuthFailure, TeviAuthVerifier } from "../domain/tevi-auth-adapter.js";
 
-const bearerPrefix = "Bearer ";
+const bearerPattern = /^Bearer\s+(.+)$/i;
 
 declare module "express-serve-static-core" {
   interface Request {
@@ -14,6 +14,12 @@ export function createTeviAuthMiddleware(verifier: TeviAuthVerifier): RequestHan
   return async (request: Request, _response: Response, next: NextFunction): Promise<void> => {
     const token = extractBearerToken(request.header("authorization"));
     if (!token) {
+      console.warn("[tevi-auth] authentication rejected", {
+        requestId: request.requestId,
+        provider: "tevi",
+        reasonCode: "TOKEN_MISSING",
+        appIdMatched: undefined
+      });
       next(new ApiHttpError(401, {
         code: "TEVI_AUTH_REQUIRED",
         message: "A valid Tevi bearer token is required.",
@@ -44,11 +50,12 @@ export function createTeviAuthMiddleware(verifier: TeviAuthVerifier): RequestHan
 }
 
 function extractBearerToken(headerValue: string | undefined): string | null {
-  if (!headerValue?.startsWith(bearerPrefix)) {
+  const match = bearerPattern.exec(headerValue ?? "");
+  if (!match) {
     return null;
   }
 
-  const token = headerValue.slice(bearerPrefix.length).trim();
+  const token = match[1]?.trim() ?? "";
   return token.length > 0 ? token : null;
 }
 
