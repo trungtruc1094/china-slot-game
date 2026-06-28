@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 interface TeviClientApi {
   createFromWindow: () => TeviClient;
@@ -12,6 +12,7 @@ interface TeviClientApi {
 interface TeviClient {
   initialize: () => Promise<TeviCallResult>;
   getState: () => TeviState;
+  getUserAppToken: (options?: { isPopup?: boolean; timeoutMs?: number }) => Promise<TeviAuthTokenResult>;
   isTeviMode: () => boolean;
   isSdkAvailable: () => boolean;
   showBackButton: () => TeviCallResult;
@@ -46,6 +47,13 @@ interface TeviCallResult {
   reason?: string;
 }
 
+interface TeviAuthTokenResult {
+  ok: boolean;
+  runtimeToken?: string;
+  status: string;
+  reason?: string;
+}
+
 interface MockScriptElement {
   async?: boolean;
   src?: string;
@@ -58,6 +66,8 @@ interface MockScriptElement {
 interface TeviSandbox {
   window: Record<string, unknown>;
   globalThis: Record<string, unknown>;
+  setTimeout: typeof setTimeout;
+  clearTimeout: typeof clearTimeout;
   document?: {
     createElement: (tagName: string) => MockScriptElement;
     querySelector: (selector: string) => MockScriptElement | null;
@@ -78,6 +88,8 @@ function loadRuntimeAndTeviClient(overrides: Partial<TeviSandbox> = {}): TeviSan
   const sandbox: TeviSandbox = {
     window: windowObject,
     globalThis: windowObject,
+    setTimeout,
+    clearTimeout,
     URLSearchParams,
     ...overrides
   };
@@ -270,5 +282,71 @@ describe("browser Tevi client", () => {
       appUrl: "https://mini.example.test/app",
       webhookUrl: "https://api.example.test/webhooks/tevi"
     });
+  });
+
+  it("gets a Tevi runtime user app token through the SDK without exposing it in debug state", async () => {
+    const sandbox = loadRuntimeAndTeviClient({
+      window: {
+        CHINA_SLOT_TEVI_MODE: true,
+        TeviJS: {
+          getUserInfo: (_request: unknown, callback: (response: unknown) => void) => callback({
+            data: { userInfo: { user_app_token: "runtime-token-secret" } }
+          })
+        }
+      }
+    });
+    const api = sandbox.window.ChinaSlotTeviClient as TeviClientApi;
+    const client = api.createFromWindow();
+
+    await expect(client.getUserAppToken({ isPopup: true })).resolves.toEqual({
+      ok: true,
+      status: "authenticated",
+      runtimeToken: "runtime-token-secret"
+    });
+    expect(JSON.stringify(client.getState())).not.toContain("runtime-token-secret");
+  });
+
+  it.each([
+    ["sdk unavailable", {}, "sdk-unavailable"],
+    ["missing method", { TeviJS: {} }, "method-unavailable"],
+    ["canceled", { TeviJS: { getUserInfo: (_request: unknown, callback: (response: unknown) => void) => callback({ error: { code: "CANCELLED" } }) } }, "user-cancelled"],
+    ["missing token", { TeviJS: { getUserInfo: (_request: unknown, callback: (response: unknown) => void) => callback({ data: { userInfo: {} } }) } }, "token-missing"]
+  ])("normalizes Tevi getUserInfo %s as a recoverable state", async (_caseName, windowOverrides, reason) => {
+    const sandbox = loadRuntimeAndTeviClient({
+      window: {
+        CHINA_SLOT_TEVI_MODE: true,
+        ...windowOverrides
+      }
+    });
+    const api = sandbox.window.ChinaSlotTeviClient as TeviClientApi;
+
+    await expect(api.createFromWindow().getUserAppToken()).resolves.toMatchObject({
+      ok: false,
+      status: "re-authentication-required",
+      reason
+    });
+  });
+
+  it("times out when Tevi getUserInfo never calls back", async () => {
+    vi.useFakeTimers();
+    const sandbox = loadRuntimeAndTeviClient({
+      window: {
+        CHINA_SLOT_TEVI_MODE: true,
+        TeviJS: {
+          getUserInfo: () => undefined
+        }
+      }
+    });
+    const api = sandbox.window.ChinaSlotTeviClient as TeviClientApi;
+    const tokenRequest = api.createFromWindow().getUserAppToken({ timeoutMs: 25 });
+
+    await vi.advanceTimersByTimeAsync(25);
+
+    await expect(tokenRequest).resolves.toMatchObject({
+      ok: false,
+      status: "re-authentication-required",
+      reason: "sdk-timeout"
+    });
+    vi.useRealTimers();
   });
 });

@@ -9,6 +9,10 @@ interface ServerClientApi {
     mode?: "production" | "demo";
     apiBaseUrl: string;
     identity: { provider: string; subject: string };
+    teviClient?: {
+      isTeviMode: () => boolean;
+      getUserAppToken: () => Promise<{ ok: boolean; runtimeToken?: string; status: string; reason?: string }>;
+    };
     fetch: (url: string, init: { method: string; headers: Record<string, string>; body: string }) => Promise<MockResponse>;
   }) => {
     startSession: () => Promise<{ sessionId: string; playerId: string; balance?: { points: number } } | null>;
@@ -254,6 +258,102 @@ describe("browser server client render contract", () => {
       { sessionId: "sess_123", playerId: "player_123", balance: { points: 875 } },
       { sessionId: "sess_123", playerId: "player_123", balance: { points: 875 } }
     ]);
+  });
+
+  it("exchanges Tevi runtime auth for an internal session while preserving request coalescing", async () => {
+    const client = loadServerClient();
+    const requests: Array<{ url: string; body: unknown }> = [];
+    let tokenRequests = 0;
+    let sdkTokenRequests = 0;
+    let resolveSdkToken: (value: { ok: boolean; runtimeToken?: string; status: string }) => void = () => undefined;
+    let resolveTokenExchange: (response: MockResponse) => void = () => undefined;
+    let resolveTokenRequestStarted: () => void = () => undefined;
+    const tokenRequestStarted = new Promise<void>((resolve) => {
+      resolveTokenRequestStarted = resolve;
+    });
+    const fetchMock = async (url: string, init: { body: string }): Promise<MockResponse> => {
+      requests.push({ url, body: JSON.parse(init.body) as unknown });
+      if (url.endsWith("/api/tevi/token")) {
+        tokenRequests += 1;
+        resolveTokenRequestStarted();
+        return new Promise((resolve) => {
+          resolveTokenExchange = resolve;
+        });
+      }
+
+      throw new Error("unexpected request");
+    };
+
+    const backendClient = client.createBackendClient({
+      mode: "production",
+      apiBaseUrl: "https://api.example.test",
+      identity: { provider: "guest", subject: "browser-player" },
+      teviClient: {
+        isTeviMode: () => true,
+        getUserAppToken: async () => {
+          sdkTokenRequests += 1;
+          return new Promise((resolve) => {
+            resolveSdkToken = resolve;
+          });
+        }
+      },
+      fetch: fetchMock
+    });
+
+    const firstSession = backendClient.startSession();
+    const secondSession = backendClient.startSession();
+    expect(sdkTokenRequests).toBe(1);
+    resolveSdkToken({ ok: true, status: "authenticated", runtimeToken: "runtime-token-secret" });
+    await tokenRequestStarted;
+    expect(tokenRequests).toBe(1);
+    resolveTokenExchange({
+      ok: true,
+      status: 201,
+      json: async () => ({
+        data: {
+          status: "authenticated",
+          reauthRequired: false,
+          session: { sessionId: "sess_tevi", playerId: "player_tevi", balance: { points: 875 } }
+        },
+        error: null,
+        requestId: "req_tevi_token_test"
+      })
+    });
+
+    await expect(Promise.all([firstSession, secondSession])).resolves.toEqual([
+      { sessionId: "sess_tevi", playerId: "player_tevi", balance: { points: 875 } },
+      { sessionId: "sess_tevi", playerId: "player_tevi", balance: { points: 875 } }
+    ]);
+    expect(requests).toEqual([{ url: "https://api.example.test/api/tevi/token", body: { runtimeToken: "runtime-token-secret" } }]);
+  });
+
+  it("surfaces Tevi re-authentication as retry state instead of creating a guest session", async () => {
+    const client = loadServerClient();
+    const requests: string[] = [];
+    const backendClient = client.createBackendClient({
+      mode: "production",
+      apiBaseUrl: "https://api.example.test",
+      identity: { provider: "guest", subject: "browser-player" },
+      teviClient: {
+        isTeviMode: () => true,
+        getUserAppToken: async () => ({ ok: false, status: "re-authentication-required", reason: "user-cancelled" })
+      },
+      fetch: async (url: string): Promise<MockResponse> => {
+        requests.push(url);
+        return { ok: true, status: 200, json: async () => ({ data: {}, error: null }) };
+      }
+    });
+
+    await expect(backendClient.spin({
+      clientSpinId: "client-spin-reauth",
+      wager: { lineBet: 1, selectedWays: 243, totalWager: 243 }
+    })).resolves.toMatchObject({
+      status: "retry",
+      retryable: true,
+      message: "Reward-bearing play is paused while the backend is unavailable."
+    });
+    expect(requests).toEqual([]);
+    expect(backendClient.status).toBe("retry");
   });
 
   it("propagates browser correlation IDs to session and spin backend requests", async () => {

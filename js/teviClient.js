@@ -86,6 +86,57 @@
         }
     }
 
+    function getUserAppToken(config, options) {
+        var sdk = getSdk();
+        if (!sdk) return Promise.resolve(reauthState("sdk-unavailable"));
+        if (typeof sdk.getUserInfo !== "function") return Promise.resolve(reauthState("method-unavailable"));
+
+        return new Promise(function (resolve) {
+            var settled = false;
+            var timeoutMs = options && typeof options.timeoutMs === "number" ? options.timeoutMs : 10000;
+            var timeoutId = setTimeout(function () {
+                complete(reauthState("sdk-timeout"));
+            }, timeoutMs);
+
+            function complete(result) {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timeoutId);
+                resolve(result);
+            }
+
+            try {
+                sdk.getUserInfo({
+                    is_popup: options && options.isPopup === true,
+                    app_id: config.appId
+                }, function (response) {
+                    var runtimeToken = response
+                        && response.data
+                        && response.data.userInfo
+                        && response.data.userInfo.user_app_token;
+
+                    if (typeof runtimeToken === "string" && runtimeToken.length > 0) {
+                        complete({ ok: true, status: "authenticated", runtimeToken: runtimeToken });
+                        return;
+                    }
+
+                    complete(reauthState(isCancellation(response) ? "user-cancelled" : "token-missing"));
+                });
+            } catch (_error) {
+                complete(reauthState("sdk-call-failed"));
+            }
+        });
+    }
+
+    function isCancellation(response) {
+        var code = response && response.error && response.error.code;
+        return code === "CANCELLED" || code === "CANCELED" || code === "USER_CANCELLED";
+    }
+
+    function reauthState(reason) {
+        return { ok: false, status: "re-authentication-required", reason: reason };
+    }
+
     function loadSdkScript(config) {
         if (!config.enabled) return Promise.resolve({ available: false, reason: "tevi-mode-disabled" });
         if (getSdk()) return Promise.resolve({ available: true, reason: "sdk-present" });
@@ -190,6 +241,7 @@
             },
             isTeviMode: function () { return config.enabled; },
             isSdkAvailable: function () { return !!getSdk(); },
+            getUserAppToken: function (options) { return getUserAppToken(config, options || {}); },
             showBackButton: function () { return callSdkMethod("showBackButton"); },
             showCloseButton: function () { return callSdkMethod("showCloseButton"); },
             loadConfig: function () { return callSdkMethod("loadConfig"); },

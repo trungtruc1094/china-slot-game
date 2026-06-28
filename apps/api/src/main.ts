@@ -3,6 +3,7 @@ import { createApp } from "./app.js";
 import { loadEnv } from "./config/env.js";
 import { createProductionDependencies, shouldUsePostgresPersistence } from "./composition/production-dependencies.js";
 import { JoseTeviAuthVerifier } from "./domain/tevi-auth-adapter.js";
+import { TeviTokenService } from "./domain/tevi-token-service.js";
 
 const env = loadEnv();
 let productionDependencies: Awaited<ReturnType<typeof createProductionDependencies>> | undefined;
@@ -21,7 +22,13 @@ try {
 }
 const appDependencies = productionDependencies?.appDependencies ?? {};
 const app = createApp(env.teviAuth.enabled
-  ? { ...appDependencies, teviAuthVerifier: new JoseTeviAuthVerifier(env.teviAuth) }
+  ? {
+      ...appDependencies,
+      teviAuthVerifier: new JoseTeviAuthVerifier(env.teviAuth),
+      ...(env.teviAuth.tokenExchange.enabled
+        ? { teviTokenService: new TeviTokenService({ appId: env.teviAuth.appId, apiBase: env.teviAuth.tokenExchange.apiBase }) }
+        : {})
+    }
   : appDependencies);
 const server = createServer(app);
 let shutdownStarted = false;

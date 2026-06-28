@@ -21,6 +21,18 @@ export interface TeviAuthEnabledEnv {
   appId: string;
   jwksUrl: string;
   allowAnonymousUsers: boolean;
+  tokenExchange: TeviTokenExchangeEnv;
+}
+
+export type TeviTokenExchangeEnv = TeviTokenExchangeDisabledEnv | TeviTokenExchangeEnabledEnv;
+
+export interface TeviTokenExchangeDisabledEnv {
+  enabled: false;
+}
+
+export interface TeviTokenExchangeEnabledEnv {
+  enabled: true;
+  apiBase: string;
 }
 
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): ApiEnv {
@@ -48,7 +60,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): ApiEnv {
     port: parsedPort,
     persistenceMode,
     budgetProtectionEnabled: source.BUDGET_PROTECTION_ENABLED !== "false",
-    teviAuth: parseTeviAuthEnv(source)
+    teviAuth: parseTeviAuthEnv(source, nodeEnv)
   };
 
   if (databaseUrl) {
@@ -58,7 +70,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): ApiEnv {
   return env;
 }
 
-function parseTeviAuthEnv(source: NodeJS.ProcessEnv): TeviAuthEnv {
+function parseTeviAuthEnv(source: NodeJS.ProcessEnv, nodeEnv: string): TeviAuthEnv {
   const explicitlyDisabled = source.TEVI_AUTH_ENABLED === "false";
   const enabled = !explicitlyDisabled && (source.TEVI_AUTH_ENABLED === "true" || Boolean(source.TEVI_APP_ID) || Boolean(source.TEVI_JWKS_URL));
   if (!enabled) {
@@ -83,20 +95,48 @@ function parseTeviAuthEnv(source: NodeJS.ProcessEnv): TeviAuthEnv {
     enabled: true,
     appId,
     jwksUrl,
-    allowAnonymousUsers: source.TEVI_ALLOW_ANONYMOUS_USERS === "true"
+    allowAnonymousUsers: source.TEVI_ALLOW_ANONYMOUS_USERS === "true",
+    tokenExchange: parseTeviTokenExchangeEnv(source, nodeEnv)
+  };
+}
+
+function parseTeviTokenExchangeEnv(source: NodeJS.ProcessEnv, nodeEnv: string): TeviTokenExchangeEnv {
+  if (source.TEVI_TOKEN_EXCHANGE_ENABLED === "false") {
+    return { enabled: false };
+  }
+
+  const rawApiBase = source.TEVI_API_BASE?.trim();
+  if (!rawApiBase && nodeEnv !== "development" && nodeEnv !== "test") {
+    throw new Error("TEVI_API_BASE is required when Tevi token exchange is enabled outside development/test");
+  }
+
+  const apiBase = rawApiBase ?? "https://developer-api.sbx.tevi.dev";
+  validateTeviApiBase(apiBase);
+
+  return {
+    enabled: true,
+    apiBase
   };
 }
 
 function validateTeviJwksUrl(rawUrl: string): void {
+  validateHttpsUrl(rawUrl, "TEVI_JWKS_URL");
+}
+
+function validateTeviApiBase(rawUrl: string): void {
+  validateHttpsUrl(rawUrl, "TEVI_API_BASE");
+}
+
+function validateHttpsUrl(rawUrl: string, name: string): void {
   let parsedUrl: URL;
   try {
     parsedUrl = new URL(rawUrl);
   } catch {
-    throw new Error("TEVI_JWKS_URL must be a valid HTTPS URL");
+    throw new Error(`${name} must be a valid HTTPS URL`);
   }
 
   if (parsedUrl.protocol !== "https:" || !parsedUrl.hostname) {
-    throw new Error("TEVI_JWKS_URL must be a valid HTTPS URL");
+    throw new Error(`${name} must be a valid HTTPS URL`);
   }
 }
 

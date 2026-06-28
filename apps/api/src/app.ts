@@ -17,6 +17,7 @@ import { createAdminSpinLedgerRouter } from "./routes/admin-spin-ledger.routes.j
 import { createSessionsRouter } from "./routes/sessions.routes.js";
 import { createSpinsRouter } from "./routes/spins.routes.js";
 import { createTeviSessionRouter } from "./routes/tevi-session.routes.js";
+import { createTeviTokenRouter } from "./routes/tevi-token.routes.js";
 import { createTeviWebhookRouter } from "./routes/tevi-webhook.routes.js";
 import { InMemoryPlayerIdentityAdapter } from "./domain/player-identity.js";
 import { InMemoryGameConfigurationRepository, type GameConfigurationProvider, type GameConfigurationRepository } from "./domain/game-configuration-repository.js";
@@ -34,6 +35,7 @@ import { InMemoryAdminAuditRepository, type AdminAuditRepository } from "./domai
 import { InMemoryRequestTraceRepository, type RequestTraceRepository } from "./domain/request-trace-repository.js";
 import { seedActiveConfigForDeployment } from "./config/seed-active-config.js";
 import type { TeviAuthVerifier } from "./domain/tevi-auth-adapter.js";
+import type { TeviTokenServicePort } from "./domain/tevi-token-service.js";
 
 export interface AppDependencies {
   clock?: Clock;
@@ -52,6 +54,7 @@ export interface AppDependencies {
   adminAuditRepository?: AdminAuditRepository;
   requestTraceRepository?: RequestTraceRepository;
   teviAuthVerifier?: TeviAuthVerifier;
+  teviTokenService?: TeviTokenServicePort;
   readinessCheck?: () => Promise<Record<string, "ready">>;
 }
 
@@ -131,6 +134,12 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use("/api", createAdminSpinLedgerRouter(spinService, adminAuditRepository));
   app.use("/api", createAdminMetricsRouter(metricsService));
   app.use("/api", createTeviWebhookRouter());
+  if (dependencies.teviTokenService) {
+    const teviTokenRouterOptions = dependencies.teviAuthVerifier
+      ? { sessionService, verifier: dependencies.teviAuthVerifier }
+      : {};
+    app.use("/api", createTeviTokenRouter(dependencies.teviTokenService, teviTokenRouterOptions));
+  }
   if (dependencies.teviAuthVerifier) {
     app.use("/api", createTeviSessionRouter(sessionService, dependencies.teviAuthVerifier));
   }

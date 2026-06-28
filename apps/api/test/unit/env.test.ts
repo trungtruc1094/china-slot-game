@@ -92,6 +92,74 @@ describe("loadEnv", () => {
     });
   });
 
+  it("parses Tevi token exchange configuration with a sandbox HTTPS default", () => {
+    expect(loadEnv({
+      TEVI_AUTH_ENABLED: "true",
+      TEVI_APP_ID: "AZX29173",
+      TEVI_JWKS_URL: "https://sandbox.tevi.example/api/v1/auth/jwks"
+    })).toMatchObject({
+      teviAuth: {
+        enabled: true,
+        appId: "AZX29173",
+        jwksUrl: "https://sandbox.tevi.example/api/v1/auth/jwks",
+        tokenExchange: {
+          enabled: true,
+          apiBase: "https://developer-api.sbx.tevi.dev"
+        }
+      }
+    });
+  });
+
+  it("allows Tevi token exchange to be explicitly disabled", () => {
+    expect(loadEnv({
+      TEVI_AUTH_ENABLED: "true",
+      TEVI_APP_ID: "AZX29173",
+      TEVI_JWKS_URL: "https://sandbox.tevi.example/api/v1/auth/jwks",
+      TEVI_TOKEN_EXCHANGE_ENABLED: "false"
+    })).toMatchObject({
+      teviAuth: {
+        enabled: true,
+        tokenExchange: {
+          enabled: false
+        }
+      }
+    });
+  });
+
+  it("requires explicit HTTPS Tevi API base outside local/test token exchange defaults", () => {
+    expect(() => loadEnv({
+      NODE_ENV: "production",
+      DATABASE_URL: "postgres://user:pass@localhost:5432/china_slot_test",
+      TEVI_AUTH_ENABLED: "true",
+      TEVI_APP_ID: "AZX29173",
+      TEVI_JWKS_URL: "https://sandbox.tevi.example/api/v1/auth/jwks"
+    })).toThrow("TEVI_API_BASE is required when Tevi token exchange is enabled outside development/test");
+
+    expect(() => loadEnv({
+      TEVI_AUTH_ENABLED: "true",
+      TEVI_APP_ID: "AZX29173",
+      TEVI_JWKS_URL: "https://sandbox.tevi.example/api/v1/auth/jwks",
+      TEVI_API_BASE: "http://developer-api.sbx.tevi.dev"
+    })).toThrow("TEVI_API_BASE must be a valid HTTPS URL");
+
+    expect(loadEnv({
+      NODE_ENV: "production",
+      DATABASE_URL: "postgres://user:pass@localhost:5432/china_slot_test",
+      TEVI_AUTH_ENABLED: "true",
+      TEVI_APP_ID: "AZX29173",
+      TEVI_JWKS_URL: "https://sandbox.tevi.example/api/v1/auth/jwks",
+      TEVI_API_BASE: "https://developer-api.flowstreamx.com"
+    })).toMatchObject({
+      teviAuth: {
+        enabled: true,
+        tokenExchange: {
+          enabled: true,
+          apiBase: "https://developer-api.flowstreamx.com"
+        }
+      }
+    });
+  });
+
   it("lets an explicit Tevi auth disabled flag override leftover Tevi settings", () => {
     expect(loadEnv({
       TEVI_AUTH_ENABLED: "false",

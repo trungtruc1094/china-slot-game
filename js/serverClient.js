@@ -162,6 +162,7 @@
         var fetchImpl = settings.fetch || globalScope.fetch;
         var storage = settings.storage || globalScope.localStorage;
         var identity = settings.identity || createBrowserIdentity(storage);
+        var teviClient = settings.teviClient || null;
         var session = null;
         var sessionRequest = null;
         var status = mode === "production" ? "idle" : "demo";
@@ -193,7 +194,7 @@
             if (sessionRequest) return sessionRequest;
 
             status = "pending";
-            sessionRequest = postJson("/api/sessions", { identity: identity }).then(function (createdSession) {
+            sessionRequest = (isTeviSessionMode() ? startTeviSession() : postJson("/api/sessions", { identity: identity })).then(function (createdSession) {
                 session = createdSession;
                 status = "ready";
                 return session;
@@ -202,6 +203,27 @@
                 throw error;
             });
             return sessionRequest;
+        }
+
+        async function startTeviSession() {
+            var tokenResult = await teviClient.getUserAppToken();
+            if (!tokenResult || !tokenResult.ok || !tokenResult.runtimeToken) {
+                var error = new Error("Tevi re-authentication is required.");
+                error.code = "TEVI_REAUTH_REQUIRED";
+                throw error;
+            }
+
+            var exchangeResult = await postJson("/api/tevi/token", { runtimeToken: tokenResult.runtimeToken });
+            if (!exchangeResult || !exchangeResult.session) {
+                var sessionError = new Error("Tevi session response is missing session data.");
+                sessionError.code = "TEVI_REAUTH_REQUIRED";
+                throw sessionError;
+            }
+            return exchangeResult.session;
+        }
+
+        function isTeviSessionMode() {
+            return teviClient && typeof teviClient.isTeviMode === "function" && teviClient.isTeviMode();
         }
 
         async function spin(request) {

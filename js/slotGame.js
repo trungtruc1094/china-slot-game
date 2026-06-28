@@ -196,8 +196,8 @@ class SlotGame extends Phaser.Scene{
 
 
         // 4) main objects
-        this.serverClient = (window.ChinaSlotServerClient) ? window.ChinaSlotServerClient.createFromWindow() : null;
         this.teviClient = (window.ChinaSlotTeviClient) ? window.ChinaSlotTeviClient.createFromWindow() : null;
+        this.serverClient = (window.ChinaSlotServerClient) ? window.ChinaSlotServerClient.createFromWindow({ teviClient: this.teviClient }) : null;
         this.teviInitializationStatus = (this.teviClient && this.teviClient.isTeviMode()) ? "idle" : "local";
         this.slotPlayer = new SlotPlayer(this.resolveInitialPlayerCoins(slotConfig.defaultCoins));
         this.reels = slotConfig.createReels(this);
