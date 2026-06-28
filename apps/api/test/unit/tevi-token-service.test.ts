@@ -9,9 +9,14 @@ const config = {
 describe("TeviTokenService", () => {
   it("exchanges a runtime token through the configured Tevi auth endpoint", async () => {
     const fetchImpl = vi.fn(async () => new Response(JSON.stringify({
-      access_token: "provider-access-token",
-      refresh_token: "provider-refresh-token",
-      expires_in: 86400
+      success: true,
+      data: {
+        access_token: "provider-access-token",
+        refresh_token: "provider-refresh-token",
+        expires_in: 86400
+      },
+      message: "Success",
+      error_code: null
     }), { status: 200, headers: { "content-type": "application/json" } }));
     const service = new TeviTokenService(config, { fetchImpl });
 
@@ -28,6 +33,20 @@ describe("TeviTokenService", () => {
         headers: { authorization: "Bearer runtime-token" }
       })
     );
+  });
+
+  it("keeps flat token responses as a sandbox compatibility fallback", async () => {
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({
+      access_token: "provider-access-token",
+      refresh_token: "provider-refresh-token"
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+    const service = new TeviTokenService(config, { fetchImpl });
+
+    await expect(service.exchangeRuntimeToken("runtime-token", "req_exchange_flat_success")).resolves.toEqual({
+      ok: true,
+      accessToken: "provider-access-token",
+      refreshToken: "provider-refresh-token"
+    });
   });
 
   it.each([
@@ -111,9 +130,14 @@ describe("TeviTokenService", () => {
 
   it("refreshes an access token through the configured Tevi auth endpoint", async () => {
     const fetchImpl = vi.fn(async () => new Response(JSON.stringify({
-      access_token: "provider-refreshed-access-token",
-      refresh_token: "provider-rotated-refresh-token",
-      expires_in: 86400
+      success: true,
+      data: {
+        access_token: "provider-refreshed-access-token",
+        refresh_token: "provider-rotated-refresh-token",
+        expires_in: 86400
+      },
+      message: "Success",
+      error_code: null
     }), { status: 200, headers: { "content-type": "application/json" } }));
     const service = new TeviTokenService(config, { fetchImpl });
 

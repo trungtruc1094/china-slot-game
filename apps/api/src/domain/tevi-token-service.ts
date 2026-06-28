@@ -37,6 +37,25 @@ const tokenResponseSchema = z.object({
   expires_in: z.number().positive().optional()
 });
 
+const tokenEnvelopeResponseSchema = z.object({
+  success: z.literal(true).optional(),
+  data: tokenResponseSchema
+});
+
+function parseTokenResponse(rawBody: unknown): z.infer<typeof tokenResponseSchema> | undefined {
+  const parsedEnvelope = tokenEnvelopeResponseSchema.safeParse(rawBody);
+  if (parsedEnvelope.success) {
+    return parsedEnvelope.data.data;
+  }
+
+  const parsedFlatBody = tokenResponseSchema.safeParse(rawBody);
+  if (parsedFlatBody.success) {
+    return parsedFlatBody.data;
+  }
+
+  return undefined;
+}
+
 export class TeviTokenService implements TeviTokenServicePort {
   private readonly fetchImpl: typeof fetch;
   private readonly clock: { now: () => Date };
@@ -109,8 +128,8 @@ export class TeviTokenService implements TeviTokenServicePort {
       };
     }
 
-    const parsedBody = tokenResponseSchema.safeParse(rawBody);
-    if (!parsedBody.success) {
+    const parsedBody = parseTokenResponse(rawBody);
+    if (!parsedBody) {
       this.logFailure(requestId, "PROVIDER_RESPONSE_INVALID", response.status);
       return {
         ok: false,
@@ -122,11 +141,11 @@ export class TeviTokenService implements TeviTokenServicePort {
 
     const result: TeviTokenExchangeSuccess = {
       ok: true,
-      accessToken: parsedBody.data.access_token,
-      refreshToken: parsedBody.data.refresh_token
+      accessToken: parsedBody.access_token,
+      refreshToken: parsedBody.refresh_token
     };
-    if (parsedBody.data.expires_in) {
-      result.expiresAt = new Date(this.clock.now().getTime() + parsedBody.data.expires_in * 1000).toISOString();
+    if (parsedBody.expires_in) {
+      result.expiresAt = new Date(this.clock.now().getTime() + parsedBody.expires_in * 1000).toISOString();
     }
 
     return result;
