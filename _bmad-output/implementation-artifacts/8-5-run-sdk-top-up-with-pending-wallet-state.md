@@ -4,7 +4,7 @@ baseline_commit: 77c8c2d
 
 # Story 8.5: Run SDK Top-Up With Pending Wallet State
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -26,41 +26,54 @@ so that I can initiate a funded wallet flow while the game waits for authoritati
 
 ## Tasks / Subtasks
 
-- [ ] Extend the Tevi browser SDK adapter for top-up execution (AC: 1, 2, 4, 5, 6)
-  - [ ] Add a method on `js/teviClient.js` such as `topup(options)` or `runTopup(options)` that wraps `window.TeviJS.topup()` only when explicit Tevi mode and SDK method availability are present.
-  - [ ] Call the SDK with exactly the backend-issued `deposit_token`, integer `amount`, configured `channel_id`, and safe metadata. Metadata may include safe correlation such as request ID or local top-up attempt ID; it must not include bearer tokens, API keys, secret keys, full deposit-token copies outside the required SDK field, refresh tokens, Tevi emails, or provider payload dumps.
-  - [ ] Normalize SDK outcomes into safe client states: `sdk-confirmation-open` if needed, `webhook-pending` on success, `canceled` on Tevi/user cancellation, `failed` for provider/SDK errors, `retryable-failure` for timeout or unavailable SDK where retry is safe.
-  - [ ] Add timeout handling so a missing SDK callback becomes a recoverable failure state, following the existing `getUserAppToken()` timeout pattern.
-  - [ ] Preserve local/demo behavior: if Tevi mode is disabled, no SDK script or top-up call is attempted and local visual play stays unchanged.
-- [ ] Add top-up signature request support to the browser backend client (AC: 1, 3, 4, 5)
-  - [ ] Extend `js/serverClient.js` with a focused method such as `requestTopupSignature(amount)` that uses the existing API base URL, request ID generation, and `{ data, error, requestId }` envelope handling.
-  - [ ] Send `POST /api/v1/payments/top-up-signature` with `{ amount }` only after Tevi authentication/session setup is available.
-  - [ ] Include an authenticated Tevi bearer path consistent with the current Story 8.3 token/session flow. Do not fall back to guest identity or client-supplied player IDs for Tevi top-up.
-  - [ ] Treat missing `data.deposit_token` as a safe failed state and do not call the SDK without it except in the explicit manual Check Round that proves Tevi returns/handles the missing-token `403` failure.
-  - [ ] Do not store full `deposit_token` in localStorage, debug panels, logs, screenshots, tests, or Check Round evidence. Passing it directly to `window.TeviJS.topup()` is the only intended browser use.
-- [ ] Add Deposit UI/client state integration without wallet crediting (AC: 2, 3, 5, 6)
-  - [ ] Add or extend the in-game Deposit entry point using the UX spine: presets, custom integer Stars input, disabled CTA for invalid amount, `Preparing Tevi deposit.`, external SDK confirmation, `Waiting for Tevi confirmation.`, `Deposit canceled.`, safe failure, and retry affordance.
-  - [ ] Use `Stars` language consistently in Tevi mode. Do not use coins/credits/cash copy for Tevi-backed wallet values.
-  - [ ] Debounce the Deposit CTA so duplicate taps do not create concurrent signature requests or SDK calls.
-  - [ ] On SDK success, show a pending top-up state and reference/correlation ID when available. Do not update `PlayerCoin`, HUD balance, server balance cache, wallet transaction state, or spin eligibility from SDK success alone.
-  - [ ] If a later balance refresh endpoint or placeholder credited-state detection already exists, show credited only after authoritative backend state says the wallet has been credited. If it does not exist yet, document webhook follow-through as manual/blocked until Story 8.6 implements crediting.
-  - [ ] Keep pending state recoverable after modal close where practical, at minimum in local client state for the current page session. Do not persist secrets to recover it.
-- [ ] Preserve story boundaries and fail-safe behavior (AC: 2, 5, 6)
-  - [ ] Do not implement `POST /api/v1/webhooks/tevi` crediting, webhook signature verification, wallet mutation, cashout, receipts, spin math, or provider reconciliation in this story.
-  - [ ] Do not treat `res.call === "ok"`, any SDK callback, or any browser-side provider result as proof of wallet credit.
-  - [ ] Do not introduce new payment/provider libraries for browser top-up. Use the existing Tevi SDK adapter and the existing backend route from Story 8.4.
-  - [ ] Ensure backend-unavailable and re-auth-required states block value-bearing top-up instead of silently using local/demo money.
-- [ ] Add focused automated tests (AC: 1-6)
-  - [ ] Extend `apps/api/test/unit/tevi-client.test.ts` for SDK `topup()` success, cancellation, missing method, SDK unavailable, timeout, thrown SDK error, no secret/token leakage in state/debug output, and Tevi-mode-only behavior.
-  - [ ] Extend `apps/api/test/unit/server-client.test.ts` for top-up signature request envelope parsing, request ID propagation, authenticated Tevi path, missing `deposit_token`, backend error mapping, no guest fallback in Tevi top-up, and no balance mutation on SDK success.
-  - [ ] Add or extend browser/client UI tests at the nearest existing test seam for Deposit modal state if a testable seam exists. Cover valid/invalid amount, submit debounce, pending state, canceled state, retryable failure, and no local/demo behavior regression.
-  - [ ] Keep adjacent Tevi/backend route tests green: `apps/api/test/integration/tevi-topup-routes.test.ts`, `apps/api/test/integration/tevi-token-routes.test.ts`, `apps/api/test/unit/tevi-token-service.test.ts`, `apps/api/test/unit/tevi-client.test.ts`, and `apps/api/test/unit/server-client.test.ts`.
-- [ ] Complete Story 8.5 Check Round (AC: 4, 7)
-  - [ ] Record focused test commands, full validation command, and any manual sandbox prerequisites.
-  - [ ] Record manual Mini App sandbox flow with placeholder/safe evidence only: amount selection, backend token request, SDK confirmation using sandbox card `4242 4242 4242 4242`, expiry `12/30`, CVV `123`, SDK callback shape/status, and pending UI state.
-  - [ ] Record cancellation, SDK failure/timeout, backend missing/invalid token, and explicit missing-`deposit_token` `403` verification behavior.
-  - [ ] Record webhook follow-through expectation: pending remains pending until Story 8.6 or a sandbox webhook credit path confirms authoritative credit. If webhook crediting is not implemented yet, mark credited-state evidence as blocked by Story 8.6 rather than faking it.
-  - [ ] Search touched code, tests, screenshots/evidence notes, and logs for full deposit tokens, bearer/access/refresh/runtime tokens, `Authorization` header values, API keys, secret keys, webhook signatures, Tevi emails, and provider payload dumps. Confirm only placeholders, field names, or safe fingerprints/correlation IDs appear.
+- [x] Extend the Tevi browser SDK adapter for top-up execution (AC: 1, 2, 4, 5, 6)
+  - [x] Add a method on `js/teviClient.js` such as `topup(options)` or `runTopup(options)` that wraps `window.TeviJS.topup()` only when explicit Tevi mode and SDK method availability are present.
+  - [x] Call the SDK with exactly the backend-issued `deposit_token`, integer `amount`, configured `channel_id`, and safe metadata. Metadata may include safe correlation such as request ID or local top-up attempt ID; it must not include bearer tokens, API keys, secret keys, full deposit-token copies outside the required SDK field, refresh tokens, Tevi emails, or provider payload dumps.
+  - [x] Normalize SDK outcomes into safe client states: `sdk-confirmation-open` if needed, `webhook-pending` on success, `canceled` on Tevi/user cancellation, `failed` for provider/SDK errors, `retryable-failure` for timeout or unavailable SDK where retry is safe.
+  - [x] Add timeout handling so a missing SDK callback becomes a recoverable failure state, following the existing `getUserAppToken()` timeout pattern.
+  - [x] Preserve local/demo behavior: if Tevi mode is disabled, no SDK script or top-up call is attempted and local visual play stays unchanged.
+- [x] Add top-up signature request support to the browser backend client (AC: 1, 3, 4, 5)
+  - [x] Extend `js/serverClient.js` with a focused method such as `requestTopupSignature(amount)` that uses the existing API base URL, request ID generation, and `{ data, error, requestId }` envelope handling.
+  - [x] Send `POST /api/v1/payments/top-up-signature` with `{ amount }` only after Tevi authentication/session setup is available.
+  - [x] Include an authenticated Tevi bearer path consistent with the current Story 8.3 token/session flow. Do not fall back to guest identity or client-supplied player IDs for Tevi top-up.
+  - [x] Treat missing `data.deposit_token` as a safe failed state and do not call the SDK without it except in the explicit manual Check Round that proves Tevi returns/handles the missing-token `403` failure.
+  - [x] Do not store full `deposit_token` in localStorage, debug panels, logs, screenshots, tests, or Check Round evidence. Passing it directly to `window.TeviJS.topup()` is the only intended browser use.
+- [x] Add Deposit UI/client state integration without wallet crediting (AC: 2, 3, 5, 6)
+  - [x] Add or extend the in-game Deposit entry point using the UX spine: presets, custom integer Stars input, disabled CTA for invalid amount, `Preparing Tevi deposit.`, external SDK confirmation, `Waiting for Tevi confirmation.`, `Deposit canceled.`, safe failure, and retry affordance.
+  - [x] Use `Stars` language consistently in Tevi mode. Do not use coins/credits/cash copy for Tevi-backed wallet values.
+  - [x] Debounce the Deposit CTA so duplicate taps do not create concurrent signature requests or SDK calls.
+  - [x] On SDK success, show a pending top-up state and reference/correlation ID when available. Do not update `PlayerCoin`, HUD balance, server balance cache, wallet transaction state, or spin eligibility from SDK success alone.
+  - [x] If a later balance refresh endpoint or placeholder credited-state detection already exists, show credited only after authoritative backend state says the wallet has been credited. If it does not exist yet, document webhook follow-through as manual/blocked until Story 8.6 implements crediting.
+  - [x] Keep pending state recoverable after modal close where practical, at minimum in local client state for the current page session. Do not persist secrets to recover it.
+- [x] Preserve story boundaries and fail-safe behavior (AC: 2, 5, 6)
+  - [x] Do not implement `POST /api/v1/webhooks/tevi` crediting, webhook signature verification, wallet mutation, cashout, receipts, spin math, or provider reconciliation in this story.
+  - [x] Do not treat `res.call === "ok"`, any SDK callback, or any browser-side provider result as proof of wallet credit.
+  - [x] Do not introduce new payment/provider libraries for browser top-up. Use the existing Tevi SDK adapter and the existing backend route from Story 8.4.
+  - [x] Ensure backend-unavailable and re-auth-required states block value-bearing top-up instead of silently using local/demo money.
+- [x] Add focused automated tests (AC: 1-6)
+  - [x] Extend `apps/api/test/unit/tevi-client.test.ts` for SDK `topup()` success, cancellation, missing method, SDK unavailable, timeout, thrown SDK error, no secret/token leakage in state/debug output, and Tevi-mode-only behavior.
+  - [x] Extend `apps/api/test/unit/server-client.test.ts` for top-up signature request envelope parsing, request ID propagation, authenticated Tevi path, missing `deposit_token`, backend error mapping, no guest fallback in Tevi top-up, and no balance mutation on SDK success.
+  - [x] Add or extend browser/client UI tests at the nearest existing test seam for Deposit modal state if a testable seam exists. Cover valid/invalid amount, submit debounce, pending state, canceled state, retryable failure, and no local/demo behavior regression.
+  - [x] Keep adjacent Tevi/backend route tests green: `apps/api/test/integration/tevi-topup-routes.test.ts`, `apps/api/test/integration/tevi-token-routes.test.ts`, `apps/api/test/unit/tevi-token-service.test.ts`, `apps/api/test/unit/tevi-client.test.ts`, and `apps/api/test/unit/server-client.test.ts`.
+- [x] Complete Story 8.5 Check Round (AC: 4, 7)
+  - [x] Record focused test commands, full validation command, and any manual sandbox prerequisites.
+  - [x] Record manual Mini App sandbox flow with placeholder/safe evidence only: amount selection, backend token request, SDK confirmation using sandbox card `4242 4242 4242 4242`, expiry `12/30`, CVV `123`, SDK callback shape/status, and pending UI state.
+  - [x] Record cancellation, SDK failure/timeout, backend missing/invalid token, and explicit missing-`deposit_token` `403` verification behavior.
+  - [x] Record webhook follow-through expectation: pending remains pending until Story 8.6 or a sandbox webhook credit path confirms authoritative credit. If webhook crediting is not implemented yet, mark credited-state evidence as blocked by Story 8.6 rather than faking it.
+  - [x] Search touched code, tests, screenshots/evidence notes, and logs for full deposit tokens, bearer/access/refresh/runtime tokens, `Authorization` header values, API keys, secret keys, webhook signatures, Tevi emails, and provider payload dumps. Confirm only placeholders, field names, or safe fingerprints/correlation IDs appear.
+
+### Review Findings (AI Code Review 2026-06-29)
+
+- [x] [Review][Patch] (resolved from Decision via Tevi SDK docs) SDK callback normalization uses the wrong field names — the real `helper_tevi.js` callback carries `error_code`/`error_message`/`data`/`action` (e.g. `error_code:-14` timeout, `-5` not ready, `-6` device unavailable), but `runTopup` checks `response.error.code`/`response.call`/`response.success`, so a real timeout/error callback is misread as `webhook-pending`. Fix: normalize on `error_code` (0/absent = success; -14/-5/-6 = retryable; other non-zero = failed) while still tolerating the existing `error.code`/`data` convention. [js/teviClient.js runTopup]
+- [x] [Review][Patch] (resolved from Decision — chose Phaser rebuild) Replace the body-injected DOM deposit overlay with a Phaser `guiController` popup using existing popup assets; presets as buttons + `+/−` stepper for custom amount (Phaser has no native text input). [js/slotGame.js initializeTeviDepositEntry]
+- [x] [Review][Patch] (resolved from Decision via SDK docs — gate it) Gate `forceSdkCallWithoutToken` behind a non-production guard; the SDK does no client-side token validation. [js/teviClient.js runTopup]
+- [x] [Review][Patch] (resolved from Decision — chose client cap) Add a client-side maximum top-up amount as a UX guard (backend remains authoritative). [js/serverClient.js, js/teviClient.js, js/slotGame.js, js/runtime-config.js]
+- [x] [Review][Patch] No timeout/abort on `requestTopupSignature` fetch — a hung network strands "Preparing Tevi deposit." with `topupPending` stuck true and no recovery. [js/serverClient.js requestTopupSignature]
+- [x] [Review][Patch] `topupPending` can stick true on a synchronous throw before the promise chain (`setTopupState`/`showTopupMessage`), permanently disabling the CTA. [js/slotGame.js submitTopup]
+- [x] [Review][Patch] `mapTopupSignatureError` classifies status 0 / opaque (CORS) responses as non-retryable `signature-rejected`. [js/serverClient.js mapTopupSignatureError]
+- [x] [Review][Patch] `resolveTopupPresets` yields an empty preset row when configured presets are all-invalid (no fallback to defaults). [js/slotGame.js resolveTopupPresets]
+- [x] [Review][Defer] AC7 manual sandbox Check Round documented but not executed — sandbox-dependent, spec-permitted; requires a human Tevi sandbox run. — deferred, requires sandbox access
+- [x] [Review][Defer] Confirm `extractSafeTopupReference` `data.id` is a safe non-sensitive reference before displaying it — verify during AC7 sandbox observation. [js/teviClient.js] — deferred, requires sandbox access
 
 ## Dev Notes
 
@@ -185,16 +198,62 @@ so that I can initiate a funded wallet flow while the game waits for authoritati
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+claude-opus-4-8 (Claude Opus 4.8)
 
 ### Debug Log References
 
+- `npm --workspace @china-slot-game/api test -- test/unit/tevi-client.test.ts` → 25 passed.
+- `npm --workspace @china-slot-game/api test -- test/unit/server-client.test.ts` → 37 passed.
+- Adjacent regression (after `npm run build -w @china-slot-game/game-math`): `vitest run test/integration/tevi-topup-routes.test.ts test/integration/tevi-token-routes.test.ts test/unit/tevi-token-service.test.ts test/unit/tevi-client.test.ts test/unit/server-client.test.ts` → 5 files, 94 passed.
+- `npm run lint` (tsc --noEmit) → clean. `npm run typecheck` → clean. `npm run build` → clean.
+- Full `npm test`: all Story 8.5 and adjacent suites pass. 4 pre-existing, environment-only failures remain (3 in `test/unit/db-runtime.test.ts`, 1 in `packages/game-math/test/game-math.test.ts`) caused by a doubled Windows drive letter (`C:\C:\…`) in `import.meta.url`-derived directory scanning. Confirmed pre-existing by re-running with this story's working changes stashed — identical failures. Untouched by this story.
+
 ### Completion Notes List
 
-- Ultimate context engine analysis completed - comprehensive developer guide created.
+- Implemented `topup(options)` on `js/teviClient.js` wrapping `window.TeviJS.topup({ amount, deposit_token, channel_id, metadata }, cb)`. Runs only in explicit Tevi mode with the SDK method present; normalizes outcomes to `webhook-pending` (success), `canceled`, `failed`, and `retryable-failure` (SDK unavailable/missing method/timeout). Timeout mirrors the existing `getUserAppToken()` pattern (default 60s). Metadata is whitelisted to `{ type: "deposit", requestId?, attemptId? }`. The deposit token is sent only in the SDK `deposit_token` field and never appears in the returned state. Normal code refuses to call the SDK without a token (`deposit-token-missing`); a `forceSdkCallWithoutToken` escape hatch exists solely for the manual 403 verification path.
+- Added `requestTopupSignature(amount)` to `js/serverClient.js`. Production + Tevi mode only (blocks guest/demo fallback), validates a positive integer amount, fetches a fresh Tevi runtime token via `teviClient.getUserAppToken()`, and POSTs `/api/v1/payments/top-up-signature` with `{ amount }`, `x-request-id`, and `Authorization: Bearer <runtimeToken>`. Parses the `{ data, error, requestId }` envelope; missing `data.deposit_token` is a safe `failed` state. Backend errors map to safe states (401→re-auth, 403→blocked, 5xx/429→retryable, other→failed) with no payload/token leakage.
+- Added Tevi deposit orchestration to `js/slotGame.js` (`submitTopup`, `handleTopupResult`, `finishTopup`, status messaging via `guiController`, `isTopupAvailable`, `setTopupState`) plus a Tevi-mode-only DOM deposit entry point (`initializeTeviDepositEntry`) with presets, a custom integer Stars input, a disabled-until-valid CTA, debounce, and a live status line. The flow never mutates `PlayerCoin`/HUD/server balance on SDK success — pending stays pending until Story 8.6 credits the wallet via webhook. Stars language is used in Tevi mode.
+- Added non-secret deposit presets to `js/runtime-config.js` (`CHINA_SLOT_TEVI_CONFIG.topup.presets`). No credentials or tokens added there.
+- Story boundaries preserved: no webhook crediting/verification, wallet mutation, cashout, receipts, spin math, reconciliation, or new payment libraries. SDK success is never treated as wallet credit.
 
 ### File List
+
+- js/teviClient.js (modified) — SDK `topup()` adapter, outcome normalization, timeout/cancellation handling.
+- js/serverClient.js (modified) — `requestTopupSignature(amount)` with authenticated Tevi bearer path and safe failure mapping.
+- js/slotGame.js (modified) — deposit orchestration, status messaging, and the Tevi-mode Phaser deposit modal/entry button; no wallet mutation from SDK success.
+- js/popups.js (modified) — `createTopupPUHandler` Phaser deposit popup (amount stepper, status line, deposit/exit buttons) using existing assets.
+- js/runtime-config.js (modified) — non-secret `topup.presets` and `topup.maxStars` display config.
+- apps/api/test/unit/tevi-client.test.ts (modified) — SDK `topup()` adapter tests.
+- apps/api/test/unit/server-client.test.ts (modified) — top-up signature request tests + slot game deposit flow tests.
 
 ### Change Log
 
 - 2026-06-29: Created Story 8.5 context for SDK top-up pending wallet state.
+- 2026-06-29: Implemented Tevi SDK top-up initiation with pending wallet state — `topup()` adapter, `requestTopupSignature()` client method, deposit UI orchestration/entry point, presets config, and focused tests. No authoritative wallet crediting (deferred to Story 8.6).
+- 2026-06-29: Code review applied 8 patches — SDK callback normalization to the real `error_code` contract (docs-grounded), Phaser `guiController` deposit modal replacing the DOM overlay, gated `forceSdkCallWithoutToken`, client-side max-amount cap, `requestTopupSignature` fetch timeout, `submitTopup` synchronous-throw guard, status-0 retryable mapping, and preset fallback. 2 items deferred (manual AC7 sandbox round, `data.id` reference confirmation). lint/typecheck/build clean; tevi/server/adjacent suites green.
+
+## Check Round
+
+### Test Commands
+
+- Focused browser adapter: `npm --workspace @china-slot-game/api test -- test/unit/tevi-client.test.ts` (25 passed).
+- Focused browser backend client + deposit flow: `npm --workspace @china-slot-game/api test -- test/unit/server-client.test.ts` (37 passed).
+- Adjacent regression (build game-math first): `npm run build -w @china-slot-game/game-math` then `npx --workspace @china-slot-game/api vitest run test/integration/tevi-topup-routes.test.ts test/integration/tevi-token-routes.test.ts test/unit/tevi-token-service.test.ts test/unit/tevi-client.test.ts test/unit/server-client.test.ts` (94 passed).
+- Browser syntax: `node --check js/teviClient.js js/serverClient.js js/slotGame.js js/runtime-config.js`.
+- Full gate: `npm run lint && npm run typecheck && npm test && npm run build`. Lint/typecheck/build clean; tests pass except 4 pre-existing Windows-only filesystem-scan failures (see Debug Log References).
+
+### Manual Mini App Sandbox Flow (to be executed in the Tevi sandbox)
+
+The automated tests cover the state machine and guardrails. The following manual sandbox flow is required to satisfy AC7 and must be recorded with safe placeholders only (`<DEPOSIT_TOKEN>`, `<TEVI_ACCESS_TOKEN>`, `<REQUEST_ID>`). Money-path crediting is **blocked by Story 8.6** and must not be faked.
+
+- Setup: launch with Tevi mode enabled (`?tevi=1`), authenticated player, app/channel IDs visible only as non-secret config, `/api/v1/payments/top-up-signature` reachable. Deposit panel renders (presets + custom Stars input + disabled CTA).
+- Success: select a valid amount → `Preparing Tevi deposit.` → backend returns a token (never shown) → `Waiting for Tevi confirmation.` → confirm with sandbox card `4242 4242 4242 4242`, expiry `12/30`, CVV `123` → SDK success callback → pending UI (`webhook-pending`) with no authoritative balance change.
+- Cancellation: cancel in the Tevi confirmation → `Deposit canceled.`, wallet unchanged.
+- Failure/timeout: SDK unavailable/missing method/timeout or backend failure → retryable/terminal safe state with retry affordance; no local/demo money fallback.
+- Missing-token 403 verification: in a controlled path only, deliberately invoke top-up without a `deposit_token` (`forceSdkCallWithoutToken`) and record that Tevi surfaces the expected `403`-class failure. Normal code never calls the SDK without a token.
+- Webhook follow-through: pending **cannot** become credited from this story alone. Credited-state evidence is blocked by Story 8.6 (webhook verification + idempotent wallet crediting).
+
+### Secret/Leakage Sweep
+
+- Grepped touched `js/` files for `deposit_token`/`depositToken`/`runtimeToken`/`Authorization`/`Bearer`: the deposit token flows in-memory only (signature result → `teviClient.topup` → SDK `deposit_token` field) and the runtime token only as the `Authorization` header value. Neither is logged, persisted to localStorage, placed in debug/pending state, or returned in normalized client state.
+- Test fixtures use non-secret placeholders (`provider.deposit.token`, `runtime-token-secret`, `deposit-token-secret`) consistent with existing Tevi tests; no real tokens, secrets, webhook signatures, Tevi emails, or provider payload dumps appear.

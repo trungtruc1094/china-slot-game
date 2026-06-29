@@ -11,6 +11,7 @@
 
 [core]
 communication_language = "English"
+user_name = "TNGUYENTRU"
 
 [modules.bmm]
 user_skill_level = "intermediate"

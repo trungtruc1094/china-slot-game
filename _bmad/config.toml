@@ -13,6 +13,7 @@
 [core]
 document_output_language = "English"
 output_folder = "_bmad-output"
+project_name = "china-slot-game"
 
 [modules.bmm]
 planning_artifacts = "{project-root}/_bmad-output/planning-artifacts"
