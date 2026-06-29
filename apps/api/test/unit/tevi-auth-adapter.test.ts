@@ -275,6 +275,20 @@ describe("JoseTeviAuthVerifier", () => {
     });
   });
 
+  it("accepts a numeric user_id and coerces it to a string subject", async () => {
+    const token = await signTeviToken({
+      user_id: 633505726,
+      user_is_active: 1,
+      user_anonymous: 0,
+      app_id: appId
+    });
+
+    await expect(verifier.verify(token)).resolves.toMatchObject({
+      ok: true,
+      context: { provider: "tevi", subject: "633505726" }
+    });
+  });
+
   it("rejects missing Tevi user subjects", async () => {
     const token = await signTeviToken({
       user_is_active: true,

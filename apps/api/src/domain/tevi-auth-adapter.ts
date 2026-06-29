@@ -128,7 +128,9 @@ export class JoseTeviAuthVerifier implements TeviAuthVerifier {
       };
     }
 
-    if (typeof payload.user_id !== "string" || payload.user_id.trim().length === 0) {
+    // Tevi sends user_id as a number; accept number or non-empty string.
+    const userId = normalizeUserId(payload.user_id);
+    if (!userId) {
       return tokenInvalid("USER_ID_MISSING");
     }
 
@@ -147,7 +149,7 @@ export class JoseTeviAuthVerifier implements TeviAuthVerifier {
 
     const context: TeviAuthContext = {
       provider: "tevi",
-      subject: payload.user_id.trim(),
+      subject: userId,
       expiresAt: expiresAt.toISOString()
     };
     if (typeof payload.user_name === "string" && payload.user_name.trim().length > 0) {
@@ -193,6 +195,18 @@ function getJoseClaim(error: unknown): string | undefined {
   return typeof error === "object" && error !== null && "claim" in error && typeof error.claim === "string"
     ? error.claim
     : undefined;
+}
+
+// Tevi sends user_id as a number; accept number or non-empty string and normalize to string.
+function normalizeUserId(value: unknown): string | null {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+  return null;
 }
 
 // Tevi flag claims arrive as boolean (true/false), number (1/0), or string ("1"/"true").
