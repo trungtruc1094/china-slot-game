@@ -662,7 +662,8 @@ class SlotGame extends Phaser.Scene{
         this.depositButton.addClickEvent(() => { this.openDepositModal(); }, this);
 
         // Label centered on the button, scaled with it so text and background stay aligned.
-        this.depositButtonText = this.add.bitmapText(this.depositButton.posX, this.depositButton.posY - 4, 'gameFont_1', 'DEPOSIT', 42, 1).setOrigin(0.5);
+        // Font sized below the button width to leave padding between the text and the button edges.
+        this.depositButtonText = this.add.bitmapText(this.depositButton.posX, this.depositButton.posY - 4, 'gameFont_1', 'DEPOSIT', 34, 1).setOrigin(0.5);
         this.depositButtonText.setScale(scale);
         this.depositButtonText.tint = 0xFFFFFF;
         this.depositButtonText.depth = 16;
