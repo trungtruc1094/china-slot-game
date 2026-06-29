@@ -43,6 +43,51 @@ describe("JoseTeviAuthVerifier", () => {
     });
   });
 
+  it("accepts numeric user_is_active/user_anonymous claims (1/0) the way Tevi encodes them", async () => {
+    const token = await signTeviToken({
+      user_id: "tevi-user-1",
+      user_name: "Tevi Player",
+      user_is_active: 1,
+      user_anonymous: 0,
+      app_id: appId
+    });
+
+    await expect(verifier.verify(token)).resolves.toMatchObject({
+      ok: true,
+      context: { provider: "tevi", subject: "tevi-user-1" }
+    });
+  });
+
+  it("rejects numeric user_is_active=0 as inactive", async () => {
+    const token = await signTeviToken({
+      user_id: "tevi-user-1",
+      user_is_active: 0,
+      user_anonymous: 0,
+      app_id: appId
+    });
+
+    await expect(verifier.verify(token)).resolves.toMatchObject({
+      ok: false,
+      statusCode: 403,
+      reasonCode: "USER_INACTIVE"
+    });
+  });
+
+  it("blocks numeric user_anonymous=1 by default", async () => {
+    const token = await signTeviToken({
+      user_id: "tevi-user-1",
+      user_is_active: 1,
+      user_anonymous: 1,
+      app_id: appId
+    });
+
+    await expect(verifier.verify(token)).resolves.toMatchObject({
+      ok: false,
+      statusCode: 403,
+      reasonCode: "ANONYMOUS_USER_BLOCKED"
+    });
+  });
+
   it("rejects expired tokens with a safe diagnostic code", async () => {
     const token = await signTeviToken({
       user_id: "tevi-user-1",

@@ -105,7 +105,8 @@ export class JoseTeviAuthVerifier implements TeviAuthVerifier {
       };
     }
 
-    if (payload.user_is_active !== true) {
+    // Tevi encodes user_is_active / user_anonymous as numbers (1/0) as well as booleans.
+    if (!isTruthyClaim(payload.user_is_active)) {
       return {
         ok: false,
         statusCode: 403,
@@ -114,11 +115,11 @@ export class JoseTeviAuthVerifier implements TeviAuthVerifier {
       };
     }
 
-    if (typeof payload.user_anonymous !== "boolean") {
+    if (!isBooleanishClaim(payload.user_anonymous)) {
       return tokenInvalid("USER_ANONYMITY_MISSING");
     }
 
-    if (payload.user_anonymous && !this.options.allowAnonymousUsers) {
+    if (isTruthyClaim(payload.user_anonymous) && !this.options.allowAnonymousUsers) {
       return {
         ok: false,
         statusCode: 403,
@@ -192,6 +193,19 @@ function getJoseClaim(error: unknown): string | undefined {
   return typeof error === "object" && error !== null && "claim" in error && typeof error.claim === "string"
     ? error.claim
     : undefined;
+}
+
+// Tevi flag claims arrive as boolean (true/false), number (1/0), or string ("1"/"true").
+function isTruthyClaim(value: unknown): boolean {
+  return value === true || value === 1 || value === "1" || value === "true";
+}
+
+function isFalsyClaim(value: unknown): boolean {
+  return value === false || value === 0 || value === "0" || value === "false";
+}
+
+function isBooleanishClaim(value: unknown): boolean {
+  return isTruthyClaim(value) || isFalsyClaim(value);
 }
 
 function tokenInvalid(reasonCode: TeviAuthFailureReason): TeviAuthFailure {
