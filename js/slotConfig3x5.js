@@ -73,7 +73,7 @@ var slotConfig3x5 = {
                 settings: { x: 860, y: -230 },
                 rules: { x: 860, y: -100 },
                 info: { x: 860, y: 30 },
-                deposit: { x: -740, y: -420, scale: 0.9 }
+                deposit: { x: -740, y: -420, scale: 1 }
             },
             text: {
                 linesLabel: { x: -740, y: 376, size: 38 },
@@ -136,7 +136,7 @@ var slotConfig3x5 = {
                 settings: { x: 440, y: -390, scale: 0.9 },
                 rules: { x: 440, y: -260, scale: 0.9 },
                 info: { x: 440, y: -130, scale: 0.9 },
-                deposit: { x: 0, y: 450, scale: 0.95 }
+                deposit: { x: 0, y: 450, scale: 0.86 }
             },
             text: {
                 linesLabel: { x: -170, y: 545, size: 34 },

@@ -652,18 +652,19 @@ class SlotGame extends Phaser.Scene{
         if (typeof SceneButton === "undefined") return null;
 
         var layout = (slotConfig.layout && slotConfig.layout.controls && slotConfig.layout.controls.deposit)
-            || { x: -740, y: -420, scale: 0.9 };
-        var scale = layout.scale != null ? layout.scale : 0.9;
+            || { x: -740, y: -420, scale: 1 };
+        var scale = layout.scale != null ? layout.scale : 1;
 
-        this.depositButton = new SceneButton(this, 'middle_button', 'middle_button_hover', false);
+        // Use the same panel sprite + scale as the TOTAL BET control so the deposit CTA matches its size.
+        this.depositButton = new SceneButton(this, 'panel_totalbet', 'panel_totalbet', false);
         this.depositButton.create(layout.x, layout.y, 0.5, 0.5);
         this.depositButton.button.setScale(scale);
         this.depositButton.setDepth(15);
         this.depositButton.addClickEvent(() => { this.openDepositModal(); }, this);
 
-        // Label centered on the button, scaled with it so text and background stay aligned.
-        // Font sized below the button width to leave padding between the text and the button edges.
-        this.depositButtonText = this.add.bitmapText(this.depositButton.posX, this.depositButton.posY - 4, 'gameFont_1', 'DEPOSIT', 34, 1).setOrigin(0.5);
+        // Label centered on the panel, scaled with it so text and background stay aligned,
+        // sized below the panel width to leave padding around the text.
+        this.depositButtonText = this.add.bitmapText(this.depositButton.posX, this.depositButton.posY - 4, 'gameFont_1', 'DEPOSIT', 48, 1).setOrigin(0.5);
         this.depositButtonText.setScale(scale);
         this.depositButtonText.tint = 0xFFFFFF;
         this.depositButtonText.depth = 16;
