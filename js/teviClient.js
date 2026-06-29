@@ -220,12 +220,24 @@
             return { responseType: typeof response };
         }
         var data = response.data;
-        return {
+        var summary = {
             call: response.call,
             error_code: response.error_code,
             topKeys: Object.keys(response).join(","),
             dataKeys: (data && typeof data === "object") ? Object.keys(data).join(",") : (data === undefined ? "absent" : String(data))
         };
+        // Surface the provider's error message/detail (truncated) for diagnosis — these are
+        // status strings on failure, not secrets. Shown only in the ?debugTevi panel.
+        if (response.msg !== undefined) {
+            summary.msg = (typeof response.msg === "string" ? response.msg : JSON.stringify(response.msg)).slice(0, 140);
+        }
+        if (response.response !== undefined) {
+            var detail = response.response;
+            if (typeof detail === "string") summary.responseDetail = detail.slice(0, 140);
+            else if (detail && typeof detail === "object") summary.responseDetail = "keys:" + Object.keys(detail).join(",");
+            else summary.responseDetail = String(detail);
+        }
+        return summary;
     }
 
     function setTopupDiagnostic(summary, outcome) {
@@ -453,6 +465,8 @@
             if (lastTopupDiagnostic.error_code !== undefined) lines.push("topup.error_code: " + lastTopupDiagnostic.error_code);
             if (lastTopupDiagnostic.topKeys !== undefined) lines.push("topup.topKeys: " + lastTopupDiagnostic.topKeys);
             if (lastTopupDiagnostic.dataKeys !== undefined) lines.push("topup.dataKeys: " + lastTopupDiagnostic.dataKeys);
+            if (lastTopupDiagnostic.msg !== undefined) lines.push("topup.msg: " + lastTopupDiagnostic.msg);
+            if (lastTopupDiagnostic.responseDetail !== undefined) lines.push("topup.response: " + lastTopupDiagnostic.responseDetail);
             if (lastTopupDiagnostic.responseType !== undefined) lines.push("topup.responseType: " + lastTopupDiagnostic.responseType);
             if (lastTopupDiagnostic.note !== undefined) lines.push("topup.note: " + lastTopupDiagnostic.note);
         }
