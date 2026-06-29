@@ -116,10 +116,7 @@
                     app_id: config.appId
                 }, function (response) {
                     var diagnostic = summarizeAuthResponse(response);
-                    var runtimeToken = response
-                        && response.data
-                        && response.data.userInfo
-                        && response.data.userInfo.user_app_token;
+                    var runtimeToken = extractRuntimeToken(response);
 
                     if (typeof runtimeToken === "string" && runtimeToken.length > 0) {
                         diagnostic.reason = "authenticated";
@@ -148,6 +145,23 @@
         return { ok: false, status: "re-authentication-required", reason: reason };
     }
 
+    // Resolve the Tevi runtime user app token across known response shapes:
+    //   real Tevi getUserInfo => { action, call, userInfo: { user_app_token } }   (top-level)
+    //   legacy/assumed shape  => { data: { userInfo: { user_app_token } } }
+    function resolveUserInfo(response) {
+        if (!response || typeof response !== "object") return null;
+        if (response.data && typeof response.data === "object" && response.data.userInfo) return response.data.userInfo;
+        if (response.userInfo) return response.userInfo;
+        return null;
+    }
+
+    function extractRuntimeToken(response) {
+        var userInfo = resolveUserInfo(response);
+        if (!userInfo || typeof userInfo !== "object") return null;
+        var token = userInfo.user_app_token || userInfo.userAppToken || userInfo.token || userInfo.app_token;
+        return typeof token === "string" && token.length > 0 ? token : null;
+    }
+
     // Structure-only summary (key names + booleans, never token VALUES) so we can spot a
     // shape mismatch (e.g. the token living at a different path) from the on-screen panel.
     function summarizeAuthResponse(response) {
@@ -155,14 +169,15 @@
             return { responseType: typeof response, topKeys: "(none)", dataKeys: "(none)", userInfoKeys: "(none)", hasToken: false };
         }
         var data = response.data;
-        var userInfo = data && typeof data === "object" ? data.userInfo : undefined;
+        var userInfo = resolveUserInfo(response);
         return {
             error_code: response.error_code,
             error_message: typeof response.error_message === "string" ? response.error_message : undefined,
+            call: response.call,
             topKeys: Object.keys(response).join(","),
             dataKeys: (data && typeof data === "object") ? Object.keys(data).join(",") : String(data),
-            userInfoKeys: (userInfo && typeof userInfo === "object") ? Object.keys(userInfo).join(",") : (userInfo === undefined ? "absent" : String(userInfo)),
-            hasToken: !!(userInfo && userInfo.user_app_token)
+            userInfoKeys: (userInfo && typeof userInfo === "object") ? Object.keys(userInfo).join(",") : (userInfo === null ? "absent" : String(userInfo)),
+            hasToken: !!extractRuntimeToken(response)
         };
     }
 
@@ -358,6 +373,7 @@
         if (lastAuthDiagnostic) {
             lines.push("--- getUserInfo (token-safe) ---");
             lines.push("auth.reason: " + lastAuthDiagnostic.reason);
+            if (lastAuthDiagnostic.call !== undefined) lines.push("auth.call: " + lastAuthDiagnostic.call);
             if (lastAuthDiagnostic.error_code !== undefined) lines.push("auth.error_code: " + lastAuthDiagnostic.error_code);
             if (lastAuthDiagnostic.error_message !== undefined) lines.push("auth.error_message: " + lastAuthDiagnostic.error_message);
             if (lastAuthDiagnostic.topKeys !== undefined) lines.push("auth.topKeys: " + lastAuthDiagnostic.topKeys);

@@ -323,6 +323,30 @@ describe("browser Tevi client", () => {
     expect(JSON.stringify(client.getState())).not.toContain("runtime-token-secret");
   });
 
+  it("reads the runtime token from the real Tevi getUserInfo shape (top-level userInfo, no data wrapper)", async () => {
+    const sandbox = loadRuntimeAndTeviClient({
+      window: {
+        CHINA_SLOT_TEVI_MODE: true,
+        TeviJS: {
+          getUserInfo: (_request: unknown, callback: (response: unknown) => void) => callback({
+            action: "action.user.core.getInfo",
+            call: "ok",
+            userInfo: { user_app_token: "runtime-token-secret", user_id: "u_1" }
+          })
+        }
+      }
+    });
+    const api = sandbox.window.ChinaSlotTeviClient as TeviClientApi;
+    const client = api.createFromWindow();
+
+    await expect(client.getUserAppToken()).resolves.toEqual({
+      ok: true,
+      status: "authenticated",
+      runtimeToken: "runtime-token-secret"
+    });
+    expect(JSON.stringify(client.getState())).not.toContain("runtime-token-secret");
+  });
+
   it.each([
     ["sdk unavailable", {}, "sdk-unavailable"],
     ["missing method", { TeviJS: {} }, "method-unavailable"],
