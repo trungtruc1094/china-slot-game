@@ -6,6 +6,7 @@ import { createPostgresPool } from "../db/pool.js";
 import { SessionService, SystemClock } from "../domain/session-service.js";
 import { PostgresGameConfigurationRepository } from "../repositories/postgres/game-configuration-repository.js";
 import { PostgresProviderTopUpIdempotencyRepository } from "../repositories/postgres/provider-top-up-idempotency-repository.js";
+import { PostgresTopupSignatureIssuanceRepository } from "../repositories/postgres/topup-signature-issuance-repository.js";
 import {
   PostgresAdminAuditRepository,
   PostgresAlertRepository,
@@ -23,6 +24,7 @@ export interface ProductionDependencies {
   readinessCheck: () => Promise<Record<string, "ready">>;
   shutdown: () => Promise<void>;
   providerTopUpIdempotencyRepository: PostgresProviderTopUpIdempotencyRepository;
+  topupSignatureIssuanceRepository: PostgresTopupSignatureIssuanceRepository;
 }
 
 export async function createProductionDependencies(env: ApiEnv): Promise<ProductionDependencies> {
@@ -50,6 +52,7 @@ export async function createProductionDependencies(env: ApiEnv): Promise<Product
     const budgetProtectionRepository = new PostgresBudgetProtectionRepository(pool, clock, adminAuditRepository);
     const alertRepository = new PostgresAlertRepository(pool, clock, adminAuditRepository);
     const providerTopUpIdempotencyRepository = new PostgresProviderTopUpIdempotencyRepository(pool, clock);
+    const topupSignatureIssuanceRepository = new PostgresTopupSignatureIssuanceRepository(pool);
 
     await configRepository.getActiveRecord();
     await operatorLimitsRepository.load();
@@ -93,7 +96,8 @@ export async function createProductionDependencies(env: ApiEnv): Promise<Product
       shutdown: async () => {
         await pool.end();
       },
-      providerTopUpIdempotencyRepository
+      providerTopUpIdempotencyRepository,
+      topupSignatureIssuanceRepository
     };
   } catch (error) {
     await pool.end();

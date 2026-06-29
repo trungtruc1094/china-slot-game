@@ -189,4 +189,85 @@ describe("loadEnv", () => {
   it("rejects unknown persistence modes", () => {
     expect(() => loadEnv({ PERSISTENCE_MODE: "sqlite" })).toThrow("PERSISTENCE_MODE must be either memory or postgres");
   });
+
+  it("keeps Tevi payment disabled by default without affecting token exchange", () => {
+    expect(loadEnv({
+      TEVI_AUTH_ENABLED: "true",
+      TEVI_APP_ID: "AZX29173",
+      TEVI_JWKS_URL: "https://sandbox.tevi.example/api/v1/auth/jwks"
+    })).toMatchObject({
+      teviAuth: {
+        enabled: true,
+        tokenExchange: {
+          enabled: true,
+          apiBase: "https://developer-api.sbx.tevi.dev"
+        },
+        payment: {
+          enabled: false
+        }
+      }
+    });
+  });
+
+  it("parses explicit Tevi payment top-up signature configuration", () => {
+    expect(loadEnv({
+      TEVI_AUTH_ENABLED: "true",
+      TEVI_APP_ID: "AZX29173",
+      TEVI_JWKS_URL: "https://sandbox.tevi.example/api/v1/auth/jwks",
+      TEVI_PAYMENT_ENABLED: "true",
+      TEVI_API_KEY: "api-key",
+      TEVI_SECRET_KEY: "secret-key",
+      TEVI_BILLING_CHANNEL_ID: "2300210851",
+      TEVI_DEPOSIT_MIN_STARS: "25",
+      TEVI_DEPOSIT_MAX_STARS: "5000"
+    })).toMatchObject({
+      teviAuth: {
+        enabled: true,
+        payment: {
+          enabled: true,
+          apiBase: "https://developer-api.sbx.tevi.dev",
+          depositTokenPath: "/api/v1/payments/deposit-token",
+          apiKey: "api-key",
+          secretKey: "secret-key",
+          billingChannelId: "2300210851",
+          depositMinStars: 25,
+          depositMaxStars: 5000
+        }
+      }
+    });
+  });
+
+  it("rejects invalid Tevi payment URLs, credentials, channel settings, and limits", () => {
+    const base = {
+      TEVI_AUTH_ENABLED: "true",
+      TEVI_APP_ID: "AZX29173",
+      TEVI_JWKS_URL: "https://sandbox.tevi.example/api/v1/auth/jwks",
+      TEVI_PAYMENT_ENABLED: "true",
+      TEVI_API_KEY: "api-key",
+      TEVI_SECRET_KEY: "secret-key",
+      TEVI_BILLING_CHANNEL_ID: "2300210851"
+    } satisfies NodeJS.ProcessEnv;
+
+    expect(() => loadEnv({ ...base, TEVI_PAYMENT_API_BASE: "http://developer-api.sbx.tevi.dev" })).toThrow("TEVI_PAYMENT_API_BASE must be a valid HTTPS URL");
+    expect(() => loadEnv({ ...base, TEVI_API_KEY: "" })).toThrow("TEVI_API_KEY is required when Tevi payment is enabled");
+    expect(() => loadEnv({ ...base, TEVI_SECRET_KEY: "" })).toThrow("TEVI_SECRET_KEY is required when Tevi payment is enabled");
+    expect(() => loadEnv({ ...base, TEVI_BILLING_CHANNEL_ID: "" })).toThrow("TEVI_BILLING_CHANNEL_ID is required when Tevi payment is enabled");
+    expect(() => loadEnv({ ...base, TEVI_DEPOSIT_TOKEN_PATH: "deposit-token" })).toThrow("TEVI_DEPOSIT_TOKEN_PATH must start with /");
+    expect(() => loadEnv({ ...base, TEVI_DEPOSIT_MIN_STARS: "0" })).toThrow("TEVI_DEPOSIT_MIN_STARS must be a positive safe integer");
+    expect(() => loadEnv({ ...base, TEVI_DEPOSIT_MAX_STARS: "10", TEVI_DEPOSIT_MIN_STARS: "25" })).toThrow("TEVI_DEPOSIT_MAX_STARS must be greater than or equal to TEVI_DEPOSIT_MIN_STARS");
+  });
+
+  it("fails closed for Tevi payment outside development/test without PostgreSQL persistence", () => {
+    expect(() => loadEnv({
+      NODE_ENV: "staging",
+      TEVI_AUTH_ENABLED: "true",
+      TEVI_APP_ID: "AZX29173",
+      TEVI_JWKS_URL: "https://sandbox.tevi.example/api/v1/auth/jwks",
+      TEVI_API_BASE: "https://developer-api.flowstreamx.com",
+      TEVI_PAYMENT_ENABLED: "true",
+      TEVI_API_KEY: "api-key",
+      TEVI_SECRET_KEY: "secret-key",
+      TEVI_BILLING_CHANNEL_ID: "2300210851"
+    })).toThrow("PERSISTENCE_MODE=postgres is required when Tevi payment is enabled outside development/test");
+  });
 });

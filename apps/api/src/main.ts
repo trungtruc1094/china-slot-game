@@ -3,7 +3,9 @@ import { createApp } from "./app.js";
 import { loadEnv } from "./config/env.js";
 import { createProductionDependencies, shouldUsePostgresPersistence } from "./composition/production-dependencies.js";
 import { JoseTeviAuthVerifier } from "./domain/tevi-auth-adapter.js";
+import { TeviPaymentClient } from "./domain/tevi-payment-client.js";
 import { TeviTokenService } from "./domain/tevi-token-service.js";
+import { TopupService } from "./domain/topup-service.js";
 
 const env = loadEnv();
 let productionDependencies: Awaited<ReturnType<typeof createProductionDependencies>> | undefined;
@@ -27,6 +29,25 @@ const app = createApp(env.teviAuth.enabled
       teviAuthVerifier: new JoseTeviAuthVerifier(env.teviAuth),
       ...(env.teviAuth.tokenExchange.enabled
         ? { teviTokenService: new TeviTokenService({ appId: env.teviAuth.appId, apiBase: env.teviAuth.tokenExchange.apiBase }) }
+        : {}),
+      ...(env.teviAuth.payment.enabled && productionDependencies?.topupSignatureIssuanceRepository
+        ? {
+            topupService: new TopupService(
+              {
+                appId: env.teviAuth.appId,
+                billingChannelId: env.teviAuth.payment.billingChannelId,
+                depositMinStars: env.teviAuth.payment.depositMinStars,
+                depositMaxStars: env.teviAuth.payment.depositMaxStars
+              },
+              new TeviPaymentClient({
+                apiBase: env.teviAuth.payment.apiBase,
+                depositTokenPath: env.teviAuth.payment.depositTokenPath,
+                apiKey: env.teviAuth.payment.apiKey,
+                secretKey: env.teviAuth.payment.secretKey
+              }),
+              productionDependencies.topupSignatureIssuanceRepository
+            )
+          }
         : {})
     }
   : appDependencies);

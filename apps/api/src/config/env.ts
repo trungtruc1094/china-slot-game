@@ -22,6 +22,7 @@ export interface TeviAuthEnabledEnv {
   jwksUrl: string;
   allowAnonymousUsers: boolean;
   tokenExchange: TeviTokenExchangeEnv;
+  payment: TeviPaymentEnv;
 }
 
 export type TeviTokenExchangeEnv = TeviTokenExchangeDisabledEnv | TeviTokenExchangeEnabledEnv;
@@ -33,6 +34,23 @@ export interface TeviTokenExchangeDisabledEnv {
 export interface TeviTokenExchangeEnabledEnv {
   enabled: true;
   apiBase: string;
+}
+
+export type TeviPaymentEnv = TeviPaymentDisabledEnv | TeviPaymentEnabledEnv;
+
+export interface TeviPaymentDisabledEnv {
+  enabled: false;
+}
+
+export interface TeviPaymentEnabledEnv {
+  enabled: true;
+  apiBase: string;
+  depositTokenPath: string;
+  apiKey: string;
+  secretKey: string;
+  billingChannelId: string;
+  depositMinStars: number;
+  depositMaxStars: number;
 }
 
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): ApiEnv {
@@ -96,7 +114,58 @@ function parseTeviAuthEnv(source: NodeJS.ProcessEnv, nodeEnv: string): TeviAuthE
     appId,
     jwksUrl,
     allowAnonymousUsers: source.TEVI_ALLOW_ANONYMOUS_USERS === "true",
-    tokenExchange: parseTeviTokenExchangeEnv(source, nodeEnv)
+    tokenExchange: parseTeviTokenExchangeEnv(source, nodeEnv),
+    payment: parseTeviPaymentEnv(source, nodeEnv)
+  };
+}
+
+function parseTeviPaymentEnv(source: NodeJS.ProcessEnv, nodeEnv: string): TeviPaymentEnv {
+  if (source.TEVI_PAYMENT_ENABLED !== "true") {
+    return { enabled: false };
+  }
+
+  if (nodeEnv !== "development" && nodeEnv !== "test" && source.PERSISTENCE_MODE !== "postgres") {
+    throw new Error("PERSISTENCE_MODE=postgres is required when Tevi payment is enabled outside development/test");
+  }
+
+  const apiBase = source.TEVI_PAYMENT_API_BASE?.trim() || source.TEVI_API_BASE?.trim() || "https://developer-api.sbx.tevi.dev";
+  validatePaymentApiBase(apiBase);
+
+  const depositTokenPath = source.TEVI_DEPOSIT_TOKEN_PATH?.trim() || "/api/v1/payments/deposit-token";
+  if (!depositTokenPath.startsWith("/")) {
+    throw new Error("TEVI_DEPOSIT_TOKEN_PATH must start with /");
+  }
+
+  const apiKey = source.TEVI_API_KEY?.trim();
+  if (!apiKey) {
+    throw new Error("TEVI_API_KEY is required when Tevi payment is enabled");
+  }
+
+  const secretKey = source.TEVI_SECRET_KEY?.trim();
+  if (!secretKey) {
+    throw new Error("TEVI_SECRET_KEY is required when Tevi payment is enabled");
+  }
+
+  const billingChannelId = source.TEVI_BILLING_CHANNEL_ID?.trim() || source.TEVI_CHANNEL_ID?.trim();
+  if (!billingChannelId) {
+    throw new Error("TEVI_BILLING_CHANNEL_ID is required when Tevi payment is enabled");
+  }
+
+  const depositMinStars = parsePositiveSafeInteger(source.TEVI_DEPOSIT_MIN_STARS ?? "1", "TEVI_DEPOSIT_MIN_STARS");
+  const depositMaxStars = parsePositiveSafeInteger(source.TEVI_DEPOSIT_MAX_STARS ?? "10000", "TEVI_DEPOSIT_MAX_STARS");
+  if (depositMaxStars < depositMinStars) {
+    throw new Error("TEVI_DEPOSIT_MAX_STARS must be greater than or equal to TEVI_DEPOSIT_MIN_STARS");
+  }
+
+  return {
+    enabled: true,
+    apiBase,
+    depositTokenPath,
+    apiKey,
+    secretKey,
+    billingChannelId,
+    depositMinStars,
+    depositMaxStars
   };
 }
 
@@ -125,6 +194,19 @@ function validateTeviJwksUrl(rawUrl: string): void {
 
 function validateTeviApiBase(rawUrl: string): void {
   validateHttpsUrl(rawUrl, "TEVI_API_BASE");
+}
+
+function validatePaymentApiBase(rawUrl: string): void {
+  validateHttpsUrl(rawUrl, "TEVI_PAYMENT_API_BASE");
+}
+
+function parsePositiveSafeInteger(rawValue: string, name: string): number {
+  const parsedValue = Number(rawValue);
+  if (!Number.isSafeInteger(parsedValue) || parsedValue <= 0) {
+    throw new Error(`${name} must be a positive safe integer`);
+  }
+
+  return parsedValue;
 }
 
 function validateHttpsUrl(rawUrl: string, name: string): void {
