@@ -244,25 +244,30 @@
     }
 
     function normalizeTopupOutcome(response) {
-        if (isCancellation(response)) {
+        // Documented Tevi success indicator: response.call === "ok" (see /docs/sdk topup).
+        var call = response && typeof response.call === "string" ? response.call : null;
+        if (call === "ok") {
+            var pending = topupState("webhook-pending", "sdk-confirmed");
+            var reference = extractSafeTopupReference(response);
+            if (reference) pending.reference = reference;
+            return pending;
+        }
+
+        if (isCancellation(response) || (call && /cancel/i.test(call))) {
             return topupState("canceled", "user-cancelled");
         }
 
+        // Transient SDK bridge errors (timeout / not-ready / device) are recoverable.
         var errorCode = getSdkErrorCode(response);
-        if (errorCode !== null && errorCode !== 0) {
-            // Reason carries only the numeric code — never error_message (provider text).
-            var transient = RETRYABLE_SDK_ERROR_CODES.indexOf(errorCode) !== -1;
-            return topupState(transient ? "retryable-failure" : "failed", "sdk-error:" + errorCode);
+        if (errorCode !== null && errorCode !== 0 && RETRYABLE_SDK_ERROR_CODES.indexOf(errorCode) !== -1) {
+            return topupState("retryable-failure", "sdk-error:" + errorCode);
         }
 
-        if (isLegacyTopupError(response)) {
-            return topupState("failed", topupErrorReason(response));
-        }
-
-        var pending = topupState("webhook-pending", "sdk-confirmed");
-        var reference = extractSafeTopupReference(response);
-        if (reference) pending.reference = reference;
-        return pending;
+        // Anything that is not an explicit "ok" is a failure — never an optimistic pending.
+        if (call) return topupState("failed", "provider-call:" + call.slice(0, 40));
+        if (errorCode !== null && errorCode !== 0) return topupState("failed", "sdk-error:" + errorCode);
+        if (isLegacyTopupError(response)) return topupState("failed", topupErrorReason(response));
+        return topupState("failed", "unknown-response");
     }
 
     function runTopup(config, options) {

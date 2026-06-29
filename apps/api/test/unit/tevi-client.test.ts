@@ -407,7 +407,7 @@ describe("browser Tevi client top-up SDK adapter", () => {
     let captured: Record<string, unknown> | undefined;
     const sandbox = topupSandbox((options: Record<string, unknown>, callback: (response: unknown) => void) => {
       captured = options;
-      callback({ error_code: 0, error_message: "", data: { id: "tevi-ref-1" } });
+      callback({ call: "ok", amount: 100, data: { id: "tevi-ref-1" } });
     });
     const client = (sandbox.window.ChinaSlotTeviClient as TeviClientApi).createFromWindow();
 
@@ -477,8 +477,8 @@ describe("browser Tevi client top-up SDK adapter", () => {
     expect(JSON.stringify(declinedResult)).not.toContain("declined");
   });
 
-  it("treats an error_code:0 callback as a pending deposit and surfaces only a safe reference", async () => {
-    const sandbox = topupSandbox((_o: unknown, cb: (r: unknown) => void) => cb({ error_code: 0, error_message: "", data: { reference: "safe-ref-9" } }));
+  it("treats a documented call:ok callback as a pending deposit and surfaces only a safe reference", async () => {
+    const sandbox = topupSandbox((_o: unknown, cb: (r: unknown) => void) => cb({ call: "ok", data: { reference: "safe-ref-9" } }));
     const client = (sandbox.window.ChinaSlotTeviClient as TeviClientApi).createFromWindow();
 
     await expect(client.topup({ amount: 100, depositToken: "deposit-token-secret" })).resolves.toEqual({
@@ -486,6 +486,17 @@ describe("browser Tevi client top-up SDK adapter", () => {
       status: "webhook-pending",
       reason: "sdk-confirmed",
       reference: "safe-ref-9"
+    });
+  });
+
+  it("treats a non-ok call value as a failure rather than an optimistic pending", async () => {
+    const sandbox = topupSandbox((_o: unknown, cb: (r: unknown) => void) => cb({ call: "insufficient_funds" }));
+    const client = (sandbox.window.ChinaSlotTeviClient as TeviClientApi).createFromWindow();
+
+    await expect(client.topup({ amount: 100, depositToken: "deposit-token-secret" })).resolves.toEqual({
+      ok: false,
+      status: "failed",
+      reason: "provider-call:insufficient_funds"
     });
   });
 
