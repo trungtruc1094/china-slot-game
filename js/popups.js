@@ -97,10 +97,10 @@ function createTopupPUHandler(popup)
     popup['minusButton'].clickEvent.add(()=>{popup.scene.soundController.playClip('button_click', false);}, popup);
     popup['plusButton'].clickEvent.add(()=>{popup.scene.soundController.playClip('button_click', false);}, popup);
 
-    // confirm (deposit) and exit
+    // confirm (deposit) and exit — label centered on the button and sized to fit
     popup.addButton('okButton','middle_button', 'middle_button_hover', false, 0, 140 + yOffset);
     popup['okButton'].clickEvent.add(()=>{popup.scene.soundController.playClip('button_click', false);}, popup);
-    popup.okText = popup.scene.add.bitmapText(0, 138 + yOffset, 'gameFont_1', 'DEPOSIT', 48, 1).setOrigin(0.5);
+    popup.okText = popup.scene.add.bitmapText(0, 136 + yOffset, 'gameFont_1', 'DEPOSIT', 42, 1).setOrigin(0.5);
     popup.okText.tint = 0xFFFFFF;
     popup.add(popup.okText);
 

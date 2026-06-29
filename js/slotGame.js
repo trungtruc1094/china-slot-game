@@ -644,21 +644,27 @@ class SlotGame extends Phaser.Scene{
 
     // Phaser deposit entry button, shown only inside an explicit Tevi sandbox session.
     // Reuses the existing popup button asset; opens the in-game deposit modal on click.
+    // Position comes from the active layout (slotConfig.layout.controls.deposit) so it stays
+    // on-screen in both portrait and landscape.
     initializeTeviDepositEntry()
     {
         if (!this.isTopupAvailable()) return null;
         if (typeof SceneButton === "undefined") return null;
 
-        var halfW = slotGame.config.width / 2;
-        var halfH = slotGame.config.height / 2;
+        var layout = (slotConfig.layout && slotConfig.layout.controls && slotConfig.layout.controls.deposit)
+            || { x: -740, y: -420, scale: 0.9 };
+        var scale = layout.scale != null ? layout.scale : 0.9;
 
         this.depositButton = new SceneButton(this, 'middle_button', 'middle_button_hover', false);
-        this.depositButton.create(-halfW + 220, -halfH + 110, 0.5, 0.5);
-        this.depositButton.button.setScale(0.7);
+        this.depositButton.create(layout.x, layout.y, 0.5, 0.5);
+        this.depositButton.button.setScale(scale);
         this.depositButton.setDepth(15);
         this.depositButton.addClickEvent(() => { this.openDepositModal(); }, this);
 
-        this.depositButtonText = this.add.bitmapText(this.depositButton.posX, this.depositButton.posY, 'gameFont_1', 'DEPOSIT ★', 40, 1).setOrigin(0.5);
+        // Label centered on the button, scaled with it so text and background stay aligned.
+        this.depositButtonText = this.add.bitmapText(this.depositButton.posX, this.depositButton.posY - 4, 'gameFont_1', 'DEPOSIT', 42, 1).setOrigin(0.5);
+        this.depositButtonText.setScale(scale);
+        this.depositButtonText.tint = 0xFFFFFF;
         this.depositButtonText.depth = 16;
         return this.depositButton;
     }
