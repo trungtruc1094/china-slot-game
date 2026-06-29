@@ -93,6 +93,7 @@ interface TeviSandbox {
   };
   location?: { search: string };
   URLSearchParams: typeof URLSearchParams;
+  Buffer?: typeof Buffer;
   ChinaSlotTeviClient?: TeviClientApi;
 }
 
@@ -108,6 +109,7 @@ function loadRuntimeAndTeviClient(overrides: Partial<TeviSandbox> = {}): TeviSan
     setTimeout,
     clearTimeout,
     URLSearchParams,
+    Buffer,
     ...overrides
   };
 
@@ -427,6 +429,33 @@ describe("browser Tevi client top-up SDK adapter", () => {
     });
     // The deposit token must never appear in the normalized client state.
     expect(JSON.stringify(result)).not.toContain("deposit-token-secret");
+  });
+
+  it("sends the UUID channel_id decoded from the deposit token, not the configured numeric one", async () => {
+    const b64url = (value: object) => Buffer.from(JSON.stringify(value)).toString("base64url");
+    const depositToken = `${b64url({ alg: "none" })}.${b64url({ channel_id: "56eb9135-265f-4001-a876-9845818f26f7" })}.sig`;
+    let captured: Record<string, unknown> | undefined;
+    const sandbox = topupSandbox((options: Record<string, unknown>, callback: (response: unknown) => void) => {
+      captured = options;
+      callback({ call: "ok" });
+    });
+    const client = (sandbox.window.ChinaSlotTeviClient as TeviClientApi).createFromWindow();
+
+    await expect(client.topup({ amount: 100, depositToken })).resolves.toMatchObject({ ok: true, status: "webhook-pending" });
+    expect(captured?.channel_id).toBe("56eb9135-265f-4001-a876-9845818f26f7");
+    expect(captured?.channel_id).not.toBe("channel_777");
+  });
+
+  it("falls back to the configured channel_id when the deposit token has no channel claim", async () => {
+    let captured: Record<string, unknown> | undefined;
+    const sandbox = topupSandbox((options: Record<string, unknown>, callback: (response: unknown) => void) => {
+      captured = options;
+      callback({ call: "ok" });
+    });
+    const client = (sandbox.window.ChinaSlotTeviClient as TeviClientApi).createFromWindow();
+
+    await client.topup({ amount: 100, depositToken: "opaque-non-jwt-token" });
+    expect(captured?.channel_id).toBe("channel_777");
   });
 
   it("normalizes a Tevi cancellation callback into a recoverable canceled state", async () => {

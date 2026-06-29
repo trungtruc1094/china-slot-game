@@ -297,6 +297,16 @@
         return typeof code === "string" && code.length > 0 ? "provider-error:" + code : "provider-error";
     }
 
+    // Tevi's topup() requires channel_id as the UUID encoded in the deposit token payload
+    // (not the numeric billing channel id). Decode the token and read it out; never log the token.
+    function extractDepositChannelId(depositToken) {
+        var claims = decodeJwtClaims(depositToken);
+        if (!claims) return null;
+        if (typeof claims.channel_id === "string" && claims.channel_id.length > 0) return claims.channel_id;
+        if (typeof claims.billing_channel_id === "string" && claims.billing_channel_id.length > 0) return claims.billing_channel_id;
+        return null;
+    }
+
     function extractSafeTopupReference(response) {
         var data = response && response.data;
         if (!data) return null;
@@ -350,9 +360,12 @@
             return Promise.resolve(topupState("failed", "deposit-token-missing"));
         }
 
+        var extractedChannelId = hasToken ? extractDepositChannelId(depositToken) : null;
+        var resolvedChannelId = extractedChannelId || config.channelId;
+        var channelSource = extractedChannelId ? "deposit-token" : "config";
         var sdkOptions = {
             amount: options.amount,
-            channel_id: config.channelId,
+            channel_id: resolvedChannelId,
             metadata: buildSafeTopupMetadata(options)
         };
         if (hasToken) sdkOptions.deposit_token = depositToken;
@@ -376,7 +389,10 @@
             try {
                 sdk.topup(sdkOptions, function (response) {
                     var outcome = normalizeTopupOutcome(response);
-                    setTopupDiagnostic(summarizeTopupResponse(response), outcome);
+                    var summary = summarizeTopupResponse(response);
+                    summary.channelId = resolvedChannelId;
+                    summary.channelSource = channelSource;
+                    setTopupDiagnostic(summary, outcome);
                     complete(outcome);
                 });
             } catch (_error) {
@@ -461,6 +477,8 @@
             lines.push("--- topup (token-safe) ---");
             if (lastTopupDiagnostic.resolvedStatus !== undefined) lines.push("topup.status: " + lastTopupDiagnostic.resolvedStatus);
             if (lastTopupDiagnostic.resolvedReason !== undefined) lines.push("topup.reason: " + lastTopupDiagnostic.resolvedReason);
+            if (lastTopupDiagnostic.channelId !== undefined) lines.push("topup.channelId: " + lastTopupDiagnostic.channelId);
+            if (lastTopupDiagnostic.channelSource !== undefined) lines.push("topup.channelSource: " + lastTopupDiagnostic.channelSource);
             if (lastTopupDiagnostic.call !== undefined) lines.push("topup.call: " + lastTopupDiagnostic.call);
             if (lastTopupDiagnostic.error_code !== undefined) lines.push("topup.error_code: " + lastTopupDiagnostic.error_code);
             if (lastTopupDiagnostic.topKeys !== undefined) lines.push("topup.topKeys: " + lastTopupDiagnostic.topKeys);
