@@ -761,6 +761,18 @@ Tevi readiness gates:
 
 This updated boundary supersedes the old non-cash reward assumption only for the Tevi integration path. Non-Tevi deployments remain inside the original non-cash community reward boundary unless a separate PRD and architecture update changes them.
 
+### Verified Tevi API Contracts (Sandbox, 2026-06-30)
+
+The contracts below were confirmed end-to-end against the live Tevi sandbox during Story 8.5 and **correct several planning assumptions above**. They are authoritative for implementation; the full reference (with diagnostics and a per-game checklist) is `docs/tevi-integration-playbook.md`. The official `docs.tevi.com` shapes were repeatedly wrong — prefer runtime/playbook where they conflict.
+
+- **Auth token shape:** `TeviJS.getUserInfo` returns the token at **top-level `userInfo.user_app_token`** (no `data` wrapper); success indicator is `call: "ok"`.
+- **JWT claims are numeric, not boolean/string:** `user_is_active` and `user_anonymous` arrive as `1`/`0`, and `user_id` as a number. `TeviAuthAdapter` must coerce these (not require strict `=== true`/`typeof "string"`), and `TEVI_JWKS_URL` must be the full sandbox URL `https://developer-api.sbx.tevi.dev/api/v1/auth/jwks`.
+- **Deposit-token issuance auth:** `TeviPaymentClient` must call `POST /api/v1/payments/top-up-signature` with **`Authorization: Bearer <user_app_token>`** (the end user's token, **forwarded** from the client) and body `{ amount }` — **not** the app API key/secret. This means the auth middleware must retain and thread the raw bearer token, not just the decoded identity. The deposit token is returned at **`data.token`** (not `data.deposit_token`).
+- **SDK `topup()` contract:** success is `response.call === "ok"`; `channel_id` must be the **UUID decoded from the deposit-token payload**, not the numeric billing channel id. Failures carry `msg`/`response` detail (e.g. `Insufficient balance.`).
+- **Webhook signature header is `X-Tevi-Signature`** (HMAC-SHA256 over the compact JSON payload) — note the casing differs from the `X-TEVI-SIGNATURE` used in the boundary notes above; use the verified casing in `TeviWebhookService`.
+- **Cashout** (`POST /api/v1/payments/cashout`) authenticates with **`X-API-Key`** (server-to-server) — distinct from top-up's user-token auth.
+- **Operational:** the top-up route only mounts when both Tevi auth and `TEVI_PAYMENT_ENABLED=true` are configured (missing config → silent 404); the Tevi webview caches aggressively (cache-bust client assets); and there is no in-webview console (ship a token-safe `?debugTevi=1` panel + structured `[tevi-*]` backend logs).
+
 ### Updated Structure Additions
 
 Add or refine the API structure as follows:

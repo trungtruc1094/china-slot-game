@@ -253,6 +253,30 @@ The automated tests cover the state machine and guardrails. The following manual
 - Missing-token 403 verification: in a controlled path only, deliberately invoke top-up without a `deposit_token` (`forceSdkCallWithoutToken`) and record that Tevi surfaces the expected `403`-class failure. Normal code never calls the SDK without a token.
 - Webhook follow-through: pending **cannot** become credited from this story alone. Credited-state evidence is blocked by Story 8.6 (webhook verification + idempotent wallet crediting).
 
+### Sandbox Verification Results (executed 2026-06-30)
+
+Manual AC7 Check Round was executed live in the Tevi mobile sandbox (`chinareel.pleagamehub.com` + `china-slot-api` on Render). The full pipeline is **verified working end-to-end up to the actual Tevi charge**; the only remaining blocker is external (Tevi sandbox wallet funding). Verified via the on-screen `?debugTevi=1` panel + Render `[tevi-*]` logs (token-safe).
+
+Verified chain (each confirmed by log/panel):
+- ✅ Tevi-mode launch, SDK loaded, `getUserInfo` returns `user_app_token` (real shape: top-level `userInfo`, no `data` wrapper).
+- ✅ Backend JWT verification (after fixing numeric `user_is_active`/`user_anonymous`/`user_id` claims and the JWKS URL).
+- ✅ Backend issues deposit token — `POST /api/v1/payments/top-up-signature` → `201`, `[tevi-topup] deposit token issued`.
+- ✅ SDK `topup()` invoked; Tevi confirmation sheet shown; callback received (`call` contract).
+- ✅ `channel_id` correctly resolved to the UUID decoded from the deposit-token payload.
+- ⛔ Final charge declined with `topup.msg: "Insufficient balance."` — the sandbox Tevi wallet holds no Stars. Tevi's "Purchase Star" funding sheet then returned `internal_server_error` (Tevi-side sandbox bug). **Not an app defect.**
+
+Cascade of real integration defects found & fixed during this Check Round (all were latent because Stories 8.2–8.4 were never validated live):
+1. Client read `getUserInfo` token at `data.userInfo` — real shape is top-level `userInfo`.
+2. Verifier required boolean/string claims — Tevi sends numeric `user_is_active:1`, `user_anonymous:0`, `user_id:<number>`.
+3. `TEVI_JWKS_URL` must be the full HTTPS URL incl. `/api/v1/auth/jwks`; payment route only mounts when `TEVI_PAYMENT_ENABLED=true` (else silent 404).
+4. Backend → Tevi deposit-token call must use `Bearer <user_app_token>` (forwarded) + body `{amount}`, not app API key/secret.
+5. Deposit token is at `data.token`, not `data.deposit_token`.
+6. SDK `topup` success indicator is `call === "ok"`; `channel_id` must be the UUID from the deposit-token payload, not the numeric billing channel id.
+
+**Outstanding to fully close AC2/AC7 (pending-state proof):** fund the sandbox Tevi account with Stars (and/or resolve Tevi's Purchase-Star sandbox 500), then re-run and confirm the UI lands on `webhook-pending`. This is a Tevi account/sandbox action, not code.
+
+**Reusable knowledge** (verified Tevi contracts + gotchas + diagnostics, written for future stories and future game integrations): see `docs/tevi-integration-playbook.md`.
+
 ### Secret/Leakage Sweep
 
 - Grepped touched `js/` files for `deposit_token`/`depositToken`/`runtimeToken`/`Authorization`/`Bearer`: the deposit token flows in-memory only (signature result → `teviClient.topup` → SDK `deposit_token` field) and the runtime token only as the `Authorization` header value. Neither is logged, persisted to localStorage, placed in debug/pending state, or returned in normalized client state.

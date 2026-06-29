@@ -8,6 +8,8 @@ parent_prd: prd-china-slot-game-2026-06-01
 
 # Tevi Mini App Integration PRD Addendum: China Slot Game
 
+> **Implementers (Stories 8.6+):** Before coding any Tevi-facing behavior, read `docs/tevi-integration-playbook.md`. It records the **verified-against-sandbox** Tevi API contracts and the real gotchas (numeric JWT claims, top-level `userInfo`, deposit token at `data.token`, UUID `channel_id` from the deposit token, forwarded `user_app_token` auth, conditional route mounting / silent 404, webview cache-busting, etc.). The official `docs.tevi.com` shapes were repeatedly wrong — the playbook supersedes them where they conflict.
+
 ## 0. Understanding And Open Assumptions
 
 ### Understanding
