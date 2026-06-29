@@ -109,7 +109,7 @@ development_status:
   8-2-authenticate-tevi-users-and-map-player-identity: done
   8-3-exchange-and-refresh-tevi-tokens: done
   8-4-issue-backend-top-up-signatures: done
-  8-5-run-sdk-top-up-with-pending-wallet-state: backlog
+  8-5-run-sdk-top-up-with-pending-wallet-state: ready-for-dev
   8-6-verify-tevi-webhooks-and-credit-stars-idempotently: backlog
   8-7-spin-with-server-owned-stars-wallet-and-ledger: backlog
   8-8-request-manual-tevi-stars-cashout: backlog
