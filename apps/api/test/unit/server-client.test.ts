@@ -17,6 +17,7 @@ interface ServerClientApi {
   }) => {
     startSession: () => Promise<{ sessionId: string; playerId: string; balance?: { points: number } } | null>;
     spin: (request: { clientSpinId: string; wager: { lineBet: number; selectedWays: number; totalWager: number } }) => Promise<NormalizedSpinResult | SpinRetryState>;
+    requestTopupSignature: (amount: number) => Promise<TopupSignatureResult>;
     mode: "production" | "demo";
     status: string;
   };
@@ -31,6 +32,24 @@ interface ServerClientApi {
   buildRetryState: (error: Error) => SpinRetryState;
 }
 
+type TopupSignatureResult =
+  | { ok: true; depositToken: string; requestId: string }
+  | { ok: false; status: string; reason: string; retryable: boolean; requestId: string | null };
+
+interface TopupGame {
+  topupState: string;
+  topupPending: boolean;
+  topupReference: string | null;
+  topupModal: unknown;
+  topupAmount: number;
+  teviClient: unknown;
+  serverClient: unknown;
+  guiController?: unknown;
+  slotPlayer: unknown;
+  submitTopup: (amount: number) => Promise<unknown> | null;
+  topupStatusMessage: (status: string) => string;
+}
+
 interface SlotGameCtor {
   prototype: {
     initializeBackendSessionBalance: () => void;
@@ -41,6 +60,17 @@ interface SlotGameCtor {
     createClientSpinId: () => string;
     createBackendWager: () => { lineBet: number; selectedWays: number; totalWager: number };
     runSlot: () => void;
+    submitTopup: (amount: number) => Promise<unknown> | null;
+    isTopupAvailable: () => boolean;
+    isValidTopupAmount: (amount: number) => boolean;
+    resolveTopupMaxStars: () => number;
+    createTopupAttemptId: () => string;
+    setTopupState: (state: string) => void;
+    finishTopup: (status: string) => void;
+    handleTopupResult: (result: unknown) => void;
+    topupStatusMessage: (status: string) => string;
+    renderTopupStatus: () => void;
+    updateTopupConfirmEnabled: () => void;
   };
 }
 
@@ -766,3 +796,307 @@ describe("browser server client render contract", () => {
 function isRetryState(result: NormalizedSpinResult | SpinRetryState): result is SpinRetryState {
   return "retryable" in result && result.retryable === true;
 }
+
+interface TopupClientHooks {
+  teviMode?: boolean;
+  tokenResult?: { ok: boolean; runtimeToken?: string; status: string; reason?: string };
+}
+
+function createTopupBackendClient(
+  client: ServerClientApi,
+  fetchMock: (url: string, init: { method: string; headers: Record<string, string>; body: string }) => Promise<MockResponse>,
+  hooks: TopupClientHooks = {}
+): ReturnType<ServerClientApi["createBackendClient"]> {
+  return client.createBackendClient({
+    mode: "production",
+    apiBaseUrl: "https://api.example.test",
+    identity: { provider: "guest", subject: "browser-player" },
+    teviClient: {
+      isTeviMode: () => hooks.teviMode ?? true,
+      getUserAppToken: async () => hooks.tokenResult ?? { ok: true, status: "authenticated", runtimeToken: "runtime-token-secret" }
+    },
+    fetch: fetchMock
+  });
+}
+
+describe("browser server client Tevi top-up signature requests", () => {
+  it("requests an authenticated deposit token and returns it with the correlation id", async () => {
+    const client = loadServerClient();
+    const calls: Array<{ url: string; init: { method: string; headers: Record<string, string>; body: string } }> = [];
+    const backendClient = createTopupBackendClient(client, async (url, init) => {
+      calls.push({ url, init });
+      return {
+        ok: true,
+        status: 201,
+        json: async () => ({ data: { deposit_token: "provider.deposit.token" }, error: null, requestId: init.headers["x-request-id"] })
+      };
+    });
+
+    const result = await backendClient.requestTopupSignature(100);
+
+    expect(result).toMatchObject({ ok: true, depositToken: "provider.deposit.token" });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toBe("https://api.example.test/api/v1/payments/top-up-signature");
+    expect(calls[0]?.init.method).toBe("POST");
+    expect(calls[0]?.init.headers.authorization).toBe("Bearer runtime-token-secret");
+    expect(calls[0]?.init.headers["x-request-id"]).toMatch(/^req_browser_/);
+    expect(JSON.parse(calls[0]?.init.body ?? "{}")).toEqual({ amount: 100 });
+    if (result.ok) {
+      expect(result.requestId).toBe(calls[0]?.init.headers["x-request-id"]);
+    }
+  });
+
+  it("refuses to request a signature outside Tevi mode and never falls back to guest identity", async () => {
+    const client = loadServerClient();
+    const calls: string[] = [];
+    const backendClient = createTopupBackendClient(client, async (url) => {
+      calls.push(url);
+      return { ok: true, status: 201, json: async () => ({ data: { deposit_token: "provider.deposit.token" }, error: null }) };
+    }, { teviMode: false });
+
+    await expect(backendClient.requestTopupSignature(100)).resolves.toEqual({
+      ok: false,
+      status: "blocked",
+      reason: "tevi-mode-required",
+      retryable: false,
+      requestId: null
+    });
+    expect(calls).toEqual([]);
+  });
+
+  it("surfaces Tevi re-authentication without calling the backend", async () => {
+    const client = loadServerClient();
+    const calls: string[] = [];
+    const backendClient = createTopupBackendClient(client, async (url) => {
+      calls.push(url);
+      return { ok: true, status: 201, json: async () => ({ data: { deposit_token: "provider.deposit.token" }, error: null }) };
+    }, { tokenResult: { ok: false, status: "re-authentication-required", reason: "user-cancelled" } });
+
+    await expect(backendClient.requestTopupSignature(100)).resolves.toMatchObject({
+      ok: false,
+      status: "re-authentication-required",
+      reason: "user-cancelled",
+      retryable: true
+    });
+    expect(calls).toEqual([]);
+  });
+
+  it("rejects invalid amounts before any network call", async () => {
+    const client = loadServerClient();
+    const calls: string[] = [];
+    const backendClient = createTopupBackendClient(client, async (url) => {
+      calls.push(url);
+      return { ok: true, status: 201, json: async () => ({ data: { deposit_token: "x" }, error: null }) };
+    });
+
+    await expect(backendClient.requestTopupSignature(1.5)).resolves.toMatchObject({ ok: false, status: "failed", reason: "invalid-amount" });
+    expect(calls).toEqual([]);
+  });
+
+  it("treats a missing deposit token in a success envelope as a safe failed state", async () => {
+    const client = loadServerClient();
+    const backendClient = createTopupBackendClient(client, async () => ({
+      ok: true,
+      status: 201,
+      json: async () => ({ data: {}, error: null, requestId: "req_no_token" })
+    }));
+
+    await expect(backendClient.requestTopupSignature(100)).resolves.toMatchObject({
+      ok: false,
+      status: "failed",
+      reason: "deposit-token-missing"
+    });
+  });
+
+  it.each([
+    [401, "TEVI_AUTH_REQUIRED", { status: "re-authentication-required", reason: "tevi-auth-required", retryable: true }],
+    [403, "TEVI_WRONG_APP", { status: "blocked", reason: "tevi-forbidden", retryable: false }],
+    [409, "TEVI_TOP_UP_DUPLICATE_REQUEST", { status: "failed", reason: "signature-rejected", retryable: false }],
+    [503, "TEVI_PAYMENT_CONFIG_MISSING", { status: "retryable-failure", reason: "backend-unavailable", retryable: true }]
+  ])("maps a %s backend error into a safe top-up state", async (httpStatus, code, expected) => {
+    const client = loadServerClient();
+    const backendClient = createTopupBackendClient(client, async () => ({
+      ok: false,
+      status: httpStatus as number,
+      json: async () => ({ data: null, error: { code, message: "internal db-01 sess_secret", details: {} } })
+    }));
+
+    await expect(backendClient.requestTopupSignature(100)).resolves.toMatchObject(expected as Record<string, unknown>);
+  });
+
+  it("converts a network failure into a retryable top-up failure", async () => {
+    const client = loadServerClient();
+    const backendClient = createTopupBackendClient(client, async () => {
+      throw new Error("network offline at db-01 req_secret_123");
+    });
+
+    await expect(backendClient.requestTopupSignature(100)).resolves.toMatchObject({
+      ok: false,
+      status: "retryable-failure",
+      reason: "backend-unavailable",
+      retryable: true
+    });
+  });
+});
+
+describe("slot game Tevi deposit flow", () => {
+  function bindTopupGame(SlotGame: SlotGameCtor, overrides: Partial<TopupGame>): TopupGame {
+    return {
+      topupState: "idle",
+      topupPending: false,
+      topupReference: null,
+      topupModal: null,
+      topupAmount: 0,
+      teviClient: null,
+      serverClient: null,
+      guiController: null,
+      slotPlayer: null,
+      submitTopup: SlotGame.prototype.submitTopup,
+      isTopupAvailable: SlotGame.prototype.isTopupAvailable,
+      isValidTopupAmount: SlotGame.prototype.isValidTopupAmount,
+      resolveTopupMaxStars: SlotGame.prototype.resolveTopupMaxStars,
+      createTopupAttemptId: SlotGame.prototype.createTopupAttemptId,
+      setTopupState: SlotGame.prototype.setTopupState,
+      finishTopup: SlotGame.prototype.finishTopup,
+      handleTopupResult: SlotGame.prototype.handleTopupResult,
+      topupStatusMessage: SlotGame.prototype.topupStatusMessage,
+      renderTopupStatus: SlotGame.prototype.renderTopupStatus,
+      updateTopupConfirmEnabled: SlotGame.prototype.updateTopupConfirmEnabled,
+      ...overrides
+    } as unknown as TopupGame;
+  }
+
+  it("moves to pending without mutating the wallet on SDK success", async () => {
+    const SlotGame = loadSlotGame();
+    const balanceCalls: number[] = [];
+    const topupCalls: Array<Record<string, unknown>> = [];
+    const game = bindTopupGame(SlotGame, {
+      teviClient: {
+        isTeviMode: () => true,
+        topup: async (options: Record<string, unknown>) => {
+          topupCalls.push(options);
+          return { ok: true, status: "webhook-pending", reason: "sdk-confirmed", reference: "tevi-ref-9" };
+        }
+      },
+      serverClient: {
+        requestTopupSignature: async () => ({ ok: true, depositToken: "provider.deposit.token", requestId: "req_browser_1" })
+      },
+      slotPlayer: { setCoinsCount: (points: number) => balanceCalls.push(points), addCoins: (points: number) => balanceCalls.push(points) }
+    });
+
+    await game.submitTopup(100);
+
+    expect(game.topupState).toBe("webhook-pending");
+    expect(game.topupPending).toBe(false);
+    expect(game.topupReference).toBe("tevi-ref-9");
+    expect(balanceCalls).toEqual([]);
+    expect(topupCalls).toHaveLength(1);
+    expect(topupCalls[0]).toMatchObject({ amount: 100, depositToken: "provider.deposit.token", requestId: "req_browser_1" });
+    expect(game.topupStatusMessage("webhook-pending")).toContain("Waiting for Tevi confirmation");
+  });
+
+  it("debounces duplicate deposit submissions while a request is in flight", async () => {
+    const SlotGame = loadSlotGame();
+    let signatureCalls = 0;
+    let releaseSignature: (value: { ok: false; status: string; reason: string; retryable: boolean; requestId: null }) => void = () => undefined;
+    const game = bindTopupGame(SlotGame, {
+      teviClient: { isTeviMode: () => true, topup: async () => ({ ok: true, status: "webhook-pending" }) },
+      serverClient: {
+        requestTopupSignature: async () => {
+          signatureCalls += 1;
+          return new Promise((resolve) => {
+            releaseSignature = resolve;
+          });
+        }
+      },
+      slotPlayer: { setCoinsCount: () => undefined }
+    });
+
+    const first = game.submitTopup(100);
+    const second = game.submitTopup(100);
+
+    expect(second).toBeNull();
+    expect(signatureCalls).toBe(1);
+    releaseSignature({ ok: false, status: "retryable-failure", reason: "backend-unavailable", retryable: true, requestId: null });
+    await first;
+    expect(game.topupPending).toBe(false);
+  });
+
+  it("rejects an invalid amount without requesting a signature", async () => {
+    const SlotGame = loadSlotGame();
+    let signatureCalls = 0;
+    const game = bindTopupGame(SlotGame, {
+      teviClient: { isTeviMode: () => true, topup: async () => ({ ok: true, status: "webhook-pending" }) },
+      serverClient: {
+        requestTopupSignature: async () => {
+          signatureCalls += 1;
+          return { ok: true, depositToken: "x", requestId: "r" };
+        }
+      },
+      slotPlayer: { setCoinsCount: () => undefined }
+    });
+
+    expect(game.submitTopup(1.5)).toBeNull();
+    expect(game.topupState).toBe("invalid-amount");
+    expect(signatureCalls).toBe(0);
+  });
+
+  it("surfaces a signature re-auth failure without calling the SDK or wallet", async () => {
+    const SlotGame = loadSlotGame();
+    const balanceCalls: number[] = [];
+    let sdkCalls = 0;
+    const game = bindTopupGame(SlotGame, {
+      teviClient: {
+        isTeviMode: () => true,
+        topup: async () => {
+          sdkCalls += 1;
+          return { ok: true, status: "webhook-pending" };
+        }
+      },
+      serverClient: {
+        requestTopupSignature: async () => ({ ok: false, status: "re-authentication-required", reason: "tevi-auth-required", retryable: true, requestId: null })
+      },
+      slotPlayer: { setCoinsCount: (points: number) => balanceCalls.push(points) }
+    });
+
+    await game.submitTopup(100);
+
+    expect(game.topupState).toBe("re-authentication-required");
+    expect(sdkCalls).toBe(0);
+    expect(balanceCalls).toEqual([]);
+    expect(game.topupPending).toBe(false);
+  });
+
+  it("maps an SDK cancellation into a recoverable canceled state", async () => {
+    const SlotGame = loadSlotGame();
+    const game = bindTopupGame(SlotGame, {
+      teviClient: { isTeviMode: () => true, topup: async () => ({ ok: false, status: "canceled", reason: "user-cancelled" }) },
+      serverClient: { requestTopupSignature: async () => ({ ok: true, depositToken: "provider.deposit.token", requestId: "req_browser_2" }) },
+      slotPlayer: { setCoinsCount: () => undefined }
+    });
+
+    await game.submitTopup(100);
+
+    expect(game.topupState).toBe("canceled");
+    expect(game.topupPending).toBe(false);
+  });
+
+  it("does nothing in local/demo mode where Tevi top-up is unavailable", async () => {
+    const SlotGame = loadSlotGame();
+    let signatureCalls = 0;
+    const game = bindTopupGame(SlotGame, {
+      teviClient: { isTeviMode: () => false, topup: async () => ({ ok: true, status: "webhook-pending" }) },
+      serverClient: {
+        requestTopupSignature: async () => {
+          signatureCalls += 1;
+          return { ok: true, depositToken: "x", requestId: "r" };
+        }
+      },
+      slotPlayer: { setCoinsCount: () => undefined }
+    });
+
+    expect(game.submitTopup(100)).toBeNull();
+    expect(signatureCalls).toBe(0);
+    expect(game.topupState).toBe("idle");
+  });
+});

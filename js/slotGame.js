@@ -210,6 +210,11 @@ class SlotGame extends Phaser.Scene{
         this.backendSpinPlan = null;
         this.backendSpinPending = false;
         this.backendSpinStatus = (this.serverClient && this.serverClient.mode === "production") ? "idle" : "demo";
+        this.topupState = "idle";
+        this.topupPending = false;
+        this.topupReference = null;
+        this.topupModal = null;
+        this.topupAmount = 0;
    
         // 5) add sounds 
         this.box_click_clip = this.sound.add('box_click_clip');
@@ -225,6 +230,7 @@ class SlotGame extends Phaser.Scene{
         this.slotControls.init(slotConfig.selectedLines, true);
         this.initializeTeviMiniAppShell();
         this.initializeBackendSessionBalance();
+        this.initializeTeviDepositEntry();
 
         // 7) state machine
         this.stateMachine = new StateMachine();
@@ -493,6 +499,236 @@ class SlotGame extends Phaser.Scene{
         this.slotPlayer.setCoinsCount(backendPlan.balanceAfter);
         this.slotControls.setFreeSpinsCount(backendPlan.freeSpinState.remaining);
         this.slotControls.setJackpotAmount(backendPlan.jackpotState.awarded);
+    }
+
+    // ----- Tevi Star top-up (Story 8.5): SDK initiation + pending state only -----
+    // This flow never mutates the authoritative wallet balance. Crediting happens
+    // only after Story 8.6 verifies the Tevi webhook and updates backend state.
+
+    isTopupAvailable()
+    {
+        return !!(this.teviClient && this.teviClient.isTeviMode && this.teviClient.isTeviMode()
+            && this.serverClient && typeof this.serverClient.requestTopupSignature === "function"
+            && this.teviClient.topup);
+    }
+
+    createTopupAttemptId()
+    {
+        return "topup-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2);
+    }
+
+    resolveTopupMaxStars()
+    {
+        var teviConfig = (typeof window !== "undefined" && window.CHINA_SLOT_TEVI_CONFIG) || {};
+        var topupConfig = teviConfig.topup || {};
+        var max = Number(topupConfig.maxStars);
+        return isFinite(max) && max > 0 ? max : 100000;
+    }
+
+    isValidTopupAmount(amount)
+    {
+        return typeof amount === "number" && isFinite(amount) && Math.floor(amount) === amount
+            && amount > 0 && amount <= this.resolveTopupMaxStars();
+    }
+
+    submitTopup(amount)
+    {
+        if (!this.isTopupAvailable()) return null;     // local/demo mode: no value-bearing top-up
+        if (this.topupPending) return null;            // debounce duplicate CTA taps
+        if (!this.isValidTopupAmount(amount)) {
+            this.setTopupState("invalid-amount");
+            return null;
+        }
+
+        this.topupPending = true;
+        var attemptId;
+        try {
+            // Guard the synchronous prelude so a render/clock error can never strand topupPending.
+            this.topupReference = null;
+            this.setTopupState("preparing");
+            attemptId = this.createTopupAttemptId();
+        } catch (_error) {
+            this.topupPending = false;
+            this.setTopupState("retryable-failure");
+            return null;
+        }
+
+        return this.serverClient.requestTopupSignature(amount).then((signature) => {
+            if (!signature || !signature.ok) {
+                this.finishTopup(signature && signature.status ? signature.status : "retryable-failure");
+                return null;
+            }
+
+            this.setTopupState("sdk-confirmation-open");
+
+            // The deposit token is passed straight to the SDK and never stored on the scene.
+            return this.teviClient.topup({
+                amount: amount,
+                depositToken: signature.depositToken,
+                requestId: signature.requestId,
+                attemptId: attemptId
+            }).then((result) => {
+                this.handleTopupResult(result);
+                return result;
+            });
+        }).catch(() => {
+            this.finishTopup("retryable-failure");
+            return null;
+        });
+    }
+
+    handleTopupResult(result)
+    {
+        var status = result && result.status ? result.status : "failed";
+        this.topupPending = false;
+        if (status === "webhook-pending") {
+            this.topupReference = (result && result.reference) || null;
+            // Intentionally do NOT update PlayerCoin/HUD/server balance here.
+            this.setTopupState("webhook-pending");
+            return;
+        }
+        this.finishTopup(status);
+    }
+
+    finishTopup(status)
+    {
+        this.topupPending = false;
+        this.setTopupState(status || "failed");
+    }
+
+    setTopupState(state)
+    {
+        this.topupState = state;
+        this.renderTopupStatus();
+    }
+
+    topupStatusMessage(status)
+    {
+        switch (status) {
+            case "idle":
+                return "Ready to deposit Stars.";
+            case "preparing":
+                return "Preparing Tevi deposit.";
+            case "sdk-confirmation-open":
+                return "Waiting for Tevi confirmation.";
+            case "invalid-amount":
+                return "Enter a whole number of Stars to deposit.";
+            case "webhook-pending":
+                return this.topupReference
+                    ? "Waiting for Tevi confirmation. Reference " + this.topupReference + "."
+                    : "Waiting for Tevi confirmation.";
+            case "canceled":
+                return "Deposit canceled.";
+            case "re-authentication-required":
+                return "Sign in to Tevi again to deposit Stars.";
+            case "blocked":
+                return "Tevi deposit is unavailable right now.";
+            case "retryable-failure":
+                return "Tevi deposit did not complete. Tap Deposit to try again.";
+            default:
+                return "Tevi deposit could not be completed.";
+        }
+    }
+
+    resolveTopupPresets()
+    {
+        var defaults = [50, 100, 250, 500];
+        var teviConfig = (typeof window !== "undefined" && window.CHINA_SLOT_TEVI_CONFIG) || {};
+        var topupConfig = teviConfig.topup || {};
+        if (Array.isArray(topupConfig.presets)) {
+            var valid = topupConfig.presets.filter((value) => this.isValidTopupAmount(value));
+            if (valid.length > 0) return valid;   // fall back to defaults when all configured presets are invalid
+        }
+        return defaults;
+    }
+
+    // Phaser deposit entry button, shown only inside an explicit Tevi sandbox session.
+    // Reuses the existing popup button asset; opens the in-game deposit modal on click.
+    initializeTeviDepositEntry()
+    {
+        if (!this.isTopupAvailable()) return null;
+        if (typeof SceneButton === "undefined") return null;
+
+        var halfW = slotGame.config.width / 2;
+        var halfH = slotGame.config.height / 2;
+
+        this.depositButton = new SceneButton(this, 'middle_button', 'middle_button_hover', false);
+        this.depositButton.create(-halfW + 220, -halfH + 110, 0.5, 0.5);
+        this.depositButton.button.setScale(0.7);
+        this.depositButton.setDepth(15);
+        this.depositButton.addClickEvent(() => { this.openDepositModal(); }, this);
+
+        this.depositButtonText = this.add.bitmapText(this.depositButton.posX, this.depositButton.posY, 'gameFont_1', 'DEPOSIT ★', 40, 1).setOrigin(0.5);
+        this.depositButtonText.depth = 16;
+        return this.depositButton;
+    }
+
+    openDepositModal()
+    {
+        if (!this.isTopupAvailable()) return null;
+        if (this.topupModal) return this.topupModal;   // already open
+        if (!this.guiController || !this.guiController.showPopUp) return null;
+        if (typeof createTopupPUHandler === "undefined") return null;
+
+        var presets = this.resolveTopupPresets();
+        this.topupAmount = presets.length > 0 ? presets[0] : 0;
+        this.topupStep = presets.length > 0 ? presets[0] : 50;   // stepper increment mirrors the smallest preset
+        if (this.topupState !== "webhook-pending") this.setTopupState("idle");
+
+        var modal = this.guiController.showPopUp(createTopupPUHandler);
+        this.topupModal = modal;
+
+        modal.minusButton.addClickEvent(() => { this.adjustTopupAmount(-this.topupStep); }, this);
+        modal.plusButton.addClickEvent(() => { this.adjustTopupAmount(this.topupStep); }, this);
+        modal.okButton.addClickEvent(() => { this.submitTopup(this.topupAmount); }, this);
+        modal.exitButton.addClickEvent(() => { this.closeDepositModal(); }, this);
+
+        this.renderTopupModalAmount();
+        this.renderTopupStatus();
+        return modal;
+    }
+
+    closeDepositModal()
+    {
+        if (this.topupModal && this.guiController) {
+            this.guiController.closePopUp(this.topupModal);
+        }
+        this.topupModal = null;
+    }
+
+    adjustTopupAmount(delta)
+    {
+        if (this.topupPending) return;     // amount is locked while a deposit is in flight
+        var next = (Number(this.topupAmount) || 0) + delta;
+        var max = this.resolveTopupMaxStars();
+        if (next < 0) next = 0;
+        if (next > max) next = max;
+        this.topupAmount = next;
+        this.renderTopupModalAmount();
+        this.updateTopupConfirmEnabled();
+    }
+
+    renderTopupModalAmount()
+    {
+        if (this.topupModal && this.topupModal.amountText) {
+            this.topupModal.amountText.text = String(this.topupAmount || 0) + " ★";
+        }
+    }
+
+    renderTopupStatus()
+    {
+        if (this.topupModal && this.topupModal.messageText) {
+            this.topupModal.messageText.text = this.topupStatusMessage(this.topupState);
+        }
+        this.updateTopupConfirmEnabled();
+    }
+
+    updateTopupConfirmEnabled()
+    {
+        if (!this.topupModal || !this.topupModal.okButton) return;
+        var enabled = !this.topupPending && this.isValidTopupAmount(this.topupAmount);
+        this.topupModal.okButton.setInteractable(enabled);
+        if (this.topupModal.okButton.button) this.topupModal.okButton.button.alpha = enabled ? 1 : 0.5;
     }
 
     // add sprite relative to scene center

@@ -137,6 +137,131 @@
         return { ok: false, status: "re-authentication-required", reason: reason };
     }
 
+    function isPositiveInteger(value) {
+        return typeof value === "number" && isFinite(value) && Math.floor(value) === value && value > 0;
+    }
+
+    function topupState(status, reason) {
+        return { ok: status === "webhook-pending", status: status, reason: reason };
+    }
+
+    function buildSafeTopupMetadata(options) {
+        // Only safe correlation identifiers are forwarded to the SDK. Deposit tokens,
+        // bearer/refresh tokens, API keys, and provider payloads must never appear here.
+        var metadata = { type: "deposit" };
+        if (options) {
+            if (typeof options.requestId === "string" && options.requestId.length > 0) metadata.requestId = options.requestId;
+            if (typeof options.attemptId === "string" && options.attemptId.length > 0) metadata.attemptId = options.attemptId;
+        }
+        return metadata;
+    }
+
+    // Tevi helper_tevi.js delivers callbacks shaped { error_code, error_message, data, action }.
+    // error_code 0 / absent = success; transient codes (-14 timeout, -5 not ready, -6 device
+    // unavailable) are recoverable; any other non-zero code is terminal. We also tolerate the
+    // adapter's existing { error: { code }, data } convention used by getUserInfo.
+    var RETRYABLE_SDK_ERROR_CODES = [-14, -5, -6];
+    var DEFAULT_TOPUP_MAX_STARS = 100000;
+
+    function resolveTopupMaxStars() {
+        var topupConfig = (globalScope.CHINA_SLOT_TEVI_CONFIG && globalScope.CHINA_SLOT_TEVI_CONFIG.topup) || {};
+        var max = Number(topupConfig.maxStars);
+        return isFinite(max) && max > 0 ? max : DEFAULT_TOPUP_MAX_STARS;
+    }
+
+    function getSdkErrorCode(response) {
+        return response && typeof response.error_code === "number" ? response.error_code : null;
+    }
+
+    function isLegacyTopupError(response) {
+        if (!response) return false;
+        return !!response.error || response.call === "error" || response.success === false;
+    }
+
+    function topupErrorReason(response) {
+        var code = response && response.error && response.error.code;
+        return typeof code === "string" && code.length > 0 ? "provider-error:" + code : "provider-error";
+    }
+
+    function extractSafeTopupReference(response) {
+        var data = response && response.data;
+        if (!data) return null;
+        var candidate = data.reference || data.referenceId || data.transactionId || data.transaction_id || data.id;
+        return typeof candidate === "string" && candidate.length > 0 ? candidate : null;
+    }
+
+    function normalizeTopupOutcome(response) {
+        if (isCancellation(response)) {
+            return topupState("canceled", "user-cancelled");
+        }
+
+        var errorCode = getSdkErrorCode(response);
+        if (errorCode !== null && errorCode !== 0) {
+            // Reason carries only the numeric code — never error_message (provider text).
+            var transient = RETRYABLE_SDK_ERROR_CODES.indexOf(errorCode) !== -1;
+            return topupState(transient ? "retryable-failure" : "failed", "sdk-error:" + errorCode);
+        }
+
+        if (isLegacyTopupError(response)) {
+            return topupState("failed", topupErrorReason(response));
+        }
+
+        var pending = topupState("webhook-pending", "sdk-confirmed");
+        var reference = extractSafeTopupReference(response);
+        if (reference) pending.reference = reference;
+        return pending;
+    }
+
+    function runTopup(config, options) {
+        if (!config.enabled) return Promise.resolve(topupState("failed", "tevi-mode-disabled"));
+
+        var sdk = getSdk();
+        if (!sdk) return Promise.resolve(topupState("retryable-failure", "sdk-unavailable"));
+        if (typeof sdk.topup !== "function") return Promise.resolve(topupState("retryable-failure", "method-unavailable"));
+
+        if (!isPositiveInteger(options.amount)) return Promise.resolve(topupState("failed", "invalid-amount"));
+        if (options.amount > resolveTopupMaxStars()) return Promise.resolve(topupState("failed", "amount-too-large"));
+
+        var depositToken = options.depositToken;
+        var hasToken = typeof depositToken === "string" && depositToken.length > 0;
+        // The token-less SDK call exists only for the manual 403 verification path, and is
+        // gated to non-production so it can never ship as a normal deposit path.
+        var allowForcedNoToken = options.forceSdkCallWithoutToken === true && config.environment !== "production";
+        if (!hasToken && !allowForcedNoToken) {
+            return Promise.resolve(topupState("failed", "deposit-token-missing"));
+        }
+
+        var sdkOptions = {
+            amount: options.amount,
+            channel_id: config.channelId,
+            metadata: buildSafeTopupMetadata(options)
+        };
+        if (hasToken) sdkOptions.deposit_token = depositToken;
+
+        return new Promise(function (resolve) {
+            var settled = false;
+            var timeoutMs = typeof options.timeoutMs === "number" ? options.timeoutMs : 60000;
+            var timeoutId = setTimeout(function () {
+                complete(topupState("retryable-failure", "sdk-timeout"));
+            }, timeoutMs);
+
+            function complete(result) {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timeoutId);
+                resolve(result);
+            }
+
+            try {
+                sdk.topup(sdkOptions, function (response) {
+                    complete(normalizeTopupOutcome(response));
+                });
+            } catch (_error) {
+                complete(topupState("failed", "sdk-call-failed"));
+            }
+        });
+    }
+
     function loadSdkScript(config) {
         if (!config.enabled) return Promise.resolve({ available: false, reason: "tevi-mode-disabled" });
         if (getSdk()) return Promise.resolve({ available: true, reason: "sdk-present" });
@@ -242,6 +367,7 @@
             isTeviMode: function () { return config.enabled; },
             isSdkAvailable: function () { return !!getSdk(); },
             getUserAppToken: function (options) { return getUserAppToken(config, options || {}); },
+            topup: function (options) { return runTopup(config, options || {}); },
             showBackButton: function () { return callSdkMethod("showBackButton"); },
             showCloseButton: function () { return callSdkMethod("showCloseButton"); },
             loadConfig: function () { return callSdkMethod("loadConfig"); },

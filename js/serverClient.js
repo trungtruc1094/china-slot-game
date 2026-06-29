@@ -155,6 +155,53 @@
         return defaultRetryWindowMessage;
     }
 
+    function isPositiveInteger(value) {
+        return typeof value === "number" && isFinite(value) && Math.floor(value) === value && value > 0;
+    }
+
+    function topupSignatureFailure(reason, retryable, requestId) {
+        return {
+            ok: false,
+            status: retryable ? "retryable-failure" : "failed",
+            reason: reason,
+            retryable: !!retryable,
+            requestId: requestId || null
+        };
+    }
+
+    function topupSignatureReauth(reason) {
+        return { ok: false, status: "re-authentication-required", reason: reason, retryable: true, requestId: null };
+    }
+
+    function topupSignatureBlocked(reason, requestId) {
+        return { ok: false, status: "blocked", reason: reason, retryable: false, requestId: requestId || null };
+    }
+
+    var DEFAULT_TOPUP_MAX_STARS = 100000;
+
+    function resolveTopupMaxStars() {
+        var topupConfig = (globalScope.CHINA_SLOT_TEVI_CONFIG && globalScope.CHINA_SLOT_TEVI_CONFIG.topup) || {};
+        var max = Number(topupConfig.maxStars);
+        return isFinite(max) && max > 0 ? max : DEFAULT_TOPUP_MAX_STARS;
+    }
+
+    function mapTopupSignatureError(httpStatus, code, requestId) {
+        // Status 0 / opaque (CORS, blocked) responses are transient, not terminal rejections.
+        if (!httpStatus) {
+            return topupSignatureFailure("backend-unavailable", true, requestId);
+        }
+        if (httpStatus === 401 || code === "TEVI_AUTH_REQUIRED" || code === "TEVI_REAUTH_REQUIRED" || code === "TEVI_TOKEN_INVALID") {
+            return topupSignatureReauth("tevi-auth-required");
+        }
+        if (httpStatus === 403 || code === "TEVI_WRONG_APP" || code === "TEVI_ANONYMOUS_BLOCKED" || code === "TEVI_USER_INACTIVE") {
+            return topupSignatureBlocked("tevi-forbidden", requestId);
+        }
+        if (httpStatus >= 500 || httpStatus === 429) {
+            return topupSignatureFailure("backend-unavailable", true, requestId);
+        }
+        return topupSignatureFailure("signature-rejected", false, requestId);
+    }
+
     function createBackendClient(options) {
         var settings = options || {};
         var mode = resolveMode(settings);
@@ -163,6 +210,7 @@
         var storage = settings.storage || globalScope.localStorage;
         var identity = settings.identity || createBrowserIdentity(storage);
         var teviClient = settings.teviClient || null;
+        var topupRequestTimeoutMs = typeof settings.topupRequestTimeoutMs === "number" ? settings.topupRequestTimeoutMs : 15000;
         var session = null;
         var sessionRequest = null;
         var status = mode === "production" ? "idle" : "demo";
@@ -251,6 +299,79 @@
             return buildRetryState(error);
         }
 
+        async function requestTopupSignature(amount) {
+            if (mode !== "production") {
+                // Local/demo mode must never issue value-bearing top-up requests.
+                return topupSignatureFailure("not-production-mode", false);
+            }
+            if (!isTeviSessionMode()) {
+                // No guest or client-supplied identity fallback for Tevi top-up.
+                return topupSignatureBlocked("tevi-mode-required");
+            }
+            if (!isPositiveInteger(amount)) {
+                return topupSignatureFailure("invalid-amount", false);
+            }
+            if (amount > resolveTopupMaxStars()) {
+                // Client-side UX guard; the backend remains the authoritative limit.
+                return topupSignatureFailure("amount-too-large", false);
+            }
+            if (!fetchImpl) {
+                return topupSignatureFailure("backend-unavailable", true);
+            }
+
+            var tokenResult;
+            try {
+                tokenResult = await teviClient.getUserAppToken();
+            } catch (_error) {
+                return topupSignatureReauth("token-request-failed");
+            }
+            if (!tokenResult || !tokenResult.ok || !tokenResult.runtimeToken) {
+                return topupSignatureReauth(tokenResult && tokenResult.reason ? tokenResult.reason : "re-authentication-required");
+            }
+
+            var requestId = createRequestId();
+            var controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+            var abortTimer = controller ? setTimeout(function () { controller.abort(); }, topupRequestTimeoutMs) : null;
+            var response;
+            try {
+                response = await fetchImpl(apiBaseUrl + "/api/v1/payments/top-up-signature", {
+                    method: "POST",
+                    headers: {
+                        "content-type": "application/json",
+                        "x-request-id": requestId,
+                        "authorization": "Bearer " + tokenResult.runtimeToken
+                    },
+                    body: JSON.stringify({ amount: amount }),
+                    signal: controller ? controller.signal : undefined
+                });
+            } catch (_error) {
+                // Network failure or abort timeout — recoverable, never strands the UI.
+                return topupSignatureFailure("backend-unavailable", true, requestId);
+            } finally {
+                if (abortTimer) clearTimeout(abortTimer);
+            }
+
+            var envelope;
+            try {
+                envelope = await response.json();
+            } catch (_error) {
+                return topupSignatureFailure("invalid-response", true, requestId);
+            }
+
+            if (!response.ok || (envelope && envelope.error)) {
+                var code = envelope && envelope.error && envelope.error.code;
+                return mapTopupSignatureError(response.status, code, requestId);
+            }
+
+            var depositToken = envelope && envelope.data && envelope.data.deposit_token;
+            if (typeof depositToken !== "string" || depositToken.length === 0) {
+                // Never call the SDK without an authoritative deposit token.
+                return topupSignatureFailure("deposit-token-missing", false, requestId);
+            }
+
+            return { ok: true, depositToken: depositToken, requestId: requestId };
+        }
+
         return {
             mode: mode,
             apiBaseUrl: apiBaseUrl,
@@ -258,7 +379,8 @@
             get status() { return status; },
             startSession: startSession,
             spin: spin,
-            setRetry: setRetry
+            setRetry: setRetry,
+            requestTopupSignature: requestTopupSignature
         };
     }
 

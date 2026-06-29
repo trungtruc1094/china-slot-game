@@ -14,6 +14,12 @@
         channelId: teviConfig.channelId || globalScope.TEVI_CHANNEL_ID || "2300210851",
         appUrl: teviConfig.appUrl || globalScope.TEVI_APP_URL || "https://chinareel.pleagamehub.com/",
         webhookUrl: teviConfig.webhookUrl || globalScope.TEVI_WEBHOOK_URL || "https://china-slot-api.onrender.com/api/webhooks/tevi",
-        sdkUrl: teviConfig.sdkUrl || "https://static.tevicdn.com/helper_tevi.js"
+        sdkUrl: teviConfig.sdkUrl || "https://static.tevicdn.com/helper_tevi.js",
+        // Non-secret display values only. Authoritative deposit limits live in the backend;
+        // maxStars is a client-side UX guard, not an enforcement boundary.
+        topup: {
+            presets: (teviConfig.topup && teviConfig.topup.presets) || [50, 100, 250, 500],
+            maxStars: (teviConfig.topup && teviConfig.topup.maxStars) || 100000
+        }
     };
 })(typeof window !== "undefined" ? window : globalThis);

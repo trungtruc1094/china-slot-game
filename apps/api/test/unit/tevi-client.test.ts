@@ -13,6 +13,7 @@ interface TeviClient {
   initialize: () => Promise<TeviCallResult>;
   getState: () => TeviState;
   getUserAppToken: (options?: { isPopup?: boolean; timeoutMs?: number }) => Promise<TeviAuthTokenResult>;
+  topup: (options: TeviTopupOptions) => Promise<TeviTopupResult>;
   isTeviMode: () => boolean;
   isSdkAvailable: () => boolean;
   showBackButton: () => TeviCallResult;
@@ -52,6 +53,22 @@ interface TeviAuthTokenResult {
   runtimeToken?: string;
   status: string;
   reason?: string;
+}
+
+interface TeviTopupOptions {
+  amount?: number;
+  depositToken?: string;
+  requestId?: string;
+  attemptId?: string;
+  timeoutMs?: number;
+  forceSdkCallWithoutToken?: boolean;
+}
+
+interface TeviTopupResult {
+  ok: boolean;
+  status: string;
+  reason?: string;
+  reference?: string;
 }
 
 interface MockScriptElement {
@@ -348,5 +365,220 @@ describe("browser Tevi client", () => {
       reason: "sdk-timeout"
     });
     vi.useRealTimers();
+  });
+});
+
+describe("browser Tevi client top-up SDK adapter", () => {
+  function topupSandbox(topup: unknown): TeviSandbox {
+    return loadRuntimeAndTeviClient({
+      window: {
+        CHINA_SLOT_TEVI_MODE: true,
+        CHINA_SLOT_TEVI_CONFIG: { environment: "sandbox", appId: "app_123", channelId: "channel_777" },
+        TeviJS: { topup }
+      }
+    });
+  }
+
+  it("calls the SDK with the backend deposit token and safe metadata, then reports webhook-pending", async () => {
+    let captured: Record<string, unknown> | undefined;
+    const sandbox = topupSandbox((options: Record<string, unknown>, callback: (response: unknown) => void) => {
+      captured = options;
+      callback({ error_code: 0, error_message: "", data: { id: "tevi-ref-1" } });
+    });
+    const client = (sandbox.window.ChinaSlotTeviClient as TeviClientApi).createFromWindow();
+
+    const result = await client.topup({
+      amount: 100,
+      depositToken: "deposit-token-secret",
+      requestId: "req_browser_abc",
+      attemptId: "topup-attempt-1"
+    });
+
+    expect(result).toEqual({ ok: true, status: "webhook-pending", reason: "sdk-confirmed", reference: "tevi-ref-1" });
+    expect(captured).toEqual({
+      amount: 100,
+      deposit_token: "deposit-token-secret",
+      channel_id: "channel_777",
+      metadata: { type: "deposit", requestId: "req_browser_abc", attemptId: "topup-attempt-1" }
+    });
+    // The deposit token must never appear in the normalized client state.
+    expect(JSON.stringify(result)).not.toContain("deposit-token-secret");
+  });
+
+  it("normalizes a Tevi cancellation callback into a recoverable canceled state", async () => {
+    const sandbox = topupSandbox((_options: unknown, callback: (response: unknown) => void) => {
+      callback({ error: { code: "CANCELLED" } });
+    });
+    const client = (sandbox.window.ChinaSlotTeviClient as TeviClientApi).createFromWindow();
+
+    await expect(client.topup({ amount: 100, depositToken: "deposit-token-secret" })).resolves.toEqual({
+      ok: false,
+      status: "canceled",
+      reason: "user-cancelled"
+    });
+  });
+
+  it("maps a legacy provider error callback to a terminal failed state without leaking provider payloads", async () => {
+    const sandbox = topupSandbox((_options: unknown, callback: (response: unknown) => void) => {
+      callback({ error: { code: "PROVIDER_DECLINED" } });
+    });
+    const client = (sandbox.window.ChinaSlotTeviClient as TeviClientApi).createFromWindow();
+
+    await expect(client.topup({ amount: 100, depositToken: "deposit-token-secret" })).resolves.toEqual({
+      ok: false,
+      status: "failed",
+      reason: "provider-error:PROVIDER_DECLINED"
+    });
+  });
+
+  it("maps the SDK error_code contract: transient codes are retryable, others terminal, and error_message is never surfaced", async () => {
+    const api = (sb: TeviSandbox) => (sb.window.ChinaSlotTeviClient as TeviClientApi).createFromWindow();
+
+    const timeout = api(topupSandbox((_o: unknown, cb: (r: unknown) => void) => cb({ error_code: -14, error_message: "request Timeout!", data: {} })));
+    await expect(timeout.topup({ amount: 100, depositToken: "deposit-token-secret" })).resolves.toEqual({
+      ok: false,
+      status: "retryable-failure",
+      reason: "sdk-error:-14"
+    });
+
+    const notReady = api(topupSandbox((_o: unknown, cb: (r: unknown) => void) => cb({ error_code: -5, error_message: "Not ready!", data: {} })));
+    await expect(notReady.topup({ amount: 100, depositToken: "deposit-token-secret" })).resolves.toMatchObject({
+      status: "retryable-failure",
+      reason: "sdk-error:-5"
+    });
+
+    const declined = api(topupSandbox((_o: unknown, cb: (r: unknown) => void) => cb({ error_code: 42, error_message: "declined: card 4242", data: {} })));
+    const declinedResult = await declined.topup({ amount: 100, depositToken: "deposit-token-secret" });
+    expect(declinedResult).toEqual({ ok: false, status: "failed", reason: "sdk-error:42" });
+    expect(JSON.stringify(declinedResult)).not.toContain("declined");
+  });
+
+  it("treats an error_code:0 callback as a pending deposit and surfaces only a safe reference", async () => {
+    const sandbox = topupSandbox((_o: unknown, cb: (r: unknown) => void) => cb({ error_code: 0, error_message: "", data: { reference: "safe-ref-9" } }));
+    const client = (sandbox.window.ChinaSlotTeviClient as TeviClientApi).createFromWindow();
+
+    await expect(client.topup({ amount: 100, depositToken: "deposit-token-secret" })).resolves.toEqual({
+      ok: true,
+      status: "webhook-pending",
+      reason: "sdk-confirmed",
+      reference: "safe-ref-9"
+    });
+  });
+
+  it("rejects amounts above the client-side maximum before calling the SDK", async () => {
+    let called = false;
+    const sandbox = topupSandbox(() => { called = true; });
+    const client = (sandbox.window.ChinaSlotTeviClient as TeviClientApi).createFromWindow();
+
+    await expect(client.topup({ amount: 100001, depositToken: "deposit-token-secret" })).resolves.toEqual({
+      ok: false,
+      status: "failed",
+      reason: "amount-too-large"
+    });
+    expect(called).toBe(false);
+  });
+
+  it("treats a missing SDK topup method as a retryable failure", async () => {
+    const sandbox = loadRuntimeAndTeviClient({ window: { CHINA_SLOT_TEVI_MODE: true, TeviJS: {} } });
+    const client = (sandbox.window.ChinaSlotTeviClient as TeviClientApi).createFromWindow();
+
+    await expect(client.topup({ amount: 100, depositToken: "deposit-token-secret" })).resolves.toEqual({
+      ok: false,
+      status: "retryable-failure",
+      reason: "method-unavailable"
+    });
+  });
+
+  it("treats an unavailable SDK as a retryable failure", async () => {
+    const sandbox = loadRuntimeAndTeviClient({ window: { CHINA_SLOT_TEVI_MODE: true } });
+    const client = (sandbox.window.ChinaSlotTeviClient as TeviClientApi).createFromWindow();
+
+    await expect(client.topup({ amount: 100, depositToken: "deposit-token-secret" })).resolves.toEqual({
+      ok: false,
+      status: "retryable-failure",
+      reason: "sdk-unavailable"
+    });
+  });
+
+  it("times out a missing SDK topup callback as a retryable failure", async () => {
+    vi.useFakeTimers();
+    const sandbox = topupSandbox(() => undefined);
+    const client = (sandbox.window.ChinaSlotTeviClient as TeviClientApi).createFromWindow();
+    const pending = client.topup({ amount: 100, depositToken: "deposit-token-secret", timeoutMs: 25 });
+
+    await vi.advanceTimersByTimeAsync(25);
+
+    await expect(pending).resolves.toEqual({ ok: false, status: "retryable-failure", reason: "sdk-timeout" });
+    vi.useRealTimers();
+  });
+
+  it("treats a thrown SDK topup error as a terminal failure", async () => {
+    const sandbox = topupSandbox(() => {
+      throw new Error("sdk exploded");
+    });
+    const client = (sandbox.window.ChinaSlotTeviClient as TeviClientApi).createFromWindow();
+
+    await expect(client.topup({ amount: 100, depositToken: "deposit-token-secret" })).resolves.toEqual({
+      ok: false,
+      status: "failed",
+      reason: "sdk-call-failed"
+    });
+  });
+
+  it("refuses to call the SDK without a deposit token by default", async () => {
+    let called = false;
+    const sandbox = topupSandbox(() => {
+      called = true;
+    });
+    const client = (sandbox.window.ChinaSlotTeviClient as TeviClientApi).createFromWindow();
+
+    await expect(client.topup({ amount: 100 })).resolves.toEqual({
+      ok: false,
+      status: "failed",
+      reason: "deposit-token-missing"
+    });
+    expect(called).toBe(false);
+  });
+
+  it("can deliberately call the SDK without a deposit token for the manual 403 verification path", async () => {
+    let captured: Record<string, unknown> | undefined;
+    const sandbox = topupSandbox((options: Record<string, unknown>, callback: (response: unknown) => void) => {
+      captured = options;
+      callback({ error: { code: "DEPOSIT_TOKEN_REQUIRED" } });
+    });
+    const client = (sandbox.window.ChinaSlotTeviClient as TeviClientApi).createFromWindow();
+
+    const result = await client.topup({ amount: 100, forceSdkCallWithoutToken: true });
+
+    expect(result).toEqual({ ok: false, status: "failed", reason: "provider-error:DEPOSIT_TOKEN_REQUIRED" });
+    expect(captured).not.toHaveProperty("deposit_token");
+  });
+
+  it("rejects invalid amounts before calling the SDK", async () => {
+    let called = false;
+    const sandbox = topupSandbox(() => {
+      called = true;
+    });
+    const client = (sandbox.window.ChinaSlotTeviClient as TeviClientApi).createFromWindow();
+
+    await expect(client.topup({ amount: 1.5, depositToken: "deposit-token-secret" })).resolves.toEqual({
+      ok: false,
+      status: "failed",
+      reason: "invalid-amount"
+    });
+    expect(called).toBe(false);
+  });
+
+  it("does not attempt SDK top-up outside explicit Tevi mode", async () => {
+    let called = false;
+    const sandbox = loadRuntimeAndTeviClient({ window: { TeviJS: { topup: () => { called = true; } } } });
+    const client = (sandbox.window.ChinaSlotTeviClient as TeviClientApi).createFromWindow();
+
+    await expect(client.topup({ amount: 100, depositToken: "deposit-token-secret" })).resolves.toEqual({
+      ok: false,
+      status: "failed",
+      reason: "tevi-mode-disabled"
+    });
+    expect(called).toBe(false);
   });
 });
