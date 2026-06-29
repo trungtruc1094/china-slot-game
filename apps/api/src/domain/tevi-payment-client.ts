@@ -1,4 +1,3 @@
-import { z } from "zod";
 import type { IssueDepositTokenRequest, TeviPaymentClientPort, TeviPaymentClientResult } from "./topup-service.js";
 
 export interface TeviPaymentClientConfig {
@@ -12,17 +11,22 @@ export interface TeviPaymentClientDependencies {
   fetchImpl?: typeof fetch;
 }
 
-const depositTokenResponseSchema = z.union([
-  z.object({
-    success: z.boolean().optional(),
-    data: z.object({
-      deposit_token: z.string().trim().min(1)
-    })
-  }),
-  z.object({
-    deposit_token: z.string().trim().min(1)
-  })
-]);
+// Tevi returns the deposit token at data.token; tolerate data.deposit_token and the
+// top-level variants too so a minor provider response change doesn't break issuance.
+function extractDepositToken(value: unknown): string | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const data = (record.data && typeof record.data === "object") ? record.data as Record<string, unknown> : null;
+  const candidates = [data?.token, data?.deposit_token, record.token, record.deposit_token];
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim().length > 0) {
+      return candidate.trim();
+    }
+  }
+  return null;
+}
 
 // Structure-only summary (key names + types, never values) so a shape mismatch in the
 // provider response can be diagnosed from logs without leaking the deposit token.
@@ -89,8 +93,8 @@ export class TeviPaymentClient implements TeviPaymentClientPort {
       return parsedJson.failure;
     }
 
-    const parsedResponse = depositTokenResponseSchema.safeParse(parsedJson.value);
-    if (!parsedResponse.success) {
+    const depositToken = extractDepositToken(parsedJson.value);
+    if (!depositToken) {
       console.warn("[tevi-payment] provider response rejected", {
         requestId: request.requestId,
         reasonCode: "PROVIDER_RESPONSE_INVALID",
@@ -104,10 +108,6 @@ export class TeviPaymentClient implements TeviPaymentClientPort {
         statusCode: 502
       };
     }
-
-    const depositToken = "data" in parsedResponse.data
-      ? parsedResponse.data.data.deposit_token
-      : parsedResponse.data.deposit_token;
 
     return {
       ok: true,

@@ -46,6 +46,21 @@ describe("TeviPaymentClient", () => {
     );
   });
 
+  it("reads the deposit token from Tevi's data.token response shape", async () => {
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({
+      success: true,
+      data: { token: "provider.deposit.token" },
+      message: "Success",
+      error_code: ""
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+    const client = new TeviPaymentClient(config, { fetchImpl });
+
+    await expect(client.issueDepositToken(request)).resolves.toEqual({
+      ok: true,
+      depositToken: "provider.deposit.token"
+    });
+  });
+
   it.each([401, 403])("maps provider auth status %s without leaking secrets", async (status) => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ error: "provider-secret-key provider.deposit.token" }), { status }));
