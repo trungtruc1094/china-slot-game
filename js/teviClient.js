@@ -8,6 +8,10 @@
     var defaultWebhookUrl = "https://china-slot-api.onrender.com/api/webhooks/tevi";
     var sdkScriptRequest = null;
     var debugPanelElement = null;
+    var debugClient = null;
+    // Safe, token-free summary of the last getUserInfo result, surfaced in the on-screen
+    // debug panel (?debugTevi=1) so Tevi-app auth can be diagnosed without a console.
+    var lastAuthDiagnostic = null;
 
     function getDocument() {
         if (globalScope.document) return globalScope.document;
@@ -88,13 +92,14 @@
 
     function getUserAppToken(config, options) {
         var sdk = getSdk();
-        if (!sdk) return Promise.resolve(reauthState("sdk-unavailable"));
-        if (typeof sdk.getUserInfo !== "function") return Promise.resolve(reauthState("method-unavailable"));
+        if (!sdk) { setAuthDiagnostic({ reason: "sdk-unavailable" }); return Promise.resolve(reauthState("sdk-unavailable")); }
+        if (typeof sdk.getUserInfo !== "function") { setAuthDiagnostic({ reason: "method-unavailable" }); return Promise.resolve(reauthState("method-unavailable")); }
 
         return new Promise(function (resolve) {
             var settled = false;
             var timeoutMs = options && typeof options.timeoutMs === "number" ? options.timeoutMs : 10000;
             var timeoutId = setTimeout(function () {
+                setAuthDiagnostic({ reason: "sdk-timeout" });
                 complete(reauthState("sdk-timeout"));
             }, timeoutMs);
 
@@ -110,19 +115,25 @@
                     is_popup: options && options.isPopup === true,
                     app_id: config.appId
                 }, function (response) {
+                    var diagnostic = summarizeAuthResponse(response);
                     var runtimeToken = response
                         && response.data
                         && response.data.userInfo
                         && response.data.userInfo.user_app_token;
 
                     if (typeof runtimeToken === "string" && runtimeToken.length > 0) {
+                        diagnostic.reason = "authenticated";
+                        setAuthDiagnostic(diagnostic);
                         complete({ ok: true, status: "authenticated", runtimeToken: runtimeToken });
                         return;
                     }
 
-                    complete(reauthState(isCancellation(response) ? "user-cancelled" : "token-missing"));
+                    diagnostic.reason = isCancellation(response) ? "user-cancelled" : "token-missing";
+                    setAuthDiagnostic(diagnostic);
+                    complete(reauthState(diagnostic.reason));
                 });
             } catch (_error) {
+                setAuthDiagnostic({ reason: "sdk-call-failed" });
                 complete(reauthState("sdk-call-failed"));
             }
         });
@@ -135,6 +146,33 @@
 
     function reauthState(reason) {
         return { ok: false, status: "re-authentication-required", reason: reason };
+    }
+
+    // Structure-only summary (key names + booleans, never token VALUES) so we can spot a
+    // shape mismatch (e.g. the token living at a different path) from the on-screen panel.
+    function summarizeAuthResponse(response) {
+        if (!response || typeof response !== "object") {
+            return { responseType: typeof response, topKeys: "(none)", dataKeys: "(none)", userInfoKeys: "(none)", hasToken: false };
+        }
+        var data = response.data;
+        var userInfo = data && typeof data === "object" ? data.userInfo : undefined;
+        return {
+            error_code: response.error_code,
+            error_message: typeof response.error_message === "string" ? response.error_message : undefined,
+            topKeys: Object.keys(response).join(","),
+            dataKeys: (data && typeof data === "object") ? Object.keys(data).join(",") : String(data),
+            userInfoKeys: (userInfo && typeof userInfo === "object") ? Object.keys(userInfo).join(",") : (userInfo === undefined ? "absent" : String(userInfo)),
+            hasToken: !!(userInfo && userInfo.user_app_token)
+        };
+    }
+
+    function setAuthDiagnostic(diagnostic) {
+        lastAuthDiagnostic = diagnostic;
+        refreshDebugPanel();
+    }
+
+    function refreshDebugPanel() {
+        if (debugClient) renderDebugPanel(debugClient);
     }
 
     function isPositiveInteger(value) {
@@ -307,7 +345,7 @@
         var existingPanel = debugPanelElement || (browserDocument.querySelector && browserDocument.querySelector("[data-china-slot-tevi-debug]"));
         var panel = existingPanel || browserDocument.createElement("pre");
         var state = client.getState();
-        panel.textContent = [
+        var lines = [
             "China Slot Tevi Debug",
             "mode: " + state.mode,
             "environment: " + state.environment,
@@ -316,7 +354,18 @@
             "channelId: " + state.channelId,
             "appUrl: " + state.appUrl,
             "webhookUrl: " + state.webhookUrl
-        ].join("\n");
+        ];
+        if (lastAuthDiagnostic) {
+            lines.push("--- getUserInfo (token-safe) ---");
+            lines.push("auth.reason: " + lastAuthDiagnostic.reason);
+            if (lastAuthDiagnostic.error_code !== undefined) lines.push("auth.error_code: " + lastAuthDiagnostic.error_code);
+            if (lastAuthDiagnostic.error_message !== undefined) lines.push("auth.error_message: " + lastAuthDiagnostic.error_message);
+            if (lastAuthDiagnostic.topKeys !== undefined) lines.push("auth.topKeys: " + lastAuthDiagnostic.topKeys);
+            if (lastAuthDiagnostic.dataKeys !== undefined) lines.push("auth.dataKeys: " + lastAuthDiagnostic.dataKeys);
+            if (lastAuthDiagnostic.userInfoKeys !== undefined) lines.push("auth.userInfoKeys: " + lastAuthDiagnostic.userInfoKeys);
+            lines.push("auth.hasToken: " + lastAuthDiagnostic.hasToken);
+        }
+        panel.textContent = lines.join("\n");
         panel.setAttribute && panel.setAttribute("data-china-slot-tevi-debug", "true");
         panel.style.position = "fixed";
         panel.style.left = "8px";
@@ -343,6 +392,7 @@
 
         client = {
             initialize: function () {
+                debugClient = client;
                 renderDebugPanel(client);
                 return loadSdkScript(config).then(function (result) {
                     if (!result.available) return result;
@@ -378,6 +428,7 @@
             }
         };
 
+        debugClient = client;
         return client;
     }
 
