@@ -12,6 +12,8 @@
     // Safe, token-free summary of the last getUserInfo result, surfaced in the on-screen
     // debug panel (?debugTevi=1) so Tevi-app auth can be diagnosed without a console.
     var lastAuthDiagnostic = null;
+    // Safe, token-free summary of the last topup() SDK callback + resolved state.
+    var lastTopupDiagnostic = null;
 
     function getDocument() {
         if (globalScope.document) return globalScope.document;
@@ -213,6 +215,26 @@
         refreshDebugPanel();
     }
 
+    function summarizeTopupResponse(response) {
+        if (!response || typeof response !== "object") {
+            return { responseType: typeof response };
+        }
+        var data = response.data;
+        return {
+            call: response.call,
+            error_code: response.error_code,
+            topKeys: Object.keys(response).join(","),
+            dataKeys: (data && typeof data === "object") ? Object.keys(data).join(",") : (data === undefined ? "absent" : String(data))
+        };
+    }
+
+    function setTopupDiagnostic(summary, outcome) {
+        lastTopupDiagnostic = summary || {};
+        lastTopupDiagnostic.resolvedStatus = outcome && outcome.status;
+        lastTopupDiagnostic.resolvedReason = outcome && outcome.reason;
+        refreshDebugPanel();
+    }
+
     function refreshDebugPanel() {
         if (debugClient) renderDebugPanel(debugClient);
     }
@@ -327,7 +349,9 @@
             var settled = false;
             var timeoutMs = typeof options.timeoutMs === "number" ? options.timeoutMs : 60000;
             var timeoutId = setTimeout(function () {
-                complete(topupState("retryable-failure", "sdk-timeout"));
+                var timeoutOutcome = topupState("retryable-failure", "sdk-timeout");
+                setTopupDiagnostic({ note: "no-callback-before-timeout" }, timeoutOutcome);
+                complete(timeoutOutcome);
             }, timeoutMs);
 
             function complete(result) {
@@ -339,10 +363,14 @@
 
             try {
                 sdk.topup(sdkOptions, function (response) {
-                    complete(normalizeTopupOutcome(response));
+                    var outcome = normalizeTopupOutcome(response);
+                    setTopupDiagnostic(summarizeTopupResponse(response), outcome);
+                    complete(outcome);
                 });
             } catch (_error) {
-                complete(topupState("failed", "sdk-call-failed"));
+                var failOutcome = topupState("failed", "sdk-call-failed");
+                setTopupDiagnostic({ note: "sdk-threw" }, failOutcome);
+                complete(failOutcome);
             }
         });
     }
@@ -416,6 +444,17 @@
             if (lastAuthDiagnostic.claim_user_is_active !== undefined) lines.push("auth.claim.user_is_active: " + lastAuthDiagnostic.claim_user_is_active);
             if (lastAuthDiagnostic.claim_user_anonymous !== undefined) lines.push("auth.claim.user_anonymous: " + lastAuthDiagnostic.claim_user_anonymous);
             if (lastAuthDiagnostic.claims !== undefined) lines.push("auth.claims: " + lastAuthDiagnostic.claims);
+        }
+        if (lastTopupDiagnostic) {
+            lines.push("--- topup (token-safe) ---");
+            if (lastTopupDiagnostic.resolvedStatus !== undefined) lines.push("topup.status: " + lastTopupDiagnostic.resolvedStatus);
+            if (lastTopupDiagnostic.resolvedReason !== undefined) lines.push("topup.reason: " + lastTopupDiagnostic.resolvedReason);
+            if (lastTopupDiagnostic.call !== undefined) lines.push("topup.call: " + lastTopupDiagnostic.call);
+            if (lastTopupDiagnostic.error_code !== undefined) lines.push("topup.error_code: " + lastTopupDiagnostic.error_code);
+            if (lastTopupDiagnostic.topKeys !== undefined) lines.push("topup.topKeys: " + lastTopupDiagnostic.topKeys);
+            if (lastTopupDiagnostic.dataKeys !== undefined) lines.push("topup.dataKeys: " + lastTopupDiagnostic.dataKeys);
+            if (lastTopupDiagnostic.responseType !== undefined) lines.push("topup.responseType: " + lastTopupDiagnostic.responseType);
+            if (lastTopupDiagnostic.note !== undefined) lines.push("topup.note: " + lastTopupDiagnostic.note);
         }
         panel.textContent = lines.join("\n");
         panel.setAttribute && panel.setAttribute("data-china-slot-tevi-debug", "true");
