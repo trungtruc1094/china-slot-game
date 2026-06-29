@@ -120,6 +120,7 @@
 
                     if (typeof runtimeToken === "string" && runtimeToken.length > 0) {
                         diagnostic.reason = "authenticated";
+                        attachSafeTokenClaims(diagnostic, runtimeToken);
                         setAuthDiagnostic(diagnostic);
                         complete({ ok: true, status: "authenticated", runtimeToken: runtimeToken });
                         return;
@@ -179,6 +180,32 @@
             userInfoKeys: (userInfo && typeof userInfo === "object") ? Object.keys(userInfo).join(",") : (userInfo === null ? "absent" : String(userInfo)),
             hasToken: !!extractRuntimeToken(response)
         };
+    }
+
+    // Decode a JWT payload (middle segment) without verifying — debug only.
+    function decodeJwtClaims(token) {
+        try {
+            var parts = String(token).split(".");
+            if (parts.length !== 3) return null;
+            var b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+            while (b64.length % 4 !== 0) b64 += "=";
+            var decoded = (typeof atob === "function")
+                ? atob(b64)
+                : (typeof Buffer !== "undefined" ? Buffer.from(b64, "base64").toString("utf8") : null);
+            if (decoded === null) return null;
+            return JSON.parse(decoded);
+        } catch (_error) {
+            return null;
+        }
+    }
+
+    // Attach only the non-secret auth-gating claims (never email/id/name/avatar).
+    function attachSafeTokenClaims(diagnostic, token) {
+        var claims = decodeJwtClaims(token);
+        if (!claims) { diagnostic.claims = "undecodable"; return; }
+        diagnostic.claim_app_id = String(claims.app_id);
+        diagnostic.claim_user_is_active = String(claims.user_is_active) + " (" + typeof claims.user_is_active + ")";
+        diagnostic.claim_user_anonymous = String(claims.user_anonymous) + " (" + typeof claims.user_anonymous + ")";
     }
 
     function setAuthDiagnostic(diagnostic) {
@@ -385,6 +412,10 @@
             if (lastAuthDiagnostic.dataKeys !== undefined) lines.push("auth.dataKeys: " + lastAuthDiagnostic.dataKeys);
             if (lastAuthDiagnostic.userInfoKeys !== undefined) lines.push("auth.userInfoKeys: " + lastAuthDiagnostic.userInfoKeys);
             lines.push("auth.hasToken: " + lastAuthDiagnostic.hasToken);
+            if (lastAuthDiagnostic.claim_app_id !== undefined) lines.push("auth.claim.app_id: " + lastAuthDiagnostic.claim_app_id);
+            if (lastAuthDiagnostic.claim_user_is_active !== undefined) lines.push("auth.claim.user_is_active: " + lastAuthDiagnostic.claim_user_is_active);
+            if (lastAuthDiagnostic.claim_user_anonymous !== undefined) lines.push("auth.claim.user_anonymous: " + lastAuthDiagnostic.claim_user_anonymous);
+            if (lastAuthDiagnostic.claims !== undefined) lines.push("auth.claims: " + lastAuthDiagnostic.claims);
         }
         panel.textContent = lines.join("\n");
         panel.setAttribute && panel.setAttribute("data-china-slot-tevi-debug", "true");
