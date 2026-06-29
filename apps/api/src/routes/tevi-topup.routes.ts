@@ -37,11 +37,20 @@ export function createTeviTopupRouter(
       const sessionResult = await sessionService.createOrResume({
         identity: request.teviAuth
       });
+      if (!request.teviAuthToken) {
+        throw new ApiHttpError(401, {
+          code: "TEVI_AUTH_REQUIRED",
+          message: "A valid Tevi bearer token is required.",
+          details: {}
+        });
+      }
+
       const result = await topupService.issueSignature({
         playerId: sessionResult.response.playerId,
         teviAuth: request.teviAuth,
         amount: parsedRequest.amount,
-        requestId: request.requestId
+        requestId: request.requestId,
+        userAppToken: request.teviAuthToken
       });
 
       if (!result.ok) {

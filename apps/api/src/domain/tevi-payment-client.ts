@@ -40,17 +40,14 @@ export class TeviPaymentClient implements TeviPaymentClientPort {
       response = await this.fetchImpl(this.buildUrl(), {
         method: "POST",
         headers: {
-          authorization: `Bearer ${this.config.apiKey}`,
+          // Tevi's top-up-signature authenticates with the end user's user_app_token (Bearer),
+          // not the app API key. Body is just the amount; the channel is encoded in the returned token.
+          authorization: `Bearer ${request.userAppToken}`,
           "content-type": "application/json",
-          "x-tevi-secret-key": this.config.secretKey,
           "x-request-id": request.requestId
         },
         body: JSON.stringify({
-          app_id: request.appId,
-          billing_channel_id: request.billingChannelId,
-          amount: request.amount,
-          external_player_id: request.playerId,
-          tevi_user_id: request.teviSubject
+          amount: request.amount
         })
       });
     } catch {

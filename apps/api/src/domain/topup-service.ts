@@ -16,6 +16,7 @@ export interface IssueDepositTokenRequest {
   teviSubject: string;
   amount: number;
   requestId: string;
+  userAppToken: string;
 }
 
 export type TeviPaymentClientResult = TeviPaymentClientSuccess | TeviPaymentClientFailure;
@@ -84,6 +85,7 @@ export interface TopupSignatureRequest {
   teviAuth: TeviAuthContext;
   amount: number;
   requestId: string;
+  userAppToken: string;
 }
 
 const systemClock: Clock = { now: () => new Date() };
@@ -137,7 +139,8 @@ export class TopupService {
       playerId: request.playerId,
       teviSubject: request.teviAuth.subject,
       amount: request.amount,
-      requestId: request.requestId
+      requestId: request.requestId,
+      userAppToken: request.userAppToken
     });
 
     if (!providerResult.ok) {

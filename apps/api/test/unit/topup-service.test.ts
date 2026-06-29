@@ -49,6 +49,7 @@ describe("TopupService", () => {
     await expect(service.issueSignature({
       playerId: "player_123",
       teviAuth: authContext,
+      userAppToken: "user-app-token-secret",
       amount: 100,
       requestId: "req_success"
     })).resolves.toEqual({
@@ -62,7 +63,8 @@ describe("TopupService", () => {
       playerId: "player_123",
       teviSubject: "tevi-user-1",
       amount: 100,
-      requestId: "req_success"
+      requestId: "req_success",
+      userAppToken: "user-app-token-secret"
     });
     expect(repository.records).toEqual([{ 
       providerName: "tevi",
@@ -86,7 +88,7 @@ describe("TopupService", () => {
     const repository = new MemoryIssuanceRepository();
     const service = new TopupService(config, paymentClient, repository);
 
-    await expect(service.issueSignature({ playerId: "player_123", teviAuth: authContext, amount, requestId: "req_invalid" })).resolves.toMatchObject({
+    await expect(service.issueSignature({ playerId: "player_123", teviAuth: authContext, userAppToken: "user-app-token-secret", amount, requestId: "req_invalid" })).resolves.toMatchObject({
       ok: false,
       code: amount === 9 ? "TEVI_TOP_UP_LIMIT_EXCEEDED" : "INVALID_TOP_UP_AMOUNT",
       statusCode: 400
@@ -103,7 +105,7 @@ describe("TopupService", () => {
     const repository = new MemoryIssuanceRepository();
     const service = new TopupService(config, paymentClient, repository);
 
-    await expect(service.issueSignature({ playerId: "player_123", teviAuth: authContext, amount: 1001, requestId: "req_limit" })).resolves.toMatchObject({
+    await expect(service.issueSignature({ playerId: "player_123", teviAuth: authContext, userAppToken: "user-app-token-secret", amount: 1001, requestId: "req_limit" })).resolves.toMatchObject({
       ok: false,
       code: "TEVI_TOP_UP_LIMIT_EXCEEDED",
       reasonCode: "AMOUNT_ABOVE_MAX",
@@ -119,7 +121,7 @@ describe("TopupService", () => {
     const repository = new MemoryIssuanceRepository();
     const service = new TopupService(config, paymentClient, repository);
 
-    await expect(service.issueSignature({ playerId: "", teviAuth: authContext, amount: 100, requestId: "req_no_player" })).resolves.toMatchObject({
+    await expect(service.issueSignature({ playerId: "", teviAuth: authContext, userAppToken: "user-app-token-secret", amount: 100, requestId: "req_no_player" })).resolves.toMatchObject({
       ok: false,
       code: "TEVI_AUTH_REQUIRED",
       statusCode: 401
@@ -134,10 +136,10 @@ describe("TopupService", () => {
     const repository = new MemoryIssuanceRepository();
     const service = new TopupService(config, paymentClient, repository, { now: () => new Date("2026-06-29T00:00:00.000Z") });
 
-    await expect(service.issueSignature({ playerId: "player_123", teviAuth: authContext, amount: 100, requestId: "req_duplicate" })).resolves.toMatchObject({
+    await expect(service.issueSignature({ playerId: "player_123", teviAuth: authContext, userAppToken: "user-app-token-secret", amount: 100, requestId: "req_duplicate" })).resolves.toMatchObject({
       ok: true
     });
-    await expect(service.issueSignature({ playerId: "player_123", teviAuth: authContext, amount: 100, requestId: "req_duplicate" })).resolves.toEqual({
+    await expect(service.issueSignature({ playerId: "player_123", teviAuth: authContext, userAppToken: "user-app-token-secret", amount: 100, requestId: "req_duplicate" })).resolves.toEqual({
       ok: false,
       code: "TEVI_TOP_UP_DUPLICATE_REQUEST",
       reasonCode: "REQUEST_ID_ALREADY_USED",
@@ -161,7 +163,7 @@ describe("TopupService", () => {
     const repository = new MemoryIssuanceRepository();
     const service = new TopupService(config, paymentClient, repository);
 
-    await expect(service.issueSignature({ playerId: "player_123", teviAuth: authContext, amount: 100, requestId: "req_provider_failed" })).resolves.toMatchObject({
+    await expect(service.issueSignature({ playerId: "player_123", teviAuth: authContext, userAppToken: "user-app-token-secret", amount: 100, requestId: "req_provider_failed" })).resolves.toMatchObject({
       ok: false,
       code: "TEVI_TOP_UP_SIGNATURE_FAILED",
       reasonCode: "PROVIDER_REJECTED",

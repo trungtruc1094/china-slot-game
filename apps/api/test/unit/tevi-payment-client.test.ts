@@ -14,11 +14,12 @@ const request = {
   playerId: "player_123",
   teviSubject: "tevi-user-1",
   amount: 100,
-  requestId: "req_payment"
+  requestId: "req_payment",
+  userAppToken: "user-app-token-secret"
 };
 
 describe("TeviPaymentClient", () => {
-  it("requests a deposit token using backend credentials only", async () => {
+  it("requests a deposit token using the end user's user_app_token and amount-only body", async () => {
     const fetchImpl = vi.fn(async () => new Response(JSON.stringify({
       success: true,
       data: {
@@ -36,18 +37,11 @@ describe("TeviPaymentClient", () => {
       expect.objectContaining({
         method: "POST",
         headers: {
-          authorization: "Bearer provider-api-key",
+          authorization: "Bearer user-app-token-secret",
           "content-type": "application/json",
-          "x-tevi-secret-key": "provider-secret-key",
           "x-request-id": "req_payment"
         },
-        body: JSON.stringify({
-          app_id: "AZX29173",
-          billing_channel_id: "2300210851",
-          amount: 100,
-          external_player_id: "player_123",
-          tevi_user_id: "tevi-user-1"
-        })
+        body: JSON.stringify({ amount: 100 })
       })
     );
   });
@@ -66,6 +60,7 @@ describe("TeviPaymentClient", () => {
     });
     expect(JSON.stringify(warnSpy.mock.calls)).not.toContain("provider-secret-key");
     expect(JSON.stringify(warnSpy.mock.calls)).not.toContain("provider.deposit.token");
+    expect(JSON.stringify(warnSpy.mock.calls)).not.toContain("user-app-token-secret");
     warnSpy.mockRestore();
   });
 

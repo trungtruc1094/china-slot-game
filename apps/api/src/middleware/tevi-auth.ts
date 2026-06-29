@@ -7,6 +7,7 @@ const bearerPattern = /^Bearer\s+(.+)$/i;
 declare module "express-serve-static-core" {
   interface Request {
     teviAuth?: TeviAuthContext;
+    teviAuthToken?: string;
   }
 }
 
@@ -45,6 +46,7 @@ export function createTeviAuthMiddleware(verifier: TeviAuthVerifier): RequestHan
     }
 
     request.teviAuth = result.context;
+    request.teviAuthToken = token;
     next();
   };
 }
