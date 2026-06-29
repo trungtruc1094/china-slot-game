@@ -24,6 +24,23 @@ const depositTokenResponseSchema = z.union([
   })
 ]);
 
+// Structure-only summary (key names + types, never values) so a shape mismatch in the
+// provider response can be diagnosed from logs without leaking the deposit token.
+function describeResponseShape(value: unknown): Record<string, unknown> {
+  if (value === null || typeof value !== "object") {
+    return { type: value === null ? "null" : typeof value };
+  }
+  const record = value as Record<string, unknown>;
+  const shape: Record<string, unknown> = { topKeys: Object.keys(record).sort() };
+  const data = record.data;
+  if (data && typeof data === "object") {
+    shape.dataKeys = Object.keys(data as Record<string, unknown>).sort();
+  } else if ("data" in record) {
+    shape.dataType = data === null ? "null" : typeof data;
+  }
+  return shape;
+}
+
 export class TeviPaymentClient implements TeviPaymentClientPort {
   private readonly fetchImpl: typeof fetch;
 
@@ -76,7 +93,9 @@ export class TeviPaymentClient implements TeviPaymentClientPort {
     if (!parsedResponse.success) {
       console.warn("[tevi-payment] provider response rejected", {
         requestId: request.requestId,
-        reasonCode: "PROVIDER_RESPONSE_INVALID"
+        reasonCode: "PROVIDER_RESPONSE_INVALID",
+        // Key names only — never values — so we can locate the deposit token field without leaking it.
+        responseShape: describeResponseShape(parsedJson.value)
       });
       return {
         ok: false,
