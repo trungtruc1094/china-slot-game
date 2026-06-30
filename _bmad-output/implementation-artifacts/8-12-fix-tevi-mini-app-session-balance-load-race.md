@@ -134,6 +134,7 @@ Client-only fix in three slices, matching the root cause:
 - `js/serverClient.js` — modified: `startTeviSession` preserves the underlying re-auth reason on the thrown error; new read-only `refreshSession()` exposed on the client.
 - `apps/api/test/unit/server-client.test.ts` — modified: updated 3 existing stubs for the new method surface; added 4 unit tests (AC1/AC2/AC4); extended `SlotGameCtor`/`TopupGame` types.
 - `_bmad-output/implementation-artifacts/8-12-fix-tevi-mini-app-session-balance-load-race.md` — story tracking (this file).
+- `index.html` — bumped the shared cache-bust token `?v=20260630f` → `?v=20260630g` so clients re-fetch the patched `serverClient.js`/`slotGame.js` instead of serving cached copies (code-review follow-up).
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` — status transitions.
 
 ## Change Log
