@@ -67,6 +67,34 @@ describe("TeviWebhookService", () => {
     expect(creditPort.credits).toHaveLength(0);
   });
 
+  it("credits when only data.user carries the subject (metadata.user_id absent)", async () => {
+    const payload = { id: "evt_data_user", event: "user_topup", data: { user: "633505726", amount: 250, metadata: { type: "deposit" } } };
+    const result = await service.process({ payload, requestId: "req_1" });
+    expect(result.status).toBe("credited");
+    expect(creditPort.credits).toEqual([{ providerEventId: "evt_data_user", playerId: "player_known", amount: 250, correlationId: "req_1" }]);
+  });
+
+  it("credits when only metadata.user_id carries the subject (data.user absent)", async () => {
+    const payload = { id: "evt_meta_user", event: "user_topup", data: { amount: 100, metadata: { user_id: 633505726, type: "deposit" } } };
+    const result = await service.process({ payload, requestId: "req_1" });
+    expect(result.status).toBe("credited");
+    expect(creditPort.credits).toEqual([{ providerEventId: "evt_meta_user", playerId: "player_known", amount: 100, correlationId: "req_1" }]);
+  });
+
+  it("logs a token-safe payload shape (key names + types only) on a parse failure", async () => {
+    const infoSpy = vi.spyOn(console, "info");
+    const payload = { id: "evt_no_user", event: "user_topup", data: { amount: 10, metadata: { type: "deposit" } } };
+    const result = await service.process({ payload, requestId: "req_1" });
+    expect(result).toEqual({ status: "failed", reasonCode: "missing_user", providerEventId: "evt_no_user" });
+    expect(infoSpy).toHaveBeenCalledWith(
+      "[tevi-webhook] payload shape on parse failure",
+      expect.objectContaining({
+        reasonCode: "missing_user",
+        shape: { id: "string", event: "string", data: { amount: "number", metadata: { type: "string" } } }
+      })
+    );
+  });
+
   it("fails when data.user and metadata.user_id disagree", async () => {
     const payload = { id: "evt_mismatch", event: "user_topup", data: { user: "111", amount: 10, metadata: { user_id: 222, type: "deposit" } } };
     const result = await service.process({ payload, requestId: "req_1" });

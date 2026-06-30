@@ -87,6 +87,9 @@ export class TeviWebhookService implements TeviWebhookServicePort {
       return this.recordNonCrediting(parsed.providerEventId, parsed.event, "ignored", parsed.reasonCode, input.requestId);
     }
     if (parsed.kind === "invalid") {
+      // Token-safe shape diagnostics so a real payload that doesn't match the documented shape can be diagnosed
+      // on the first live delivery (playbook §8) — key names + value TYPES only, never any values.
+      logWebhookShape(input.requestId, parsed.providerEventId, parsed.event, parsed.reasonCode, input.payload);
       return this.recordNonCrediting(parsed.providerEventId, parsed.event, "failed", parsed.reasonCode, input.requestId);
     }
 
@@ -252,15 +255,20 @@ function parseWebhook(payload: unknown): ParsedWebhook {
     return { kind: "ignored", providerEventId, event, reasonCode: `metadata_type_not_deposit:${stringifyType(metadata.type)}` };
   }
 
-  // data.user is a numeric STRING; metadata.user_id is an unquoted NUMBER for the same value. Coerce both and
-  // cross-check. The STRING form is authoritative for the subject: metadata.user_id is a JSON number that
-  // JSON.parse can round for ids above 2^53, so deriving the subject from data.user avoids precision loss.
-  const userFromData = coerceSubject(data.user);
-  const userFromMetadata = coerceSubject(metadata.user_id);
-  if (!userFromData || !userFromMetadata) {
+  // Tevi's DOC example carries the user id at BOTH data.user (string) and data.metadata.user_id (number), but a
+  // real delivery may include only one (or place it at data.user_id). Gather every plausible location, accept
+  // whichever is present, and only flag user_mismatch when two PRESENT candidates actually disagree. The string
+  // form is preferred for the subject (a JSON number can lose precision above 2^53). The earlier "both required"
+  // cross-check rejected real payloads with reasonCode "missing_user" — see the first-live-event finding (8.6).
+  const subjectCandidates = [data.user, data.user_id, metadata.user_id]
+    .map(coerceSubject)
+    .filter((subject): subject is string => subject !== null);
+  const distinctSubjects = [...new Set(subjectCandidates)];
+  const teviSubject = distinctSubjects[0];
+  if (teviSubject === undefined) {
     return { kind: "invalid", providerEventId, event, reasonCode: "missing_user" };
   }
-  if (userFromData !== userFromMetadata) {
+  if (distinctSubjects.length > 1) {
     return { kind: "invalid", providerEventId, event, reasonCode: "user_mismatch" };
   }
 
@@ -269,7 +277,7 @@ function parseWebhook(payload: unknown): ParsedWebhook {
     return { kind: "invalid", providerEventId, event, reasonCode: "invalid_amount" };
   }
 
-  return { kind: "topup", providerEventId, event, teviSubject: userFromData, amount };
+  return { kind: "topup", providerEventId, event, teviSubject, amount };
 }
 
 // Tevi sends the same user id as a quoted string (data.user) and an unquoted number (metadata.user_id).
@@ -297,4 +305,40 @@ function logWebhook(message: string, requestId: string, providerEventId: string 
     providerEventId,
     reasonCode
   });
+}
+
+function logWebhookShape(requestId: string, providerEventId: string | null, event: string, reasonCode: string, payload: unknown): void {
+  // Emits key NAMES and value TYPES only (e.g. { data: { user: "string", metadata: { type: "string" } } }) so the
+  // real provider payload structure can be diagnosed without leaking ids/secrets/values (playbook §8).
+  console.info("[tevi-webhook] payload shape on parse failure", {
+    requestId,
+    event,
+    providerEventId,
+    reasonCode,
+    shape: describePayloadShape(payload)
+  });
+}
+
+function describePayloadShape(value: unknown, depth = 3): unknown {
+  if (value === null) {
+    return "null";
+  }
+  if (Array.isArray(value)) {
+    if (depth <= 0) {
+      return "array";
+    }
+    return value.length === 0 ? [] : [describePayloadShape(value[0], depth - 1), ...(value.length > 1 ? ["…"] : [])];
+  }
+  if (typeof value === "object") {
+    if (depth <= 0) {
+      return "object";
+    }
+    const shape: Record<string, unknown> = {};
+    for (const key of Object.keys(value as Record<string, unknown>)) {
+      shape[key] = describePayloadShape((value as Record<string, unknown>)[key], depth - 1);
+    }
+    return shape;
+  }
+  // Primitive: report the TYPE only (string | number | boolean), never the value.
+  return typeof value;
 }

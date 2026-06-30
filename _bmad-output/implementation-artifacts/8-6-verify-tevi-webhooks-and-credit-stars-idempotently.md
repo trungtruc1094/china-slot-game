@@ -4,7 +4,7 @@ baseline_commit: 03c5ec3
 
 # Story 8.6: Verify Tevi Webhooks and Credit Stars Idempotently
 
-Status: done
+Status: in-progress
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -63,6 +63,24 @@ so that webhook retries or duplicate provider events cannot create incorrect Sta
   - [x] Record a webhook replay proof: deliver the same signed `user_topup` payload N times and show one credit transaction and one `completed` idempotency row; deliver a conflicting payload and show `duplicate`/quarantine with no mutation.
   - [x] If a live Tevi sandbox webhook is not deliverable (the sandbox Stars-funding blocker from Story 8.5 / playbook §4 may prevent a real charge), record the replay proof via signed local/integration requests and mark live-sandbox crediting as blocked-by-external (Tevi funding), not faked.
   - [x] Sweep touched files, tests, logs, and Check Round notes for the webhook secret, signatures, bearer/deposit tokens, API keys, and Tevi emails — confirm only placeholders/field-names/safe fingerprints appear.
+
+## First Live Webhook Finding (2026-06-30, reopened from `done`)
+
+The first real `user_topup` webhook was delivered (sandbox funding unblocked; a 200-Star charge was actually deducted). Signature verification **passed**, but the handler rejected the event with **`reasonCode: missing_user`** (HTTP 200, recorded `failed`) — so no credit. Root cause: the parser required the user id to be present in **both** `data.user` AND `data.metadata.user_id` and cross-checked them, but the real payload doesn't carry it in both spots. This is the "payload not runtime-verified — build a tolerant parser, log the real shape on first live event" item the story explicitly deferred to live delivery, so it is in-scope completion of AC2/AC6, not 8.7+ scope.
+
+Fixes:
+- **Tolerant user extraction** [apps/api/src/domain/tevi-webhook-service.ts:244-262] — gather subject candidates from `data.user`, `data.user_id`, and `data.metadata.user_id`; accept whichever is present; `user_mismatch` only when two present candidates disagree. Prefer the string form (precision).
+- **Token-safe shape logging on parse failure** [apps/api/src/domain/tevi-webhook-service.ts] — `logWebhookShape`/`describePayloadShape` emit key names + value TYPES only (never values) so the real payload structure is diagnosable on the next/resent delivery (playbook §8).
+- Unit tests added: credit with only `data.user`, credit with only `metadata.user_id`, and the token-safe shape log on `missing_user`.
+
+Recovery for the stuck 200-Star event (`6601a9cb-9c33-41c3-90e5-43b005d238af`): it is recorded terminal `failed`, so a redelivery would be quarantined `duplicate` (not credited). Delete that idempotency row before resending so a replay credits it:
+```sql
+DELETE FROM provider_top_up_idempotency_records
+WHERE provider_name = 'tevi' AND provider_event_id = '6601a9cb-9c33-41c3-90e5-43b005d238af';
+```
+Then resend the event from the Tevi dashboard (or re-deliver) — it will now parse and credit once.
+
+Remaining before re-closing 8.6: deploy, confirm the real payload parses + credits, run the AC9 live replay Check Round (one credit, replay → no double-credit), and update playbook §5 with the confirmed real shape from the new shape log.
 
 ## Review Findings
 
