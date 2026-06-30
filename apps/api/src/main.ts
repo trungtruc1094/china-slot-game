@@ -6,6 +6,7 @@ import { JoseTeviAuthVerifier } from "./domain/tevi-auth-adapter.js";
 import { TeviPaymentClient } from "./domain/tevi-payment-client.js";
 import { TeviTokenService } from "./domain/tevi-token-service.js";
 import { TopupService } from "./domain/topup-service.js";
+import { TeviWebhookService } from "./domain/tevi-webhook-service.js";
 
 const env = loadEnv();
 let productionDependencies: Awaited<ReturnType<typeof createProductionDependencies>> | undefined;
@@ -47,6 +48,16 @@ const app = createApp(env.teviAuth.enabled
               }),
               productionDependencies.topupSignatureIssuanceRepository
             )
+          }
+        : {}),
+      ...(env.teviAuth.payment.enabled && env.teviAuth.payment.webhookSecret && productionDependencies?.teviWebhookCreditRepository
+        ? {
+            teviWebhookSecret: env.teviAuth.payment.webhookSecret,
+            teviWebhookService: new TeviWebhookService({
+              idempotencyRepository: productionDependencies.providerTopUpIdempotencyRepository,
+              creditPort: productionDependencies.teviWebhookCreditRepository,
+              playerLookup: productionDependencies.playerSessionRepository
+            })
           }
         : {})
     }

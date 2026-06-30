@@ -14,6 +14,9 @@ export interface PlayerIdentityAdapter {
 
 export interface PlayerSessionRepository {
   resolvePlayer(input: SessionIdentityInput, now: Date): Promise<PlayerRecord>;
+  // Read-only identity lookup: returns the player mapped to a provider subject without ever creating one.
+  // Used by the Tevi webhook credit path (Story 8.6) — an unknown user is a safe failure, never an auto-create.
+  findPlayerByProviderSubject(provider: string, subject: string): Promise<PlayerRecord | null>;
   createSession(playerId: string, now: Date, expiresAt: Date, metadata?: Record<string, unknown>): Promise<SessionRecordLike>;
   findSessionForResume(sessionId: string, playerId: string, now: Date): Promise<SessionRecordLike | undefined>;
   getActiveSession(sessionId: string, now: Date): Promise<SessionRecordLike | undefined>;
@@ -40,6 +43,10 @@ export interface SessionSearchFilters {
 
 export class InMemoryPlayerIdentityAdapter implements PlayerIdentityAdapter {
   private readonly playersByProvider = new Map<string, Map<string, PlayerRecord>>();
+
+  public findByProviderSubject(provider: string, subject: string): PlayerRecord | null {
+    return this.playersByProvider.get(provider)?.get(subject) ?? null;
+  }
 
   public resolve(input: SessionIdentityInput, now: Date): PlayerRecord {
     if (Date.parse(input.expiresAt) <= now.getTime()) {
@@ -90,6 +97,10 @@ export class InMemoryPlayerSessionRepository implements PlayerSessionRepository 
 
   public async resolvePlayer(input: SessionIdentityInput, now: Date): Promise<PlayerRecord> {
     return this.identityAdapter.resolve(input, now);
+  }
+
+  public async findPlayerByProviderSubject(provider: string, subject: string): Promise<PlayerRecord | null> {
+    return this.identityAdapter.findByProviderSubject(provider, subject);
   }
 
   public async createSession(playerId: string, now: Date, expiresAt: Date, metadata: Record<string, unknown> = {}): Promise<SessionRecordLike> {

@@ -76,6 +76,11 @@ export class PostgresPlayerSessionRepository implements PlayerSessionRepository 
     }
   }
 
+  public async findPlayerByProviderSubject(provider: string, subject: string): Promise<PlayerRecord | null> {
+    const existing = await this.findIdentityFromPool(provider, subject);
+    return existing ? rowToPlayer(existing) : null;
+  }
+
   public async createSession(playerId: string, now: Date, expiresAt: Date, metadata: Record<string, unknown> = {}): Promise<SessionRecordLike> {
     const sessionId = `sess_${randomUUID()}`;
     const result = await this.pool.query<SessionRow>(

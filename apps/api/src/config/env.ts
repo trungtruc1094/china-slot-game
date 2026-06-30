@@ -51,6 +51,10 @@ export interface TeviPaymentEnabledEnv {
   billingChannelId: string;
   depositMinStars: number;
   depositMaxStars: number;
+  // Webhook crediting secret (Story 8.6). Tevi confirmed the webhook is signed with the SAME secret key they
+  // issue for payment calls, so this defaults to `secretKey` (TEVI_SECRET_KEY). An explicit TEVI_WEBHOOK_SECRET
+  // overrides it only if Tevi ever splits them. Always present when payment is enabled; never logged.
+  webhookSecret: string;
 }
 
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): ApiEnv {
@@ -157,6 +161,14 @@ function parseTeviPaymentEnv(source: NodeJS.ProcessEnv, nodeEnv: string): TeviPa
     throw new Error("TEVI_DEPOSIT_MAX_STARS must be greater than or equal to TEVI_DEPOSIT_MIN_STARS");
   }
 
+  // Tevi signs user_topup webhooks with the SAME secret key (TEVI_SECRET_KEY) they issue for payment calls,
+  // so the webhook secret defaults to `secretKey`. TEVI_WEBHOOK_SECRET is an optional override (kept in case
+  // Tevi ever splits them, and useful for tests). Never log either value.
+  const rawWebhookSecret = source.TEVI_WEBHOOK_SECRET?.trim();
+  if (source.TEVI_WEBHOOK_SECRET !== undefined && (!rawWebhookSecret || rawWebhookSecret.length === 0)) {
+    throw new Error("TEVI_WEBHOOK_SECRET must be a non-empty value when provided");
+  }
+
   return {
     enabled: true,
     apiBase,
@@ -165,7 +177,8 @@ function parseTeviPaymentEnv(source: NodeJS.ProcessEnv, nodeEnv: string): TeviPa
     secretKey,
     billingChannelId,
     depositMinStars,
-    depositMaxStars
+    depositMaxStars,
+    webhookSecret: rawWebhookSecret ?? secretKey
   };
 }
 

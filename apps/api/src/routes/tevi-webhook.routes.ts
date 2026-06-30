@@ -1,12 +1,22 @@
 import { Router } from "express";
-import { errorEnvelope } from "../schemas/api-envelope.js";
+import type { TeviWebhookServicePort } from "../domain/tevi-webhook-service.js";
+import { verifyTeviWebhookSignature } from "../domain/tevi-webhook-signature.js";
+import { errorEnvelope, okEnvelope } from "../schemas/api-envelope.js";
 
 const maxChallengeLength = 1024;
+const signatureHeader = "X-Tevi-Signature";
 
-export function createTeviWebhookRouter(): Router {
+export interface TeviWebhookRouterDeps {
+  webhookSecret: string;
+  webhookService: TeviWebhookServicePort;
+}
+
+// When deps are absent (memory/dev without payment+postgres or no webhook secret) the route keeps the safe
+// challenge echo plus a 501 placeholder for events, so existing tests and local dev keep working unchanged.
+export function createTeviWebhookRouter(deps?: TeviWebhookRouterDeps): Router {
   const router = Router();
 
-  router.post("/webhooks/tevi", (request, response) => {
+  router.post("/webhooks/tevi", async (request, response, next) => {
     const queryChallenge = getChallenge(request.query.challenge);
     const bodyChallenge = getChallenge(request.body?.challenge);
     const challenge = queryChallenge ?? bodyChallenge;
@@ -31,19 +41,54 @@ export function createTeviWebhookRouter(): Router {
       return;
     }
 
-    console.info("[tevi-webhook] event rejected before signature verification", {
-      requestId: request.requestId,
-      event: getEventName(request.body),
-      hasSignatureHeader: typeof request.header("X-Tevi-Signature") === "string"
-    });
+    if (!deps) {
+      console.info("[tevi-webhook] event rejected before signature verification", {
+        requestId: request.requestId,
+        event: getEventName(request.body),
+        hasSignatureHeader: typeof request.header(signatureHeader) === "string"
+      });
 
-    response.status(501).json(errorEnvelope({
-      code: "TEVI_WEBHOOK_PROCESSING_NOT_IMPLEMENTED",
-      message: "Tevi webhook event processing requires signature verification in a later story.",
-      details: {
-        expectedHeader: "X-Tevi-Signature"
-      }
-    }, request.requestId));
+      response.status(501).json(errorEnvelope({
+        code: "TEVI_WEBHOOK_PROCESSING_NOT_IMPLEMENTED",
+        message: "Tevi webhook event processing requires signature verification in a later story.",
+        details: {
+          expectedHeader: signatureHeader
+        }
+      }, request.requestId));
+      return;
+    }
+
+    // Verify the signature BEFORE parsing effects or touching any wallet (AC1). A missing/invalid signature is
+    // rejected with HTTP 401 (per Tevi docs), no idempotency record write, no wallet mutation.
+    const verification = verifyTeviWebhookSignature(deps.webhookSecret, request.body, request.header(signatureHeader));
+    if (!verification.ok) {
+      console.warn("[tevi-webhook] signature verification failed", {
+        requestId: request.requestId,
+        event: getEventName(request.body),
+        reasonCode: verification.reasonCode
+      });
+      response.status(401).json(errorEnvelope({
+        code: "TEVI_WEBHOOK_SIGNATURE_INVALID",
+        message: "Tevi webhook signature verification failed.",
+        details: {
+          expectedHeader: signatureHeader,
+          reasonCode: verification.reasonCode
+        }
+      }, request.requestId));
+      return;
+    }
+
+    try {
+      const result = await deps.webhookService.process({ payload: request.body, requestId: request.requestId });
+      // Terminal outcomes (credited, replayed, ignored, failed, duplicate) are durably recorded and return 200
+      // so an undocumented Tevi redelivery stays idempotent and safe. Genuinely transient errors throw → 5xx.
+      response.status(200).json(okEnvelope({
+        status: result.status,
+        reasonCode: result.reasonCode
+      }, request.requestId));
+    } catch (error) {
+      next(error);
+    }
   });
 
   return router;

@@ -20,6 +20,7 @@ import { createTeviSessionRouter } from "./routes/tevi-session.routes.js";
 import { createTeviTokenRouter } from "./routes/tevi-token.routes.js";
 import { createTeviTopupRouter, type TopupServicePort } from "./routes/tevi-topup.routes.js";
 import { createTeviWebhookRouter } from "./routes/tevi-webhook.routes.js";
+import type { TeviWebhookServicePort } from "./domain/tevi-webhook-service.js";
 import { InMemoryPlayerIdentityAdapter } from "./domain/player-identity.js";
 import { InMemoryGameConfigurationRepository, type GameConfigurationProvider, type GameConfigurationRepository } from "./domain/game-configuration-repository.js";
 import { MetricsService } from "./domain/metrics-service.js";
@@ -57,6 +58,8 @@ export interface AppDependencies {
   teviAuthVerifier?: TeviAuthVerifier;
   teviTokenService?: TeviTokenServicePort;
   topupService?: TopupServicePort;
+  teviWebhookService?: TeviWebhookServicePort;
+  teviWebhookSecret?: string;
   readinessCheck?: () => Promise<Record<string, "ready">>;
 }
 
@@ -135,7 +138,11 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use("/api", createAdminOperatorLimitsRouter(operatorLimitsRepository));
   app.use("/api", createAdminSpinLedgerRouter(spinService, adminAuditRepository));
   app.use("/api", createAdminMetricsRouter(metricsService));
-  app.use("/api", createTeviWebhookRouter());
+  app.use("/api", createTeviWebhookRouter(
+    dependencies.teviWebhookService && dependencies.teviWebhookSecret
+      ? { webhookService: dependencies.teviWebhookService, webhookSecret: dependencies.teviWebhookSecret }
+      : undefined
+  ));
   if (dependencies.teviTokenService) {
     const teviTokenRouterOptions = dependencies.teviAuthVerifier
       ? { sessionService, verifier: dependencies.teviAuthVerifier }

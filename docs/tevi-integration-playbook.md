@@ -114,15 +114,20 @@ window.TeviJS.topup({
 
 ---
 
-## 5. Webhook `user_topup` (for crediting — Story 8.6)  📄 from docs (not yet runtime-verified)
+## 5. Webhook `user_topup` (for crediting — Story 8.6)  ✅ doc-verified (browser read 2026-06-30) / ⚠️ payload not yet runtime-verified
+Sources: `docs.tevi.com/docs/webhook/overview` + `/docs/webhook/verification` (SPA — read in a real browser). The payload shape below is the verbatim doc example; it has **not** been confirmed against a real delivery yet (sandbox couldn't fund a charge — §4), so still parse tolerantly and log the real shape token-safely on first live event.
 ```json
-{ "id": "...", "event": "user_topup", "space_id": "...", "created_at": "...",
+{ "id": "01978a5c-5678-9012-cdef-345678901234", "event": "user_topup",
+  "space_id": "550e8400-...", "created_at": "2024-01-15T10:35:20.456789Z",
   "data": { "user": "633505726", "amount": 1000,
             "metadata": { "app_id": "...", "user_id": 633505726, "exchange_id": "...", "type": "deposit" } } }
 ```
-- Signature header is **`X-Tevi-Signature`** (note casing).
-- Verification = **HMAC-SHA256** over the **compact JSON** of the payload (`json.dumps(payload, separators=(",", ":"))`), hex digest, constant-time compare, keyed with the dashboard webhook secret.
-- Cashout webhook is `user_withdraw` (same shape, `type: "refund"`).
+- Signature header is **`X-Tevi-Signature`** (exact casing). No timestamp/version/event-id header — `created_at` and `id` are body fields. `id` is the per-event UUID (use as dedup key).
+- Verification = **HMAC-SHA256** keyed with the webhook secret, over the **compact re-serialized JSON** `json.dumps(payload, separators=(",", ":"))`, **hex digest, no `sha256=` prefix**, constant-time compare (`hmac.compare_digest`). ✅ **The webhook signing secret is the SAME value as `TEVI_SECRET_KEY`** (Tevi team confirmed 2026-06-30 — they don't spawn a separate webhook secret). There is **no distinct `TEVI_WEBHOOK_SECRET`** to obtain; the China Slot backend defaults the webhook secret to `secretKey` (`TEVI_SECRET_KEY`) and treats `TEVI_WEBHOOK_SECRET` only as an optional override. ⚠️ It signs the *re-serialized parsed* body, not raw bytes — fragile on key ordering and Python's `ensure_ascii=True` non-ASCII escaping; JS `JSON.stringify` differs on non-ASCII. Verify empirically; keep raw body to diagnose/fallback.
+- **Signature failure → return `401`, log it, do not process** (docs prescribe this). HTTPS-only, secret server-side, verify-before-process.
+- Types: `data.user` is a **string**, `data.metadata.user_id` is a **number** (same value) — coerce both. No top-level `type`; no currency field (docs never say "Stars"; `amount` is a bare int — credit 1:1).
+- Events: `product__consume` (double underscore), `user_topup`, `user_withdraw` (cashout, `type:"refund"`), `new_message`, `start_conversation`, `create_thread`.
+- **Undocumented (design around):** no challenge/handshake for URL verification (yet our 8.1 route echoes a `challenge` that the live sandbox needed — keep it); no retry policy/count/timeout; no inbound dedup-key contract (the `Idempotency-Key` docs are for the *outbound* cashout call only); no replay window; no IP allowlist; no ordering guarantee ("events may be dropped" under rate limits). A "see the events reference" link in the docs 404s — the inline examples are all that exist.
 - **Verify signature before parsing/mutating**; credit + idempotency must commit atomically.
 
 ## 6. Cashout (for Story 8.8)  📄 from docs
@@ -136,6 +141,7 @@ The top-up route is **conditionally mounted** — it only exists when **both** T
 Required env (China Slot names; see `apps/api/src/config/env.ts`):
 - Auth: `TEVI_APP_ID`, `TEVI_JWKS_URL` (full https URL w/ path), `TEVI_API_BASE`
 - Payment: `TEVI_PAYMENT_ENABLED=true`, `TEVI_API_KEY`, `TEVI_SECRET_KEY`, `TEVI_BILLING_CHANNEL_ID`, `TEVI_PAYMENT_API_BASE`, **`TEVI_DEPOSIT_TOKEN_PATH=/api/v1/payments/top-up-signature`**, `TEVI_DEPOSIT_MIN_STARS`/`TEVI_DEPOSIT_MAX_STARS`
+- Webhook crediting (Story 8.6): **no separate secret needed** — the webhook is signed with `TEVI_SECRET_KEY` (the same value). So once `TEVI_PAYMENT_ENABLED=true` + `TEVI_SECRET_KEY` + Postgres are set, verified `user_topup` crediting is active. `TEVI_WEBHOOK_SECRET` exists only as an optional override.
 - Generic SDK truthiness/limits: client UX cap via `CHINA_SLOT_TEVI_CONFIG.topup.maxStars` (backend is authoritative).
 
 ---
