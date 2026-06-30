@@ -263,6 +263,10 @@
             if (!tokenResult || !tokenResult.ok || !tokenResult.runtimeToken) {
                 var error = new Error("Tevi re-authentication is required.");
                 error.code = "TEVI_REAUTH_REQUIRED";
+                // Preserve the underlying getUserAppToken reason (e.g. sdk-unavailable /
+                // sdk-timeout vs. token-missing) so callers can distinguish a transient
+                // SDK-not-ready-yet failure (retryable) from a genuine re-auth (terminal).
+                error.reason = tokenResult && tokenResult.reason ? tokenResult.reason : "re-authentication-required";
                 throw error;
             }
 
@@ -270,9 +274,33 @@
             if (!exchangeResult || !exchangeResult.session) {
                 var sessionError = new Error("Tevi session response is missing session data.");
                 sessionError.code = "TEVI_REAUTH_REQUIRED";
+                // A successful token exchange that returns no session is a genuine re-auth /
+                // backend-contract failure, not a transient SDK-not-ready blip — mark it
+                // terminal so it surfaces the re-auth state instead of being retried (8.12 review).
+                sessionError.reason = "re-authentication-required";
                 throw sessionError;
             }
             return exchangeResult.session;
+        }
+
+        // Re-read the authoritative session/balance from the server, bypassing the cached
+        // session. Used after a Tevi deposit webhook credits the wallet so the HUD reflects
+        // the new balance without a full reload. Read-only: the client never mutates balance.
+        async function refreshSession() {
+            if (mode !== "production") return null;
+
+            var previousSession = session;
+            sessionRequest = null;
+            session = null;
+            try {
+                return await startSession();
+            } catch (error) {
+                // On a transient refresh failure keep the prior session so play continues.
+                if (!session && previousSession) {
+                    session = previousSession;
+                }
+                throw error;
+            }
         }
 
         function isTeviSessionMode() {
@@ -383,6 +411,7 @@
             identity: identity,
             get status() { return status; },
             startSession: startSession,
+            refreshSession: refreshSession,
             spin: spin,
             setRetry: setRetry,
             requestTopupSignature: requestTopupSignature

@@ -391,18 +391,26 @@ class SlotGame extends Phaser.Scene{
         return defaultCoins;
     }
 
+    isTeviSessionMode()
+    {
+        return !!(this.teviClient && this.teviClient.isTeviMode && this.teviClient.isTeviMode());
+    }
+
     initializeTeviMiniAppShell()
     {
-        if (!this.teviClient || !this.teviClient.isTeviMode || !this.teviClient.isTeviMode()) return null;
+        if (!this.isTeviSessionMode()) return null;
 
         this.teviInitializationStatus = "pending";
-        return this.teviClient.initialize().then((result) => {
+        // Expose the init promise so the session/balance load can wait for the Tevi SDK to
+        // finish loading before it calls getUserAppToken() (defect 8.12 SDK-init race).
+        this.teviReady = this.teviClient.initialize().then((result) => {
             this.teviInitializationStatus = result && result.available ? "ready" : "unavailable";
             return result;
         }).catch((_error) => {
             this.teviInitializationStatus = "unavailable";
             return null;
         });
+        return this.teviReady;
     }
 
     initializeBackendSessionBalance()
@@ -414,17 +422,87 @@ class SlotGame extends Phaser.Scene{
         }
         this.backendSpinStatus = "pending";
 
+        // Tevi sessions need a live SDK (getUserAppToken) — wait for teviClient.initialize()
+        // to resolve before the first attempt, otherwise the call races the SDK script load
+        // and fails as sdk-unavailable. Local/demo generic sessions (/api/sessions) have no
+        // such dependency and load immediately, so behavior there is unchanged (AC3).
+        if (this.isTeviSessionMode() && this.teviReady && typeof this.teviReady.then === "function") {
+            this.teviReady.then(() => this.loadBackendSessionBalance(0));
+        } else {
+            this.loadBackendSessionBalance(0);
+        }
+    }
+
+    // Terminal reasons (from teviClient.getUserAppToken) that never recover on retry:
+    // genuine not-authenticated states (token-missing / user-cancelled / re-authentication-required)
+    // plus permanently-broken integrations (method-unavailable / sdk-call-failed). Only the
+    // genuinely transient SDK-not-ready-yet reasons (sdk-unavailable / sdk-timeout) and
+    // network/backend blips are retried — getUserAppToken self-caps sdk-timeout at 10s.
+    isTerminalSessionReauth(error)
+    {
+        if (!error || error.code !== "TEVI_REAUTH_REQUIRED") return false;
+        var terminalReasons = ["token-missing", "user-cancelled", "re-authentication-required", "method-unavailable", "sdk-call-failed"];
+        return terminalReasons.indexOf(error.reason) !== -1;
+    }
+
+    scheduleSceneDelay(ms, callback)
+    {
+        if (this.time && typeof this.time.delayedCall === "function") {
+            this.time.delayedCall(ms, callback);
+            return;
+        }
+        setTimeout(callback, ms);
+    }
+
+    loadBackendSessionBalance(attempt)
+    {
+        var maxAttempts = 3;   // initial + 2 retries for slow/late SDK readiness (AC2)
+        this.backendSpinStatus = "pending";
+
         this.serverClient.startSession().then((session) => {
             var points = (session && session.balance) ? Number(session.balance.points) : NaN;
             if (!Number.isFinite(points)) {
                 throw new Error("Session balance is invalid.");
             }
             this.slotPlayer.setCoinsCount(points);
+            // Force the HUD to render even when the balance equals the initial 0 coins
+            // (setCoinsCount skips its change event when the value is unchanged), so the
+            // ' ...' placeholder is always replaced once the session resolves.
+            if (this.slotControls && typeof this.slotControls.changeCreditCoinsHandler === "function") {
+                this.slotControls.changeCreditCoinsHandler(points);
+            }
             this.backendSpinStatus = "ready";
         }).catch((error) => {
-            this.backendSpinStatus = "retry";
-            this.backendSpinPlan = window.ChinaSlotServerClient ? window.ChinaSlotServerClient.buildRetryState(error) : null;
+            if (!this.isTerminalSessionReauth(error) && attempt + 1 < maxAttempts) {
+                // Transient (SDK loaded late / network blip) — retry with a short backoff.
+                var delay = 600 * (attempt + 1);
+                this.scheduleSceneDelay(delay, () => this.loadBackendSessionBalance(attempt + 1));
+                return;
+            }
+            this.surfaceSessionBalanceFailure(error);
         });
+    }
+
+    // A failed balance load must never leave the HUD silently stuck on ' ...' (AC2).
+    surfaceSessionBalanceFailure(error)
+    {
+        var terminalReauth = this.isTerminalSessionReauth(error);
+        this.backendSpinStatus = terminalReauth ? "reauth-required" : "retry";
+        this.backendSpinPlan = window.ChinaSlotServerClient ? window.ChinaSlotServerClient.buildRetryState(error) : null;
+
+        if (this.slotControls && this.slotControls.creditSumText != null) {
+            this.slotControls.creditSumText.text = ' —';
+        }
+
+        if (this.guiController && this.guiController.showMessage) {
+            var title = terminalReauth ? "Sign in to Tevi" : "Backend unavailable";
+            var body = terminalReauth
+                ? "Sign in to Tevi again to load your Stars balance."
+                : "Could not load your balance. Reopen the game to try again.";
+            var message = this.guiController.showMessage(title, body, this, () => {
+                this.guiController.closePopUp(message);
+            });
+        }
     }
 
     createClientSpinId()
@@ -583,11 +661,75 @@ class SlotGame extends Phaser.Scene{
         this.topupPending = false;
         if (status === "webhook-pending") {
             this.topupReference = (result && result.reference) || null;
-            // Intentionally do NOT update PlayerCoin/HUD/server balance here.
+            // Crediting stays server-authoritative — we never add Stars to the wallet here.
+            // Instead poll the server for the webhook-applied credit so the HUD + dialog
+            // reflect it without a manual spin or full reload (AC4).
             this.setTopupState("webhook-pending");
+            this.startPostDepositBalanceRefresh();
             return;
         }
         this.finishTopup(status);
+    }
+
+    // Poll the authoritative server balance after a pending deposit until the credited
+    // Stars land (balance increases) or we hit the bounded attempt limit. Read-only.
+    startPostDepositBalanceRefresh()
+    {
+        if (!this.serverClient || typeof this.serverClient.refreshSession !== "function") return;
+        // New token => a fresh poll cycle; lets a later deposit supersede an earlier one.
+        this.balanceRefreshToken = (this.balanceRefreshToken || 0) + 1;
+        var token = this.balanceRefreshToken;
+
+        // Establish the baseline from a server read, not the client HUD: a stale/zero/NaN
+        // slotPlayer.coins would otherwise let the very first poll treat the pre-credit
+        // balance as "credited" (8.12 review false-positive). Only after a finite server
+        // baseline is known do we start watching for the credited increase.
+        this.serverClient.refreshSession().then((session) => {
+            if (token !== this.balanceRefreshToken) return;
+            var baseline = (session && session.balance) ? Number(session.balance.points) : NaN;
+            this.pollPostDepositBalance(0, baseline, token);
+        }).catch(() => {
+            if (token !== this.balanceRefreshToken) return;
+            // Could not read a baseline; fall back to the last known client value.
+            var baseline = this.slotPlayer ? Number(this.slotPlayer.coins) : NaN;
+            this.pollPostDepositBalance(0, baseline, token);
+        });
+    }
+
+    pollPostDepositBalance(attempt, baseline, token)
+    {
+        var maxAttempts = 8;        // bounded: ~ maxAttempts * intervalMs of polling
+        var intervalMs = 2000;
+        if (token !== this.balanceRefreshToken) return;   // superseded by a newer deposit
+
+        this.serverClient.refreshSession().then((session) => {
+            if (token !== this.balanceRefreshToken) return;
+            var points = (session && session.balance) ? Number(session.balance.points) : NaN;
+
+            // Confirm only on a real increase over the server-established baseline. Without a
+            // finite baseline we cannot distinguish a credit, so keep polling rather than
+            // accepting the current balance as "credited".
+            if (Number.isFinite(points) && Number.isFinite(baseline) && points > baseline) {
+                this.slotPlayer.setCoinsCount(points);
+                if (this.slotControls && typeof this.slotControls.changeCreditCoinsHandler === "function") {
+                    this.slotControls.changeCreditCoinsHandler(points);
+                }
+                this.backendSpinStatus = "ready";
+                if (this.topupState === "webhook-pending") this.setTopupState("credited");
+                return;
+            }
+
+            if (attempt + 1 < maxAttempts) {
+                this.scheduleSceneDelay(intervalMs, () => this.pollPostDepositBalance(attempt + 1, baseline, token));
+            }
+            // Timeout leaves the dialog on its informative webhook-pending message; the
+            // credit will still appear on the next session load / spin.
+        }).catch(() => {
+            if (token !== this.balanceRefreshToken) return;
+            if (attempt + 1 < maxAttempts) {
+                this.scheduleSceneDelay(intervalMs, () => this.pollPostDepositBalance(attempt + 1, baseline, token));
+            }
+        });
     }
 
     finishTopup(status)
@@ -617,6 +759,8 @@ class SlotGame extends Phaser.Scene{
                 return this.topupReference
                     ? "Waiting for Tevi confirmation. Reference " + this.topupReference + "."
                     : "Waiting for Tevi confirmation.";
+            case "credited":
+                return "Deposit confirmed. Your Stars balance is updated.";
             case "canceled":
                 return "Deposit canceled.";
             case "re-authentication-required":

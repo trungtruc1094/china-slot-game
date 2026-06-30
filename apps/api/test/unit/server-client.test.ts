@@ -48,11 +48,19 @@ interface TopupGame {
   slotPlayer: unknown;
   submitTopup: (amount: number) => Promise<unknown> | null;
   topupStatusMessage: (status: string) => string;
+  scheduleSceneDelay?: (ms: number, callback: () => void) => void;
 }
 
 interface SlotGameCtor {
   prototype: {
     initializeBackendSessionBalance: () => void;
+    isTeviSessionMode: () => boolean;
+    loadBackendSessionBalance: (attempt: number) => void;
+    isTerminalSessionReauth: (error: unknown) => boolean;
+    scheduleSceneDelay: (ms: number, callback: () => void) => void;
+    surfaceSessionBalanceFailure: (error: unknown) => void;
+    startPostDepositBalanceRefresh: () => void;
+    pollPostDepositBalance: (attempt: number, baseline: number, token: number) => void;
     requestBackendSpin: () => void;
     handleBackendSpinRetry: (retryState: SpinRetryState) => void;
     initializeTeviMiniAppShell: () => Promise<unknown> | null;
@@ -713,7 +721,12 @@ describe("browser server client render contract", () => {
       slotPlayer: {
         setCoinsCount: (points: number) => calls.push({ type: "balance", points })
       },
-      isBackendProductionMode: () => true
+      isBackendProductionMode: () => true,
+      isTeviSessionMode: SlotGame.prototype.isTeviSessionMode,
+      loadBackendSessionBalance: SlotGame.prototype.loadBackendSessionBalance,
+      isTerminalSessionReauth: SlotGame.prototype.isTerminalSessionReauth,
+      scheduleSceneDelay: SlotGame.prototype.scheduleSceneDelay,
+      surfaceSessionBalanceFailure: SlotGame.prototype.surfaceSessionBalanceFailure
     };
 
     SlotGame.prototype.initializeBackendSessionBalance.call(game);
@@ -784,12 +797,127 @@ describe("browser server client render contract", () => {
           throw new Error("sdk unavailable");
         }
       },
-      teviInitializationStatus: "idle"
+      teviInitializationStatus: "idle",
+      isTeviSessionMode: SlotGame.prototype.isTeviSessionMode
     };
 
     await expect(SlotGame.prototype.initializeTeviMiniAppShell.call(game)).resolves.toBeNull();
     expect(calls).toEqual(["initialize"]);
     expect(game.teviInitializationStatus).toBe("unavailable");
+  });
+
+  it("waits for the Tevi SDK to initialize before loading the session balance (AC1)", async () => {
+    const SlotGame = loadSlotGame();
+    const order: string[] = [];
+    let resolveReady: () => void = () => {};
+    const ready = new Promise<void>((r) => { resolveReady = () => { order.push("sdk-ready"); r(); }; });
+
+    const game = {
+      backendSpinStatus: "idle",
+      backendSpinPlan: null,
+      teviReady: ready,
+      teviClient: { isTeviMode: () => true },
+      serverClient: {
+        mode: "production",
+        startSession: async () => { order.push("start-session"); return { balance: { points: 1000 } }; }
+      },
+      slotControls: { creditSumText: { text: "100000" } },
+      slotPlayer: { setCoinsCount: () => {} },
+      isBackendProductionMode: () => true,
+      isTeviSessionMode: SlotGame.prototype.isTeviSessionMode,
+      loadBackendSessionBalance: SlotGame.prototype.loadBackendSessionBalance,
+      isTerminalSessionReauth: SlotGame.prototype.isTerminalSessionReauth,
+      scheduleSceneDelay: SlotGame.prototype.scheduleSceneDelay,
+      surfaceSessionBalanceFailure: SlotGame.prototype.surfaceSessionBalanceFailure
+    };
+
+    SlotGame.prototype.initializeBackendSessionBalance.call(game);
+    await Promise.resolve();
+    // Session load must not have started before the SDK signalled ready.
+    expect(order).toEqual([]);
+
+    resolveReady();
+    await ready;
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(order).toEqual(["sdk-ready", "start-session"]);
+    expect(game.backendSpinStatus).toBe("ready");
+  });
+
+  it("retries a transient SDK-not-ready session failure before succeeding (AC2)", async () => {
+    const SlotGame = loadSlotGame();
+    let attempts = 0;
+    const balances: number[] = [];
+    const game = {
+      backendSpinStatus: "pending",
+      backendSpinPlan: null,
+      serverClient: {
+        mode: "production",
+        startSession: async () => {
+          attempts += 1;
+          if (attempts === 1) {
+            const error = new Error("Tevi re-authentication is required.") as Error & { code: string; reason: string };
+            error.code = "TEVI_REAUTH_REQUIRED";
+            error.reason = "sdk-unavailable";
+            throw error;
+          }
+          return { balance: { points: 1500 } };
+        }
+      },
+      slotControls: { creditSumText: { text: " ..." } },
+      slotPlayer: { setCoinsCount: (points: number) => balances.push(points) },
+      isBackendProductionMode: () => true,
+      isTerminalSessionReauth: SlotGame.prototype.isTerminalSessionReauth,
+      loadBackendSessionBalance: SlotGame.prototype.loadBackendSessionBalance,
+      // Run the backoff immediately so the test stays deterministic.
+      scheduleSceneDelay: (_ms: number, callback: () => void) => { callback(); },
+      surfaceSessionBalanceFailure: SlotGame.prototype.surfaceSessionBalanceFailure
+    };
+
+    SlotGame.prototype.loadBackendSessionBalance.call(game, 0);
+    // Let the rejected attempt + the retry's resolution flush.
+    for (let i = 0; i < 6; i += 1) await Promise.resolve();
+
+    expect(attempts).toBe(2);
+    expect(balances).toEqual([1500]);
+    expect(game.backendSpinStatus).toBe("ready");
+  });
+
+  it("surfaces a clear re-auth state instead of stalling on a terminal session failure (AC2)", async () => {
+    const SlotGame = loadSlotGame();
+    const messages: Array<{ title: string; body: string }> = [];
+    const game = {
+      backendSpinStatus: "pending",
+      backendSpinPlan: null,
+      serverClient: {
+        mode: "production",
+        startSession: async () => {
+          const error = new Error("Tevi re-authentication is required.") as Error & { code: string; reason: string };
+          error.code = "TEVI_REAUTH_REQUIRED";
+          error.reason = "token-missing";
+          throw error;
+        }
+      },
+      slotControls: { creditSumText: { text: " ..." } },
+      slotPlayer: { setCoinsCount: () => {} },
+      guiController: {
+        showMessage: (title: string, body: string) => { messages.push({ title, body }); return {}; },
+        closePopUp: () => {}
+      },
+      isBackendProductionMode: () => true,
+      isTerminalSessionReauth: SlotGame.prototype.isTerminalSessionReauth,
+      scheduleSceneDelay: (_ms: number, callback: () => void) => { callback(); },
+      surfaceSessionBalanceFailure: SlotGame.prototype.surfaceSessionBalanceFailure
+    };
+
+    SlotGame.prototype.loadBackendSessionBalance.call(game, 0);
+    for (let i = 0; i < 4; i += 1) await Promise.resolve();
+
+    expect(game.backendSpinStatus).toBe("reauth-required");
+    expect(game.slotControls.creditSumText.text).not.toBe(" ...");
+    expect(messages).toHaveLength(1);
+    expect(messages[0]?.title ?? "").toContain("Tevi");
   });
 });
 
@@ -959,6 +1087,9 @@ describe("slot game Tevi deposit flow", () => {
       setTopupState: SlotGame.prototype.setTopupState,
       finishTopup: SlotGame.prototype.finishTopup,
       handleTopupResult: SlotGame.prototype.handleTopupResult,
+      startPostDepositBalanceRefresh: SlotGame.prototype.startPostDepositBalanceRefresh,
+      pollPostDepositBalance: SlotGame.prototype.pollPostDepositBalance,
+      scheduleSceneDelay: SlotGame.prototype.scheduleSceneDelay,
       topupStatusMessage: SlotGame.prototype.topupStatusMessage,
       renderTopupStatus: SlotGame.prototype.renderTopupStatus,
       updateTopupConfirmEnabled: SlotGame.prototype.updateTopupConfirmEnabled,
@@ -1098,5 +1229,39 @@ describe("slot game Tevi deposit flow", () => {
     expect(game.submitTopup(100)).toBeNull();
     expect(signatureCalls).toBe(0);
     expect(game.topupState).toBe("idle");
+  });
+
+  it("refreshes the balance from the server after a webhook-pending deposit (AC4)", async () => {
+    const SlotGame = loadSlotGame();
+    const balanceCalls: number[] = [];
+    let refreshCalls = 0;
+    const game = bindTopupGame(SlotGame, {
+      teviClient: {
+        isTeviMode: () => true,
+        topup: async () => ({ ok: true, status: "webhook-pending", reason: "sdk-confirmed", reference: "ref-1" })
+      },
+      serverClient: {
+        requestTopupSignature: async () => ({ ok: true, depositToken: "tok", requestId: "req-1" }),
+        // First read still shows the pre-credit balance; the second read reflects the
+        // webhook-applied credit (server-authoritative — the client only reads it).
+        refreshSession: async () => {
+          refreshCalls += 1;
+          return { balance: { points: refreshCalls >= 2 ? 1050 : 1000 } };
+        }
+      },
+      slotPlayer: { coins: 1000, setCoinsCount: (points: number) => balanceCalls.push(points), addCoins: () => {} },
+      // Run each poll tick immediately so the test is deterministic.
+      scheduleSceneDelay: (_ms: number, callback: () => void) => { callback(); }
+    });
+
+    await game.submitTopup(100);
+
+    // Flush the bounded poll cycle.
+    for (let i = 0; i < 12; i += 1) await Promise.resolve();
+
+    expect(refreshCalls).toBeGreaterThanOrEqual(2);
+    expect(balanceCalls).toEqual([1050]);
+    expect(game.topupState).toBe("credited");
+    expect(game.topupStatusMessage("credited")).toContain("Stars balance is updated");
   });
 });
