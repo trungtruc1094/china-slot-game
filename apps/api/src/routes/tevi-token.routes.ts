@@ -17,6 +17,9 @@ const teviTokenRefreshRequestSchema = z.object({
 export interface TeviTokenRouterOptions {
   sessionService?: SessionService;
   verifier?: TeviAuthVerifier;
+  // "exchange" (default): bind the session via the GET /api/v1/auth/token exchange.
+  // "direct": verify the runtime (user_app_token) directly against JWKS and skip the exchange.
+  sessionAuthMode?: "exchange" | "direct";
 }
 
 export function createTeviTokenRouter(tokenService: TeviTokenServicePort, options: TeviTokenRouterOptions = {}): Router {
@@ -26,6 +29,53 @@ export function createTeviTokenRouter(tokenService: TeviTokenServicePort, option
   router.post("/tevi/token", async (request, response, next) => {
     try {
       const parsedRequest = teviTokenRequestSchema.parse(request.body ?? {});
+
+      // Direct mode: verify the user_app_token against Tevi's JWKS (the exact verification the Tevi
+      // auth middleware already runs successfully for every payment) and bind the session from its
+      // claims — skipping GET /api/v1/auth/token, which expects a different bearer/scope and rejects
+      // the user_app_token with 401 PROVIDER_REJECTED (8.12). JWKS verification depends on neither
+      // that endpoint's bearer type nor its Login-Kit scope.
+      if (options.sessionAuthMode === "direct") {
+        if (!options.sessionService || !options.verifier) {
+          throw new ApiHttpError(503, {
+            code: "TEVI_AUTH_UNAVAILABLE",
+            message: "Tevi authentication is temporarily unavailable.",
+            details: {
+              reasonCode: "AUTH_SESSION_BINDING_UNAVAILABLE",
+              reauthRequired: true
+            }
+          });
+        }
+
+        const verifiedDirect = await options.verifier.verify(parsedRequest.runtimeToken);
+        if (!verifiedDirect.ok) {
+          console.warn("[tevi-token] runtime token rejected", {
+            requestId: request.requestId,
+            mode: "direct",
+            reasonCode: verifiedDirect.reasonCode
+          });
+          throw new ApiHttpError(401, {
+            code: "TEVI_REAUTH_REQUIRED",
+            message: "Tevi authentication requires a new sign-in.",
+            details: {
+              reasonCode: verifiedDirect.reasonCode,
+              reauthRequired: true
+            }
+          });
+        }
+
+        const directSession = await options.sessionService.createOrResume({
+          identity: verifiedDirect.context
+        });
+        response.status(directSession.statusCode).json(okEnvelope({
+          status: "authenticated",
+          accessTokenExpiresAt: verifiedDirect.context.expiresAt,
+          reauthRequired: false,
+          session: directSession.response
+        }, request.requestId));
+        return;
+      }
+
       const result = await tokenService.exchangeRuntimeToken(parsedRequest.runtimeToken, request.requestId);
       if (!result.ok) {
         throw new ApiHttpError(result.statusCode, {

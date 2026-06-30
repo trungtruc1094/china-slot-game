@@ -34,6 +34,12 @@ export interface TeviTokenExchangeDisabledEnv {
 export interface TeviTokenExchangeEnabledEnv {
   enabled: true;
   apiBase: string;
+  // How POST /api/tevi/token establishes the server session:
+  //   "exchange" (default) — round-trip the runtime token through GET /api/v1/auth/token.
+  //   "direct"             — verify the user_app_token directly against the JWKS (same check the
+  //                          Tevi auth middleware runs for payments) and skip the exchange, which
+  //                          expects a different bearer/scope and rejects the user_app_token (8.12).
+  sessionAuthMode: "exchange" | "direct";
 }
 
 export type TeviPaymentEnv = TeviPaymentDisabledEnv | TeviPaymentEnabledEnv;
@@ -197,7 +203,8 @@ function parseTeviTokenExchangeEnv(source: NodeJS.ProcessEnv, nodeEnv: string): 
 
   return {
     enabled: true,
-    apiBase
+    apiBase,
+    sessionAuthMode: source.TEVI_SESSION_AUTH_MODE === "direct" ? "direct" : "exchange"
   };
 }
 

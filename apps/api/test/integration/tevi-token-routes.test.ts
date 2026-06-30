@@ -84,6 +84,37 @@ async function startServer(result: TeviTokenExchangeResult, refreshResult: TeviT
   baseUrl = `http://127.0.0.1:${address.port}`;
 }
 
+// Direct mode: a token service that fails loudly if the exchange is ever called, so the test
+// proves POST /tevi/token verifies the runtime token via JWKS and skips GET /api/v1/auth/token.
+class ExchangeForbiddenTokenService implements TeviTokenServicePort {
+  public exchangeCalls = 0;
+
+  public async exchangeRuntimeToken(): Promise<TeviTokenExchangeResult> {
+    this.exchangeCalls += 1;
+    throw new Error("exchangeRuntimeToken must not be called in direct mode");
+  }
+
+  public async refreshAccessToken(): Promise<TeviTokenExchangeResult> {
+    return { ok: false, code: "TEVI_TOKEN_REFRESH_FAILED", reasonCode: "PROVIDER_REJECTED", statusCode: 401 };
+  }
+}
+
+async function startServerDirect(tokenService: TeviTokenServicePort): Promise<void> {
+  const sessionService = new SessionService(new InMemoryPlayerSessionRepository(), new FixedClock());
+  server = createServer(createApp({
+    clock: new FixedClock(),
+    sessionService,
+    teviAuthVerifier: new FakeTeviVerifier(),
+    teviTokenService: tokenService,
+    teviSessionAuthMode: "direct"
+  }));
+  await new Promise<void>((resolve) => {
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const address = server.address() as AddressInfo;
+  baseUrl = `http://127.0.0.1:${address.port}`;
+}
+
 async function startServerWithoutVerifier(result: TeviTokenExchangeResult): Promise<void> {
   server = createServer(createApp({
     clock: new FixedClock(),
@@ -272,6 +303,56 @@ describe("Tevi token route", () => {
         }
       },
       requestId: "req_tevi_refresh_test"
+    });
+  });
+
+  it("direct mode verifies the runtime token via JWKS and binds a session without the exchange", async () => {
+    const tokenService = new ExchangeForbiddenTokenService();
+    await startServerDirect(tokenService);
+
+    // "provider-access-token" is what the fake verifier accepts — here it stands in for a
+    // user_app_token that verifies against the JWKS (as the real one does for payments).
+    const response = await postToken("provider-access-token");
+
+    expect(response.status).toBe(201);
+    expect(tokenService.exchangeCalls).toBe(0); // the broken /api/v1/auth/token hop is never called
+    const bodyText = await response.text();
+    expect(bodyText).not.toContain("provider-access-token");
+    expect(JSON.parse(bodyText)).toMatchObject({
+      data: {
+        status: "authenticated",
+        accessTokenExpiresAt: "2026-06-29T00:00:00.000Z",
+        reauthRequired: false,
+        session: {
+          sessionId: expect.stringMatching(/^sess_/),
+          playerId: expect.stringMatching(/^player_/),
+          balance: { points: 1000 }
+        }
+      },
+      error: null,
+      requestId: "req_tevi_token_test"
+    });
+  });
+
+  it("direct mode surfaces a clear re-auth state when the runtime token does not verify", async () => {
+    const tokenService = new ExchangeForbiddenTokenService();
+    await startServerDirect(tokenService);
+
+    const response = await postToken("not-a-valid-token");
+
+    expect(response.status).toBe(401);
+    expect(tokenService.exchangeCalls).toBe(0);
+    await expect(response.json()).resolves.toEqual({
+      data: null,
+      error: {
+        code: "TEVI_REAUTH_REQUIRED",
+        message: "Tevi authentication requires a new sign-in.",
+        details: {
+          reasonCode: "TOKEN_VERIFICATION_FAILED",
+          reauthRequired: true
+        }
+      },
+      requestId: "req_tevi_token_test"
     });
   });
 

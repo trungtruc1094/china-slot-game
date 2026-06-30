@@ -57,6 +57,7 @@ export interface AppDependencies {
   requestTraceRepository?: RequestTraceRepository;
   teviAuthVerifier?: TeviAuthVerifier;
   teviTokenService?: TeviTokenServicePort;
+  teviSessionAuthMode?: "exchange" | "direct";
   topupService?: TopupServicePort;
   teviWebhookService?: TeviWebhookServicePort;
   teviWebhookSecret?: string;
@@ -145,7 +146,7 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   ));
   if (dependencies.teviTokenService) {
     const teviTokenRouterOptions = dependencies.teviAuthVerifier
-      ? { sessionService, verifier: dependencies.teviAuthVerifier }
+      ? { sessionService, verifier: dependencies.teviAuthVerifier, sessionAuthMode: dependencies.teviSessionAuthMode ?? "exchange" }
       : {};
     app.use("/api", createTeviTokenRouter(dependencies.teviTokenService, teviTokenRouterOptions));
   }

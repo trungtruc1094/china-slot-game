@@ -126,6 +126,27 @@ describe("loadEnv", () => {
     });
   });
 
+  it("defaults the session auth mode to exchange and honors TEVI_SESSION_AUTH_MODE=direct", () => {
+    const base = {
+      TEVI_AUTH_ENABLED: "true",
+      TEVI_APP_ID: "AZX29173",
+      TEVI_JWKS_URL: "https://sandbox.tevi.example/api/v1/auth/jwks"
+    };
+
+    expect(loadEnv(base)).toMatchObject({
+      teviAuth: { tokenExchange: { enabled: true, sessionAuthMode: "exchange" } }
+    });
+
+    expect(loadEnv({ ...base, TEVI_SESSION_AUTH_MODE: "direct" })).toMatchObject({
+      teviAuth: { tokenExchange: { enabled: true, sessionAuthMode: "direct" } }
+    });
+
+    // Unknown values fall back to the safe default rather than enabling direct mode.
+    expect(loadEnv({ ...base, TEVI_SESSION_AUTH_MODE: "weird" })).toMatchObject({
+      teviAuth: { tokenExchange: { enabled: true, sessionAuthMode: "exchange" } }
+    });
+  });
+
   it("requires explicit HTTPS Tevi API base outside local/test token exchange defaults", () => {
     expect(() => loadEnv({
       NODE_ENV: "production",

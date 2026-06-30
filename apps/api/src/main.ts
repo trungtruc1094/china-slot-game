@@ -29,7 +29,10 @@ const app = createApp(env.teviAuth.enabled
       ...appDependencies,
       teviAuthVerifier: new JoseTeviAuthVerifier(env.teviAuth),
       ...(env.teviAuth.tokenExchange.enabled
-        ? { teviTokenService: new TeviTokenService({ appId: env.teviAuth.appId, apiBase: env.teviAuth.tokenExchange.apiBase }) }
+        ? {
+            teviTokenService: new TeviTokenService({ appId: env.teviAuth.appId, apiBase: env.teviAuth.tokenExchange.apiBase }),
+            teviSessionAuthMode: env.teviAuth.tokenExchange.sessionAuthMode
+          }
         : {}),
       ...(env.teviAuth.payment.enabled && productionDependencies?.topupSignatureIssuanceRepository
         ? {
