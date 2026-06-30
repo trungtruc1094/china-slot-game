@@ -433,14 +433,22 @@ class SlotGame extends Phaser.Scene{
         }
     }
 
-    // Terminal reasons (from teviClient.getUserAppToken) that never recover on retry:
-    // genuine not-authenticated states (token-missing / user-cancelled / re-authentication-required)
-    // plus permanently-broken integrations (method-unavailable / sdk-call-failed). Only the
-    // genuinely transient SDK-not-ready-yet reasons (sdk-unavailable / sdk-timeout) and
-    // network/backend blips are retried — getUserAppToken self-caps sdk-timeout at 10s.
+    // Terminal failures that never recover on retry, so the user must re-auth instead of
+    // watching pointless retries:
+    //   - HTTP 401 from the session / token-exchange endpoint: the provider rejected the
+    //     runtime token (PROVIDER_REJECTED) or the access token failed verification. Retrying
+    //     re-sends the same rejected token. Provider outages surface as 5xx (502/503) and stay
+    //     retryable — that is why we key on the 401 status, not the TEVI_TOKEN_EXCHANGE_FAILED
+    //     code (which the backend also returns for transient 502/503 cases).
+    //   - TEVI_REAUTH_REQUIRED with a genuine not-authenticated reason (token-missing /
+    //     user-cancelled / re-authentication-required) or a permanently-broken integration
+    //     (method-unavailable / sdk-call-failed). Transient SDK-not-ready reasons
+    //     (sdk-unavailable / sdk-timeout) and network blips stay retryable.
     isTerminalSessionReauth(error)
     {
-        if (!error || error.code !== "TEVI_REAUTH_REQUIRED") return false;
+        if (!error) return false;
+        if (error.status === 401) return true;
+        if (error.code !== "TEVI_REAUTH_REQUIRED") return false;
         var terminalReasons = ["token-missing", "user-cancelled", "re-authentication-required", "method-unavailable", "sdk-call-failed"];
         return terminalReasons.indexOf(error.reason) !== -1;
     }

@@ -56,6 +56,60 @@ function parseTokenResponse(rawBody: unknown): z.infer<typeof tokenResponseSchem
   return undefined;
 }
 
+// Structure-only summary (key names + types, never values) of a provider error body, so a
+// rejection can be diagnosed from logs without leaking whatever the body contains.
+function describeResponseShape(value: unknown): Record<string, unknown> {
+  if (value === null || typeof value !== "object") {
+    return { type: value === null ? "null" : typeof value };
+  }
+  const record = value as Record<string, unknown>;
+  const shape: Record<string, unknown> = { topKeys: Object.keys(record).sort() };
+  const data = record.data;
+  if (data && typeof data === "object") {
+    shape.dataKeys = Object.keys(data as Record<string, unknown>).sort();
+  }
+  return shape;
+}
+
+async function describeErrorBody(response: Response): Promise<Record<string, unknown>> {
+  let text: string;
+  try {
+    text = await response.text();
+  } catch {
+    return { bodyReadFailed: true };
+  }
+  if (!text) {
+    return { empty: true };
+  }
+  try {
+    return describeResponseShape(JSON.parse(text));
+  } catch {
+    // Non-JSON error body (e.g. plain "Unauthorized") — record only its length, not the text.
+    return { nonJson: true, length: text.length };
+  }
+}
+
+// Decode ONLY the non-sensitive claims (exp / iat / app_id) of the bearer we sent, so a 401 can
+// be triaged as "token expired" vs "wrong app" without ever logging the token itself.
+function decodeSafeTokenClaims(token: string): { exp?: number; iat?: number; app_id?: string } | undefined {
+  const segments = token.split(".");
+  const payloadSegment = segments[1];
+  if (!payloadSegment) {
+    return undefined;
+  }
+  try {
+    const payloadJson = Buffer.from(payloadSegment.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8");
+    const claims = JSON.parse(payloadJson) as Record<string, unknown>;
+    const safe: { exp?: number; iat?: number; app_id?: string } = {};
+    if (typeof claims.exp === "number") safe.exp = claims.exp;
+    if (typeof claims.iat === "number") safe.iat = claims.iat;
+    if (typeof claims.app_id === "string") safe.app_id = claims.app_id;
+    return Object.keys(safe).length > 0 ? safe : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export class TeviTokenService implements TeviTokenServicePort {
   private readonly fetchImpl: typeof fetch;
   private readonly clock: { now: () => Date };
@@ -96,8 +150,16 @@ export class TeviTokenService implements TeviTokenServicePort {
     }
 
     if (!response.ok) {
+      // Token-safe diagnostics: the error body's *shape* (key names only) and the *sent* token's
+      // non-sensitive exp/app_id claims — enough to tell "expired" vs "wrong app" vs "shape change"
+      // apart, without ever logging the token or the provider response values.
+      const diagnostics = {
+        responseShape: await describeErrorBody(response),
+        sentTokenClaims: decodeSafeTokenClaims(bearerToken)
+      };
+
       if (response.status >= 500 || response.status === 429) {
-        this.logFailure(requestId, "PROVIDER_UNAVAILABLE", response.status);
+        this.logFailure(requestId, "PROVIDER_UNAVAILABLE", response.status, diagnostics);
         return {
           ok: false,
           code: failureCode,
@@ -106,7 +168,7 @@ export class TeviTokenService implements TeviTokenServicePort {
         };
       }
 
-      this.logFailure(requestId, "PROVIDER_REJECTED", response.status);
+      this.logFailure(requestId, "PROVIDER_REJECTED", response.status, diagnostics);
       return {
         ok: false,
         code: failureCode,
@@ -151,12 +213,18 @@ export class TeviTokenService implements TeviTokenServicePort {
     return result;
   }
 
-  private logFailure(requestId: string, reasonCode: TeviTokenExchangeFailure["reasonCode"], providerStatus?: number): void {
+  private logFailure(
+    requestId: string,
+    reasonCode: TeviTokenExchangeFailure["reasonCode"],
+    providerStatus?: number,
+    diagnostics?: Record<string, unknown>
+  ): void {
     console.warn("[tevi-token] token operation failed", {
       requestId,
       endpointPath: "/api/v1/auth/token",
       reasonCode,
-      providerStatus
+      providerStatus,
+      ...diagnostics
     });
   }
 }

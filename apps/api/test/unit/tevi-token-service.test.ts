@@ -171,4 +171,33 @@ describe("TeviTokenService", () => {
     expect(JSON.stringify(warnSpy.mock.calls)).not.toContain("secret body");
     warnSpy.mockRestore();
   });
+
+  it("logs token-safe diagnostics (body shape + sent exp/app_id) on a 401 rejection", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const fetchImpl = vi.fn(async () => new Response(
+      JSON.stringify({ message: "secret reason", error_code: "AUTH_EXPIRED" }),
+      { status: 401 }
+    ));
+    const service = new TeviTokenService(config, { fetchImpl });
+
+    // A JWT-shaped bearer whose payload carries non-sensitive claims plus a value we must NOT log.
+    const payload = Buffer.from(
+      JSON.stringify({ exp: 1751328000, iat: 1751241600, app_id: "AZX29173", user_id: 3033448852 })
+    ).toString("base64url");
+    const jwtish = `eyJhbGciOiJub25lIn0.${payload}.signature-secret`;
+
+    await service.exchangeRuntimeToken(jwtish, "req_exchange_diag");
+
+    const logged = warnSpy.mock.calls.find((call) => call[0] === "[tevi-token] token operation failed");
+    expect(logged).toBeDefined();
+    const detail = logged?.[1] as Record<string, unknown>;
+    expect(detail.responseShape).toEqual({ topKeys: ["error_code", "message"] });
+    expect(detail.sentTokenClaims).toEqual({ exp: 1751328000, iat: 1751241600, app_id: "AZX29173" });
+
+    const serialized = JSON.stringify(warnSpy.mock.calls);
+    expect(serialized).not.toContain("secret reason");     // provider body value not logged
+    expect(serialized).not.toContain("signature-secret");  // raw bearer token not logged
+    expect(serialized).not.toContain("user_id");           // only allow-listed claims surface
+    warnSpy.mockRestore();
+  });
 });

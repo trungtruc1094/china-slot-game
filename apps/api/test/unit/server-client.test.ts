@@ -919,6 +919,82 @@ describe("browser server client render contract", () => {
     expect(messages).toHaveLength(1);
     expect(messages[0]?.title ?? "").toContain("Tevi");
   });
+
+  it("treats a 401 token-exchange rejection as terminal re-auth without pointless retries (AC2)", async () => {
+    const SlotGame = loadSlotGame();
+    const messages: Array<{ title: string; body: string }> = [];
+    let startSessionCalls = 0;
+    const game = {
+      backendSpinStatus: "pending",
+      backendSpinPlan: null,
+      serverClient: {
+        mode: "production",
+        // Mirrors postJson's HTTP-error shape when /api/tevi/token returns 401 PROVIDER_REJECTED:
+        // status 401 + the backend's TEVI_TOKEN_EXCHANGE_FAILED code, no `reason`.
+        startSession: async () => {
+          startSessionCalls += 1;
+          const error = new Error("Tevi authentication requires a new sign-in.") as Error & { status: number; code: string };
+          error.status = 401;
+          error.code = "TEVI_TOKEN_EXCHANGE_FAILED";
+          throw error;
+        }
+      },
+      slotControls: { creditSumText: { text: " ..." } },
+      slotPlayer: { setCoinsCount: () => {} },
+      guiController: {
+        showMessage: (title: string, body: string) => { messages.push({ title, body }); return {}; },
+        closePopUp: () => {}
+      },
+      isBackendProductionMode: () => true,
+      isTerminalSessionReauth: SlotGame.prototype.isTerminalSessionReauth,
+      scheduleSceneDelay: (_ms: number, callback: () => void) => { callback(); },
+      surfaceSessionBalanceFailure: SlotGame.prototype.surfaceSessionBalanceFailure
+    };
+
+    SlotGame.prototype.loadBackendSessionBalance.call(game, 0);
+    for (let i = 0; i < 4; i += 1) await Promise.resolve();
+
+    expect(startSessionCalls).toBe(1); // terminal => no retry re-sending the rejected token
+    expect(game.backendSpinStatus).toBe("reauth-required");
+    expect(game.slotControls.creditSumText.text).not.toBe(" ...");
+    expect(messages).toHaveLength(1);
+    expect(messages[0]?.title ?? "").toContain("Tevi");
+  });
+
+  it("still retries a transient 5xx token-exchange failure rather than forcing re-auth (AC2)", async () => {
+    const SlotGame = loadSlotGame();
+    let startSessionCalls = 0;
+    const game = {
+      backendSpinStatus: "pending",
+      backendSpinPlan: null,
+      serverClient: {
+        mode: "production",
+        // PROVIDER_UNAVAILABLE surfaces as 503 with the same TEVI_TOKEN_EXCHANGE_FAILED code —
+        // must stay retryable, proving we key on the 401 status and not the code.
+        startSession: async () => {
+          startSessionCalls += 1;
+          const error = new Error("Tevi auth temporarily unavailable.") as Error & { status: number; code: string };
+          error.status = 503;
+          error.code = "TEVI_TOKEN_EXCHANGE_FAILED";
+          throw error;
+        }
+      },
+      slotControls: { creditSumText: { text: " ..." } },
+      slotPlayer: { setCoinsCount: () => {} },
+      guiController: { showMessage: () => ({}), closePopUp: () => {} },
+      isBackendProductionMode: () => true,
+      isTerminalSessionReauth: SlotGame.prototype.isTerminalSessionReauth,
+      scheduleSceneDelay: (_ms: number, callback: () => void) => { callback(); },
+      loadBackendSessionBalance: SlotGame.prototype.loadBackendSessionBalance,
+      surfaceSessionBalanceFailure: SlotGame.prototype.surfaceSessionBalanceFailure
+    };
+
+    SlotGame.prototype.loadBackendSessionBalance.call(game, 0);
+    for (let i = 0; i < 8; i += 1) await Promise.resolve();
+
+    expect(startSessionCalls).toBe(3); // initial + 2 retries (transient), then surfaced as retry
+    expect(game.backendSpinStatus).toBe("retry");
+  });
 });
 
 function isRetryState(result: NormalizedSpinResult | SpinRetryState): result is SpinRetryState {
