@@ -4,7 +4,7 @@ baseline_commit: 03c5ec3
 
 # Story 8.6: Verify Tevi Webhooks and Credit Stars Idempotently
 
-Status: in-progress
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -81,6 +81,13 @@ WHERE provider_name = 'tevi' AND provider_event_id = '6601a9cb-9c33-41c3-90e5-43
 Then resend the event from the Tevi dashboard (or re-deliver) — it will now parse and credit once.
 
 Remaining before re-closing 8.6: deploy, confirm the real payload parses + credits, run the AC9 live replay Check Round (one credit, replay → no double-credit), and update playbook §5 with the confirmed real shape from the new shape log.
+
+**Live Check Round (2026-06-30, deployed `china-slot-api`) — PASSED.** A signed `user_topup` posted to the deployed `/api/webhooks/tevi` with a **single-field payload** (`OMIT_METADATA_USER_ID` — the exact shape the old strict parser rejected as `missing_user`) returned `{ status: "credited" }` and logged `[tevi-webhook] wallet credited`. A replay of the same event id returned `{ status: "replayed", reasonCode: "already_completed" }` with no second credit — AC9 confirmed against real Postgres (credit once, idempotent replay). Signature verified with `TEVI_SECRET_KEY` (the webhook secret).
+
+Re-closed `done` on this evidence. Two follow-ups carried forward (not blocking):
+- **Real Tevi payload shape** still not byte-confirmed (we validated a synthetic single-field shape that covers the observed `missing_user` cause). The new `[tevi-webhook] payload shape on parse failure` log will surface the exact shape on the next real top-up if it diverges further; pin the parser + update playbook §5 then.
+- **Stuck original event** `6601a9cb-9c33-41c3-90e5-43b005d238af` (the real 200-Star charge) is still recorded `failed`; recover later via the SQL delete + resend, or a one-off manual credit.
+- **Secret hygiene:** `TEVI_SECRET_KEY` was exposed in a screenshot during testing — rotate it in the Tevi dashboard + Render.
 
 ## Review Findings
 
