@@ -22,4 +22,20 @@
             maxStars: (teviConfig.topup && teviConfig.topup.maxStars) || 100000
         }
     };
+
+    // Story 8.7: Stars currency presentation helper. In Tevi mode the wallet spends Tevi Stars
+    // (1 Star = 1 in-game credit), so currency amounts render with the same ★ glyph used by the
+    // top-up modal. In local/demo mode this returns the plain value so the coin/credit UI is
+    // unchanged (AC8). The backend stays authoritative; this is presentation-only.
+    globalScope.ChinaSlotCurrency = {
+        glyph: "★",
+        isStarsMode: function () {
+            return globalScope.CHINA_SLOT_TEVI_MODE === true;
+        },
+        // Stars-format a numeric amount: "★ 1234" in Tevi mode, plain value otherwise.
+        amount: function (value, fallback) {
+            var plain = (value === undefined || value === null) ? (fallback === undefined ? "" : fallback) : value;
+            return this.isStarsMode() ? this.glyph + " " + plain : plain;
+        }
+    };
 })(typeof window !== "undefined" ? window : globalThis);

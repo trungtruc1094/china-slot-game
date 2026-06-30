@@ -1011,13 +1011,16 @@ class SlotGame extends Phaser.Scene{
     showBigWinMessage(winCoins, time)
     {
         var bwPU = this.guiController.showPopUp(slotConfig.createBigWinPUHandler);
-        bwPU.messageText.text = winCoins;
+        bwPU.messageText.text = formatCurrencyAmount(winCoins);
         if(time && time > 0) this.timeoutMess = setTimeout(()=>{this. guiController.closePopUp(bwPU); if(this.timeoutMess) clearTimeout(this.timeoutMess);}, time);
     }
 
     showWinCoinsMessage(winCoins, time)
     {    
-        var wMess = this.guiController.showMessage('Congratulation!', 'Your win: ' + winCoins + ' coins!', this, 
+        var winLabel = (window.ChinaSlotCurrency && window.ChinaSlotCurrency.isStarsMode())
+            ? 'Your win: ' + winCoins + ' Stars!'
+            : 'Your win: ' + winCoins + ' coins!';
+        var wMess = this.guiController.showMessage('Congratulation!', winLabel, this,
         ()=>{
             if(this.timeoutMess) clearTimeout(this.timeoutMess);
             this.timeoutMess = null; 
@@ -1038,7 +1041,7 @@ class SlotGame extends Phaser.Scene{
     showJackpotWinMessage(winCoins, time)
     {
         var jpPU = this.guiController.showPopUp(slotConfig.createJackpotWinPUHandler);
-        jpPU.messageText.text = winCoins;
+        jpPU.messageText.text = formatCurrencyAmount(winCoins);
         this.showCoins(true);
         if(time && time > 0) this.timeoutMessJP = setTimeout(()=>{
             this. guiController.closePopUp(jpPU); 

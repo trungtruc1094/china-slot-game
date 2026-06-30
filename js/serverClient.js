@@ -87,6 +87,11 @@
             payout: Number(result.payout || 0),
             winBreakdown: result.winBreakdown || null,
             balanceAfter: Number(result.balanceAfter || 0),
+            // Story 8.7: server-owned Stars wallet fields. withdrawableBalance defaults to
+            // balanceAfter (single integer wallet, no reservation yet); currency marks a Tevi
+            // (Stars) session vs. a local credits session.
+            withdrawableBalance: Number((result.withdrawableBalance != null) ? result.withdrawableBalance : (result.balanceAfter || 0)),
+            currency: result.currency || "credits",
             freeSpinState: result.freeSpinState || { awarded: 0, remaining: 0 },
             jackpotState: result.jackpotState || { awarded: 0 }
         };

@@ -58,6 +58,8 @@ describePostgres("PostgresSpinService", () => {
       configVersionId: simpleConfig.versionId,
       payout: 5,
       balanceAfter: 1004,
+      withdrawableBalance: 1004,
+      currency: "credits",
       rewardModel: { unit: "points", cashEquivalent: false, redemptionEnabled: false }
     });
     await expect(tableCount("spins")).resolves.toBe("1");
@@ -74,6 +76,45 @@ describePostgres("PostgresSpinService", () => {
       { spin_id: response.spinId, metadata_json: { clientSpinId: "client-spin-accepted", correlationId: "req-spin-accepted", spinId: response.spinId } },
       { spin_id: response.spinId, metadata_json: { clientSpinId: "client-spin-accepted", correlationId: "req-spin-accepted", spinId: response.spinId } }
     ]);
+  });
+
+  it("marks a Tevi-mode session as Stars and persists the new fields in the replayed response_json", async () => {
+    const clock = new MutableClock();
+    await prepareActiveConfig(clock);
+    const session = await createSession(clock, "tevi-subject-spin", "tevi");
+    const firstService = new PostgresSpinService(requirePool(), { nextRandom: () => 0 }, clock);
+
+    const response = await firstService.spin({
+      clientSpinId: "client-spin-stars",
+      sessionId: session.sessionId,
+      wager: wager(),
+      correlationId: "req-spin-stars"
+    });
+
+    expect(response).toMatchObject({
+      payout: 5,
+      balanceAfter: 1004,
+      withdrawableBalance: 1004,
+      currency: "stars"
+    });
+
+    const stored = await requirePool().query<{ response_json: { currency?: string; withdrawableBalance?: number } }>(
+      `SELECT response_json FROM spin_idempotency_keys WHERE session_id = $1 AND client_spin_id = $2`,
+      [session.sessionId, "client-spin-stars"]
+    );
+    expect(stored.rows[0]?.response_json).toMatchObject({ currency: "stars", withdrawableBalance: 1004 });
+
+    // Replay through a freshly reconstructed service returns the persisted response verbatim — including the new fields — without a second debit.
+    const replayService = new PostgresSpinService(requirePool(), { nextRandom: () => 0.5 }, clock);
+    const replay = await replayService.spin({
+      clientSpinId: "client-spin-stars",
+      sessionId: session.sessionId,
+      wager: wager(),
+      correlationId: "req-spin-stars-replay"
+    });
+    expect(replay).toEqual(response);
+    await expect(tableCount("spins")).resolves.toBe("1");
+    await expect(tableCount("wallet_transactions")).resolves.toBe("2");
   });
 
   it("returns committed response on duplicate retry after service reconstruction", async () => {
@@ -222,10 +263,10 @@ async function prepareActiveConfig(clock: MutableClock): Promise<void> {
   await repository.activateDraft({ id: draft.id, actor: "operator-1" });
 }
 
-async function createSession(clock: MutableClock, subject: string): Promise<{ sessionId: string; playerId: string }> {
+async function createSession(clock: MutableClock, subject: string, provider = "demo"): Promise<{ sessionId: string; playerId: string }> {
   const service = new SessionService(new PostgresPlayerSessionRepository(requirePool()), clock);
   const result = await service.createOrResume({
-    identity: { provider: "demo", subject, displayName: subject, expiresAt: "2026-06-21T10:00:00.000Z" }
+    identity: { provider, subject, displayName: subject, expiresAt: "2026-06-21T10:00:00.000Z" }
   });
   return { sessionId: result.response.sessionId, playerId: result.response.playerId };
 }

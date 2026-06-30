@@ -89,14 +89,14 @@ afterEach(async () => {
   });
 });
 
-async function createSession(): Promise<string> {
+async function createSession(provider = "demo", subject = "player-123"): Promise<string> {
   const response = await fetch(`${baseUrl}/api/sessions`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       identity: {
-        provider: "demo",
-        subject: "player-123",
+        provider,
+        subject,
         expiresAt: "2026-06-18T09:00:00.000Z"
       }
     })
@@ -160,8 +160,11 @@ describe("spin routes", () => {
         cryptoEnabled: false
       },
       freeSpinState: { awarded: 0, remaining: 0 },
-      jackpotState: { awarded: 0 }
+      jackpotState: { awarded: 0 },
+      withdrawableBalance: 1004,
+      currency: "credits"
     });
+    expect(body.data?.withdrawableBalance).toBe(body.data?.balanceAfter);
     expect(body.data?.visibleWindow).toEqual({
       rows: 1,
       reels: [
@@ -492,7 +495,27 @@ describe("spin routes", () => {
         { reelIndex: 2, stopIndex: 0 }
       ],
       payout: 5,
-      balanceAfter: 1004
+      balanceAfter: 1004,
+      withdrawableBalance: 1004,
+      currency: "credits"
+    });
+  });
+
+  it("marks a Tevi-mode session spin as Stars currency with a withdrawable balance", async () => {
+    const sessionId = await createSession("tevi", "tevi-player-1");
+    const response = await postSpin({
+      clientSpinId: "spin-tevi-stars",
+      sessionId,
+      wager: { lineBet: 1, selectedWays: 1, totalWager: 1 }
+    });
+    const body = await response.json() as ApiEnvelope<Record<string, unknown>>;
+
+    expect(response.status).toBe(200);
+    expect(body.data).toMatchObject({
+      payout: 5,
+      balanceAfter: 1004,
+      withdrawableBalance: 1004,
+      currency: "stars"
     });
   });
 

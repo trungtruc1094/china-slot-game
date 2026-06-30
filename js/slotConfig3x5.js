@@ -1030,18 +1030,18 @@ var slotConfig3x5 = {
         slotControls.totalBetText = addText(text.totalBetLabel, 'gameFont_2', 'TOTAL  BET');
         // slotControls.totalBetText.tint = this.slotTextColor;
   
-        slotControls.totalBetSumText = addText(text.totalBetValue, 'gameFont_1', slotControls.getTotalBet());
+        slotControls.totalBetSumText = addText(text.totalBetValue, 'gameFont_1', formatCurrencyAmount(slotControls.getTotalBet()));
         // slotControls.totalBetSumText.tint = this.slotTextColor;
- 
+
         slotControls.creditText = addText(text.balanceLabel, 'gameFont_2', 'BALANCE');
         // slotControls.creditText.tint = this.slotTextColor;
 
-        slotControls.creditSumText = addText(text.balanceValue, 'gameFont_1', '' + scene.slotPlayer.coins);
+        slotControls.creditSumText = addText(text.balanceValue, 'gameFont_1', formatCurrencyAmount('' + scene.slotPlayer.coins));
         // slotControls.creditSumText.tint = this.slotTextColor;
-         
+
         slotControls.winText = addText(text.winLabel, 'gameFont_2', 'YOUR  WIN');
 
-        slotControls.winAmountText = addText(text.winValue, 'gameFont_1', '0');
+        slotControls.winAmountText = addText(text.winValue, 'gameFont_1', formatCurrencyAmount('0'));
         // slotControls.winAmountText.tint = this.slotTextColor;
         // slotControls.winAmountText.setVisible(false);
 

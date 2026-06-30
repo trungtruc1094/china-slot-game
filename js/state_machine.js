@@ -50,7 +50,10 @@ class PreSpinState
 
         if (this.slotControls.getTotalBet() > this.slotPlayer.coins)
         {
-            var mess = this.stateObject.guiController.showMessage('Sorry!', 'You have no money.', this, ()=>{this.stateObject.guiController.closePopUp(mess);});
+            var noFundsMessage = (window.ChinaSlotCurrency && window.ChinaSlotCurrency.isStarsMode())
+                ? "You don't have enough Stars."
+                : 'You have no money.';
+            var mess = this.stateObject.guiController.showMessage('Sorry!', noFundsMessage, this, ()=>{this.stateObject.guiController.closePopUp(mess);});
             if(this.slotControls.auto) this.slotControls.resetAutoSpinsMode();
             this.stateMachine.changeState(this.stateObject.iddleState);
             return;

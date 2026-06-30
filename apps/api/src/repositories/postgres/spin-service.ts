@@ -22,6 +22,7 @@ interface SessionRow {
   player_id: string;
   status: "active" | "expired";
   expires_at: Date;
+  request_metadata: Record<string, unknown> | null;
 }
 
 interface IdempotencyRow {
@@ -181,6 +182,8 @@ export class PostgresSpinService extends SpinService {
         winBreakdown,
         payout,
         balanceAfter: walletResult.wallet.balance,
+        withdrawableBalance: walletResult.wallet.balance,
+        currency: sessionCurrency(session),
         rewardModel: getRewardModelMetadata(),
         freeSpinState: { awarded: winBreakdown.totalFreeSpins, remaining: winBreakdown.totalFreeSpins },
         jackpotState: { awarded: jackpotAward }
@@ -310,7 +313,7 @@ export class PostgresSpinService extends SpinService {
       [sessionId, now]
     );
     const result = await client.query<SessionRow>(
-      `SELECT id, player_id, status, expires_at FROM sessions WHERE id = $1`,
+      `SELECT id, player_id, status, expires_at, request_metadata FROM sessions WHERE id = $1`,
       [sessionId]
     );
     const row = result.rows[0];
@@ -523,6 +526,11 @@ function rowToWalletTransaction(row: SpinWalletTransactionRow): WalletTransactio
     createdAt: row.created_at.toISOString(),
     metadata: cloneJson(row.metadata_json)
   };
+}
+
+function sessionCurrency(session: SessionRow): "stars" | "credits" {
+  const provider = session.request_metadata?.provider;
+  return provider === "tevi" ? "stars" : "credits";
 }
 
 function fingerprintWager(wager: WagerInput): string {

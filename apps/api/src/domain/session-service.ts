@@ -9,6 +9,12 @@ export interface SessionRecord {
   status: "active" | "expired";
   createdAt: Date;
   expiresAt: Date;
+  /**
+   * Identity provider that minted this session, read from the persisted session metadata
+   * (`sessions.request_metadata.provider`). A Tevi session carries `"tevi"`. Optional because
+   * legacy/in-memory sessions created without identity metadata may not record it.
+   */
+  provider?: string;
 }
 
 export interface Clock {
@@ -97,7 +103,15 @@ export class SessionService {
       });
     }
 
-    return session;
+    const provider = providerFromMetadata(session.requestMetadata);
+    return {
+      sessionId: session.sessionId,
+      playerId: session.playerId,
+      status: session.status,
+      createdAt: session.createdAt,
+      expiresAt: session.expiresAt,
+      ...(provider ? { provider } : {})
+    };
   }
 
   public async searchSessions(filters: SessionSearchFilters = {}): Promise<SessionRecord[]> {
@@ -179,4 +193,9 @@ class LegacyIdentitySessionRepository extends InMemoryPlayerSessionRepository {
 
 function isPlayerSessionRepository(value: PlayerIdentityAdapter | PlayerSessionRepository): value is PlayerSessionRepository {
   return "resolvePlayer" in value;
+}
+
+function providerFromMetadata(metadata: Record<string, unknown> | undefined): string | undefined {
+  const provider = metadata?.provider;
+  return typeof provider === "string" && provider.length > 0 ? provider : undefined;
 }

@@ -24,6 +24,17 @@ export interface SpinResponse {
   winBreakdown: WinBreakdown;
   payout: number;
   balanceAfter: number;
+  /**
+   * Withdrawable wallet balance after the spin. The wallet is a single integer balance with no
+   * reservation/segregation yet, so this equals `balanceAfter`. The distinct field exists for
+   * forward-compatibility with manual cashout (Story 8.8), which refines it (reserved-vs-available).
+   */
+  withdrawableBalance: number;
+  /**
+   * Currency marker derived from the spinning session's provider: "stars" for a Tevi session,
+   * "credits" otherwise. Tevi-ness is per-session, never a global flag.
+   */
+  currency: "stars" | "credits";
   rewardModel: RewardModelMetadata;
   freeSpinState: {
     awarded: number;
@@ -110,6 +121,7 @@ export class SpinService {
     this.validateWager(config, request.wager);
 
     const session = await this.sessions.getActiveSession(request.sessionId);
+    const currency = session.provider === "tevi" ? "stars" : "credits";
     this.validateBudgetProtection(request.wager);
     const activeLimits = this.options.operatorLimitsProvider?.getActiveLimits(this.options.operatorLimitsScopeId ?? "default");
     if (activeLimits) {
@@ -155,6 +167,8 @@ export class SpinService {
       winBreakdown,
       payout,
       balanceAfter: 0,
+      withdrawableBalance: 0,
+      currency,
       rewardModel: getRewardModelMetadata(),
       freeSpinState: {
         awarded: winBreakdown.totalFreeSpins,
@@ -168,6 +182,7 @@ export class SpinService {
     await this.wallets.applyTransactionBatch(walletRequests, {
       afterBalanceCommit: (result) => {
         spinResponse.balanceAfter = result.wallet.balance;
+        spinResponse.withdrawableBalance = result.wallet.balance;
 
         if (this.options.failLedgerCommit?.(spinResponse) === true) {
           throw new Error("Injected spin ledger failure");

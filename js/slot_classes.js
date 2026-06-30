@@ -1,3 +1,14 @@
+// Story 8.7: render a currency amount as Stars (★) when the game launched in Tevi mode,
+// otherwise return the plain value so local/demo presentation is unchanged (AC7/AC8).
+function formatCurrencyAmount(value)
+{
+    if (typeof window !== "undefined" && window.ChinaSlotCurrency)
+    {
+        return window.ChinaSlotCurrency.amount(value);
+    }
+    return value;
+}
+
 class Lamp
 {
     constructor (scene, offsetX, offsetY)
@@ -1430,13 +1441,13 @@ class SlotControls
     {
         this.refreshBetLines();
         this.refreshSpins();
-        if (this.winAmountText != null) this.winAmountText.text = 0;
+        if (this.winAmountText != null) this.winAmountText.text = formatCurrencyAmount(0);
     }
 
     refreshBetLines()
     {
-        if (this.lineBetAmountText!= null) this.lineBetAmountText.text = this.lineBet;
-        if (this.lineBetAmountText != null) this.totalBetSumText.text = this.getTotalBet();
+        if (this.lineBetAmountText!= null) this.lineBetAmountText.text = formatCurrencyAmount(this.lineBet);
+        if (this.lineBetAmountText != null) this.totalBetSumText.text = formatCurrencyAmount(this.getTotalBet());
         if (this.linesCountText != null) this.linesCountText.text = this.selectedLinesCount;
     }
 
@@ -1523,12 +1534,12 @@ class SlotControls
 
     changeTotalBetHandler(newTotalBet)
     {
-        if (this.totalBetSumText != null) this.totalBetSumText.text = newTotalBet;
+        if (this.totalBetSumText != null) this.totalBetSumText.text = formatCurrencyAmount(newTotalBet);
     }
 
     changeLineBetHandler(newLineBet)
     {
-        if (this.lineBetAmountText != null) this.lineBetAmountText.text = newLineBet;
+        if (this.lineBetAmountText != null) this.lineBetAmountText.text = formatCurrencyAmount(newLineBet);
     }
 
     changeSelectedLinesHandler(newCount, burn)
@@ -1557,12 +1568,16 @@ class SlotControls
 
     changeWinCoinsHandler(newCount)
     {
-       if(this.winAmountText != null) this.winAmountText.text = newCount;
+       if(this.winAmountText != null) this.winAmountText.text = formatCurrencyAmount(newCount);
     }
 
     changeCreditCoinsHandler(newCount)
     {
-       if(this.creditSumText != null) this.creditSumText.text = ' ' + newCount;
+       if(this.creditSumText == null) return;
+       // Tevi mode: label balance in Stars with the ★ glyph; local mode keeps the leading-space layout (AC8).
+       this.creditSumText.text = (window.ChinaSlotCurrency && window.ChinaSlotCurrency.isStarsMode())
+           ? window.ChinaSlotCurrency.amount(newCount)
+           : ' ' + newCount;
     }
 
     addLineBet(count)
@@ -1726,6 +1741,6 @@ class SlotControls
 
     changeJackpotHandler(newAmount)
     {
-        if (this.jackpotAmountText != null) this.jackpotAmountText.text = newAmount;
-    }   
+        if (this.jackpotAmountText != null) this.jackpotAmountText.text = formatCurrencyAmount(newAmount);
+    }
 }
