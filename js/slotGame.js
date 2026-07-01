@@ -945,17 +945,9 @@ class SlotGame extends Phaser.Scene{
     // reconcile provider payout later without mutating the wallet again (playbook §5).
     finishCommittedCashout(apiStatus)
     {
-        var clientState = this.mapCashoutApiStatus(apiStatus);
-        if (!clientState) return;
-        var title = apiStatus === "dispatched" ? "Cash out sent" : "Cash out submitted";
-        var body = this.cashoutStatusMessage(clientState);
+        if (!this.mapCashoutApiStatus(apiStatus)) return;
         this.closeCashoutModal();
         this.setCashoutState("idle");
-        if (this.guiController && this.guiController.showMessage) {
-            var popup = this.guiController.showMessage(title, body, this, () => {
-                this.guiController.closePopUp(popup);
-            });
-        }
     }
 
     handleCashoutResult(result)

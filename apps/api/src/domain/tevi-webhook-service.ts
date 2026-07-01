@@ -277,21 +277,30 @@ function parseWebhook(payload: unknown): ParsedWebhook {
   }
 
   const metadata = typeof data.metadata === "object" && data.metadata !== null ? (data.metadata as Record<string, unknown>) : null;
-  if (!metadata) {
-    return { kind: "invalid", providerEventId, event, reasonCode: "missing_metadata" };
-  }
-
-  const expectedType = event === teviTopupEvent ? "deposit" : "refund";
-  if (metadata.type !== expectedType) {
+  if (event === teviTopupEvent) {
+    if (!metadata) {
+      return { kind: "invalid", providerEventId, event, reasonCode: "missing_metadata" };
+    }
+    if (metadata.type !== "deposit") {
+      return {
+        kind: "ignored",
+        providerEventId,
+        event,
+        reasonCode: `metadata_type_not_deposit:${stringifyType(metadata.type)}`
+      };
+    }
+  } else if (!metadata) {
+    // Sandbox/test user_withdraw payloads may omit metadata; event name identifies cashout.
+  } else if (metadata.type !== undefined && metadata.type !== "refund") {
     return {
       kind: "ignored",
       providerEventId,
       event,
-      reasonCode: `metadata_type_not_${expectedType}:${stringifyType(metadata.type)}`
+      reasonCode: `metadata_type_not_refund:${stringifyType(metadata.type)}`
     };
   }
 
-  const subjectCandidates = [data.user, data.user_id, metadata.user_id]
+  const subjectCandidates = [data.user, data.user_id, metadata?.user_id]
     .map(coerceSubject)
     .filter((subject): subject is string => subject !== null);
   const distinctSubjects = [...new Set(subjectCandidates)];

@@ -84,6 +84,25 @@ describe("TeviWebhookService", () => {
     expect(creditPort.credits).toHaveLength(0);
   });
 
+  it("reconciles user_withdraw when metadata.type is omitted (sandbox test payloads)", async () => {
+    const cashoutPort = new FakeCashoutReconciliationPort();
+    const reconcilingService = new TeviWebhookService({
+      idempotencyRepository: repository,
+      creditPort,
+      playerLookup,
+      cashoutReconciliation: createCashoutReconciliation(repository, cashoutPort)
+    });
+
+    const payload = {
+      id: "evt_withdraw_no_type",
+      event: "user_withdraw",
+      data: { user: "633505726", amount: 100, metadata: { user_id: 633505726 } }
+    };
+    const result = await reconcilingService.process({ payload, requestId: "req_withdraw_no_type" });
+    expect(result).toEqual({ status: "reconciled", reasonCode: "cashout_reconciled", providerEventId: "evt_withdraw_no_type" });
+    expect(cashoutPort.calls).toHaveLength(1);
+  });
+
   it("fails on missing metadata", async () => {
     const payload = { id: "evt_bad", event: "user_topup", data: { user: "633505726", amount: 10 } };
     const result = await service.process({ payload, requestId: "req_1" });

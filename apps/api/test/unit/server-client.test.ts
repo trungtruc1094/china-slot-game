@@ -1425,9 +1425,8 @@ describe("slot game Tevi deposit flow", () => {
     });
   });
 
-  it("closes the cashout modal and shows acknowledgment when API status is failed_retryable", () => {
+  it("closes the cashout modal when API status is failed_retryable", () => {
     const SlotGame = loadSlotGame();
-    const messages: Array<{ title: string; body: string }> = [];
     const closeCalls: string[] = [];
     const balances: number[] = [];
     const game = {
@@ -1436,17 +1435,12 @@ describe("slot game Tevi deposit flow", () => {
       cashoutState: "preparing",
       slotPlayer: { setCoinsCount: (points: number) => balances.push(points) },
       guiController: {
-        showMessage: (title: string, body: string) => {
-          messages.push({ title, body });
-          return "cashout-message";
-        },
         closePopUp: (id: string) => closeCalls.push(id)
       },
       handleCashoutResult: SlotGame.prototype.handleCashoutResult,
       finishCommittedCashout: SlotGame.prototype.finishCommittedCashout,
       mapCashoutApiStatus: SlotGame.prototype.mapCashoutApiStatus,
       isCommittedCashoutApiStatus: SlotGame.prototype.isCommittedCashoutApiStatus,
-      cashoutStatusMessage: SlotGame.prototype.cashoutStatusMessage,
       closeCashoutModal: function (this: { cashoutModal: unknown; guiController: { closePopUp: (id: string) => void } }) {
         if (this.cashoutModal && this.guiController) {
           this.guiController.closePopUp("cashout-modal");
@@ -1470,10 +1464,6 @@ describe("slot game Tevi deposit flow", () => {
     expect(balances).toEqual([0]);
     expect(game.cashoutModal).toBeNull();
     expect(game.cashoutState).toBe("idle");
-    expect(messages).toEqual([{
-      title: "Cash out submitted",
-      body: "Your Stars balance is updated. Payout is being processed on Tevi."
-    }]);
     expect(closeCalls).toEqual(["cashout-modal"]);
   });
 
