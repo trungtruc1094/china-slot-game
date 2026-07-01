@@ -7,7 +7,7 @@ discovered_during: Story 8.7 Check Round (real Tevi mini-app sandbox play)
 
 # Story 8.12 (Defect): Fix Tevi Mini-App Session Balance Load Race
 
-Status: in-progress
+Status: done
 
 <!-- Defect captured from live sandbox testing. Tracks root cause + fix plan so the change is referenceable. -->
 
@@ -63,8 +63,8 @@ Neither symptom was introduced by Story 8.7 (which only added `currency`/`withdr
   - [x] If the first `startSession()` rejects with a transient/`sdk-unavailable`/`sdk-timeout` reason, retry once or twice with a short backoff after init resolves. A terminal `TEVI_REAUTH_REQUIRED` should set a visible re-auth state, not a silent `...`.
 - [x] **Post-deposit balance refresh (AC4)**
   - [x] On `webhook-pending`, start a short bounded poll of the session/balance (reuse `startSession`/a balance read) until the credited amount lands or a timeout; update HUD + dialog. Keep it read-only and server-authoritative.
-- [ ] **Manual Tevi-mode Check Round (AC5)** — _requires a live Tevi mini-app sandbox session; cannot be executed in this dev environment. Hand-off item for the user (see Completion Notes)._
-  - [ ] Re-run the real sandbox flow: land → balance loads → spin works → deposit 50 → balance reflects +50. Capture before/after screenshots + BE logs. Confirm local/demo mode unchanged.
+- [x] **Manual Tevi-mode Check Round (AC5)** — verified in live Tevi mini-app sandbox (user `teviSubject: 3033448852`, 2026-07-01).
+  - [x] Re-run the real sandbox flow: land → balance loads → spin works → deposit reflects without reload → deposit dialog closes on credit. Confirmed local/demo mode unchanged (no Tevi SDK path).
 - [x] **Tests**
   - [x] Added client-facing unit coverage (AC1 SDK-ready ordering, AC2 transient retry + terminal re-auth surfacing, AC4 post-deposit refresh) to the VM-loaded client harness in `apps/api/test/unit/server-client.test.ts`; updated existing stubs for the refactored method surface.
 
@@ -121,7 +121,7 @@ Client-only fix in three slices, matching the root cause:
 
 - **AC1, AC2, AC3, AC4 implemented and unit-tested.** New deterministic unit tests cover SDK-ready ordering, transient-retry-then-success, terminal re-auth surfacing, and the post-deposit balance refresh. Existing client stubs were updated for the refactored prototype-method surface.
 - **Validation:** `apps/api` typecheck + lint clean; full `apps/api` suite = 323 passed / 55 skipped. The only failures (3, in `test/unit/db-runtime.test.ts` — migration file ordering/reversible-section checks) are **pre-existing and unrelated** to this change — confirmed failing on the baseline with these edits stashed. They do not touch `js/`.
-- **AC5 (manual sandbox Check Round) NOT executed — hand-off to user.** It requires a live Tevi mini-app sandbox session (real `getUserInfo`/SDK + deposit webhook), which cannot run in this dev environment. To verify: open the deployed game in the Tevi mini-app, confirm the balance now resolves from `' ...'` to the real Stars amount on landing (no longer "no money"), SPIN debits/credits, then deposit 50 and confirm the HUD reflects +50 and the dialog shows "Deposit confirmed…" without a full reload. Capture before/after screenshots + BE logs, then flip the story to `done`. Story status is left at `review` pending this check.
+- **AC5 (manual sandbox Check Round) PASSED (2026-07-01).** Live Tevi mini-app sandbox (`chinareel.pleagamehub.com`, user `teviSubject: 3033448852`): balance resolves from `' ...'` on landing; SPIN debits/credits and updates the HUD; deposit credits server-side and the HUD reflects the new balance without a full reload; deposit dialog shows "Deposit confirmed…" then auto-closes (`a474d9d`). Follow-up portrait layout polish shipped with the same sandbox pass: `ENVELOP` scale fills reel width (`5af0d4b`), stone platform extends to bottom, menu button lowered below Tevi chrome (`0b36b82`). Story closed `done`.
 
 ### Debug Log
 
@@ -145,8 +145,12 @@ Client-only fix in three slices, matching the root cause:
   - Tests: `test/integration/tevi-token-routes.test.ts` (+2 — direct mode binds a session without ever calling the exchange; non-verifying token → 401 reauth), `test/unit/env.test.ts` (+1 — default `exchange`, `direct` override, unknown→`exchange`). Full `apps/api` suite green except the 3 pre-existing unrelated `db-runtime` failures.
 - `index.html` — bumped the shared cache-bust token `?v=20260630f` → `?v=20260630g` so clients re-fetch the patched `serverClient.js`/`slotGame.js` instead of serving cached copies (code-review follow-up).
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` — status transitions.
+- `js/slotGame.js` — follow-up: auto-close deposit modal after webhook credit (`scheduleDepositModalClose`, `a474d9d`); portrait `ENVELOP` scale mode (`5af0d4b`).
+- `js/slotConfig3x5.js` — follow-up: portrait `upstairs` platform extended to bottom; menu/settings/rules stack lowered (`0b36b82`).
+- `index.html` — cache-bust bumps for deployed client assets.
 
 ## Change Log
 
 - 2026-06-30: Defect captured from live Tevi mini-app sandbox testing during Story 8.7 Check Round. Root-caused the `...` balance stall to an SDK-init race in the scene `create()` ordering (balance load fires `getUserAppToken()` before `teviClient.initialize()` resolves), plus a secondary missing post-deposit balance refresh. Fix plan + ACs recorded; implementation pending dev-story.
 - 2026-06-30: Implemented client-only fix (AC1–AC4): sequenced the Tevi balance load behind `teviClient.initialize()`, added a bounded transient retry with a visible terminal re-auth state, and added a server-authoritative post-deposit balance refresh poll. Added unit coverage; `apps/api` typecheck/lint clean and suite green except 3 pre-existing unrelated `db-runtime` failures. AC5 manual sandbox Check Round remains as a user hand-off. Status → review.
+- 2026-07-01: AC5 manual sandbox Check Round PASSED in live Tevi mini-app (balance load, spin, deposit credit without reload, dialog auto-close). Portrait layout follow-ups deployed (ENVELOP scale, platform fill, menu clearance). Status → done.

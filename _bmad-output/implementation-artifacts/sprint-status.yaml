@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-06-27T21:00:32+0700"
-last_updated: "2026-06-30T23:59:00+0700"
+last_updated: "2026-07-01T21:00:00+0700"
 project: "China Slot Game"
 project_key: NOKEY
 tracking_system: file-system
@@ -116,7 +116,7 @@ development_status:
   8-9-reconcile-cashout-failures-safely: backlog
   8-10-send-basic-tevi-top-up-and-cashout-receipts: backlog
   8-11-verify-rtp-and-sandbox-money-path-check-rounds: backlog
-  8-12-fix-tevi-mini-app-session-balance-load-race: in-progress  # code review applied 3 patches (baseline guard, retry classification, reauth reason); 4 deferred incl. AC5 manual sandbox Check Round + Epic-10 robust deposit detection
+  8-12-fix-tevi-mini-app-session-balance-load-race: done
   epic-8-retrospective: optional
 
   epic-9: backlog
