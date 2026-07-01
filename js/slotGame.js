@@ -34,7 +34,10 @@ function createSlotGame()
 			                        // disableWebAudio: true
        },
        scale: {
-           mode: Phaser.Scale.FIT // SHOW_ALL, RESIZE, FIT, autoCenter: Phaser.Scale.CENTER_BOTH   
+           // FIT letterboxes on wide viewports (common in Tevi webviews), leaving body
+           // background visible beside the reels. ENVELOP fills portrait width edge-to-edge.
+           mode: slotGameLayoutMode === 'portrait' ? Phaser.Scale.ENVELOP : Phaser.Scale.FIT,
+           autoCenter: Phaser.Scale.CENTER_BOTH
       }
     };
    
