@@ -19,3 +19,9 @@
 - Timing tests stub `scheduleSceneDelay` to fire its callback synchronously (apps/api/test/unit/server-client.test.ts), so the bounded-recursion caps (`maxAttempts` in `loadBackendSessionBalance` / `pollPostDepositBalance`) and real async ordering are never exercised against deferred scheduling. A missing/incorrect base case wouldn't be caught. Add a deferred-scheduler test that proves the cap halts an always-failing transient.
 - Robust post-deposit confirmation: match the webhook deposit reference/status rather than a balance delta, to eliminate the residual false-negative when the credited balance doesn't strictly rise (e.g. concurrent spend). Belongs with Epic 10 `10-3` (deposit/cashout status UX); the minimal server-baseline guard applied in 8.12 only removes the false-positive.
 - `refreshSession()` (js/serverClient.js:285-300) nulls `session`/`sessionRequest` unconditionally before `startSession()`; a concurrent in-flight `startSession()` (spin) could be discarded → duplicate Tevi token-exchange / session creation, and `backendSpinStatus` is last-writer-wins. Latent only today (deposit modal blocks concurrent spins; poll ticks are sequential). Add a serialization/in-flight guard if the deposit flow ever becomes non-modal.
+
+## Deferred from: code review of 8-8-request-manual-tevi-stars-cashout (2026-07-01)
+
+- AC10 manual Tevi sandbox cashout Check Round — requires human sandbox run with funded provider account to verify live `POST /api/v1/payments/cashout` dispatch.
+- Epic 9 compliance/KYC/self-exclusion/host-float hard stops on cashout — stubbed pass-through in sandbox MVP; implement in Epic 9.
+- Operator reconciliation/retry UI for `failed_retryable` cashouts — Story 8.9.

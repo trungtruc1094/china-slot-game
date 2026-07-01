@@ -100,7 +100,41 @@ function createTopupPUHandler(popup)
     // confirm (deposit) and exit — label centered on the button and sized to fit
     popup.addButton('okButton','middle_button', 'middle_button_hover', false, 0, 140 + yOffset);
     popup['okButton'].clickEvent.add(()=>{popup.scene.soundController.playClip('button_click', false);}, popup);
-    popup.okText = popup.scene.add.bitmapText(0, 136 + yOffset, 'gameFont_1', 'DEPOSIT', 34, 1).setOrigin(0.5);
+    popup.addButton('exitButton','exit_button', 'exit_button_hover', false, 235, -190 + yOffset);
+    popup['exitButton'].clickEvent.add(()=>{popup.scene.soundController.playClip('button_click', false);}, popup);
+}
+
+// Tevi cashout modal (Story 8.8): caption, amount stepper, receive-after-fee, status line, cashout/exit buttons.
+function createCashoutPUHandler(popup)
+{
+    let yOffset = -70;
+    let backGround = popup.scene.add.sprite(0, 0 + yOffset, 'pu_background').setOrigin(0.5).setScale(1);
+    backGround.setInteractive();
+    popup.add(backGround);
+    let panel = popup.scene.add.sprite(0, 0 + yOffset, 'message_panel').setOrigin(0.5);
+    popup.add(panel);
+
+    popup.captionText = popup.scene.add.bitmapText(0, -140 + yOffset, 'gameFont', 'Cash Out', 38, 1).setOrigin(0.5);
+    popup.add(popup.captionText);
+
+    popup.amountText = popup.scene.add.bitmapText(0, -55 + yOffset, 'gameFont_1', '0 ★', 72, 1).setOrigin(0.5);
+    popup.amountText.tint = 0xFFFFFF;
+    popup.add(popup.amountText);
+
+    popup.receiveText = popup.scene.add.bitmapText(0, 5 + yOffset, 'gameFont', 'Receive: —', 30, 1).setOrigin(0.5);
+    popup.add(popup.receiveText);
+
+    popup.messageText = popup.scene.add.bitmapText(0, 55 + yOffset, 'gameFont', '1% withdrawal fee applies.', 28, 1).setOrigin(0.5);
+    popup.add(popup.messageText);
+
+    popup.addButton('minusButton', 'button_minus', 'button_minus_hover', false, -200, -55 + yOffset);
+    popup.addButton('plusButton', 'button_plus', 'button_plus_hover', false, 200, -55 + yOffset);
+    popup['minusButton'].clickEvent.add(()=>{popup.scene.soundController.playClip('button_click', false);}, popup);
+    popup['plusButton'].clickEvent.add(()=>{popup.scene.soundController.playClip('button_click', false);}, popup);
+
+    popup.addButton('okButton','middle_button', 'middle_button_hover', false, 0, 140 + yOffset);
+    popup['okButton'].clickEvent.add(()=>{popup.scene.soundController.playClip('button_click', false);}, popup);
+    popup.okText = popup.scene.add.bitmapText(0, 136 + yOffset, 'gameFont_1', 'CASH OUT', 30, 1).setOrigin(0.5);
     popup.okText.tint = 0xFFFFFF;
     popup.add(popup.okText);
 

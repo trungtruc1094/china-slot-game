@@ -19,6 +19,7 @@ import { createSpinsRouter } from "./routes/spins.routes.js";
 import { createTeviSessionRouter } from "./routes/tevi-session.routes.js";
 import { createTeviTokenRouter } from "./routes/tevi-token.routes.js";
 import { createTeviTopupRouter, type TopupServicePort } from "./routes/tevi-topup.routes.js";
+import { createTeviCashoutRouter, type CashoutRequestServicePort } from "./routes/tevi-cashout.routes.js";
 import { createTeviWebhookRouter } from "./routes/tevi-webhook.routes.js";
 import type { TeviWebhookServicePort } from "./domain/tevi-webhook-service.js";
 import { InMemoryPlayerIdentityAdapter } from "./domain/player-identity.js";
@@ -59,6 +60,7 @@ export interface AppDependencies {
   teviTokenService?: TeviTokenServicePort;
   teviSessionAuthMode?: "exchange" | "direct";
   topupService?: TopupServicePort;
+  cashoutService?: CashoutRequestServicePort;
   teviWebhookService?: TeviWebhookServicePort;
   teviWebhookSecret?: string;
   readinessCheck?: () => Promise<Record<string, "ready">>;
@@ -152,6 +154,9 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   }
   if (dependencies.teviAuthVerifier && dependencies.topupService) {
     app.use("/api", createTeviTopupRouter(dependencies.topupService, sessionService, dependencies.teviAuthVerifier));
+  }
+  if (dependencies.teviAuthVerifier && dependencies.cashoutService) {
+    app.use("/api", createTeviCashoutRouter(dependencies.cashoutService, sessionService, dependencies.teviAuthVerifier));
   }
   if (dependencies.teviAuthVerifier) {
     app.use("/api", createTeviSessionRouter(sessionService, dependencies.teviAuthVerifier));

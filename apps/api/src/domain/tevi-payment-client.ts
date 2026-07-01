@@ -1,8 +1,10 @@
+import type { CashoutDispatchClientPort, CashoutDispatchRequest, CashoutDispatchResult } from "./cashout-request-service.js";
 import type { IssueDepositTokenRequest, TeviPaymentClientPort, TeviPaymentClientResult } from "./topup-service.js";
 
 export interface TeviPaymentClientConfig {
   apiBase: string;
   depositTokenPath: string;
+  cashoutPath: string;
   apiKey: string;
   secretKey: string;
 }
@@ -45,7 +47,7 @@ function describeResponseShape(value: unknown): Record<string, unknown> {
   return shape;
 }
 
-export class TeviPaymentClient implements TeviPaymentClientPort {
+export class TeviPaymentClient implements TeviPaymentClientPort, CashoutDispatchClientPort {
   private readonly fetchImpl: typeof fetch;
 
   public constructor(
@@ -112,6 +114,88 @@ export class TeviPaymentClient implements TeviPaymentClientPort {
     return {
       ok: true,
       depositToken
+    };
+  }
+
+  public async dispatchCashout(request: CashoutDispatchRequest): Promise<CashoutDispatchResult> {
+    let response: Response;
+    try {
+      response = await this.fetchImpl(this.buildCashoutUrl(), {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-api-key": this.config.apiKey,
+          "idempotency-key": request.idempotencyKey,
+          "x-request-id": request.requestId
+        },
+        body: JSON.stringify({
+          rewards: [{ user: request.teviSubject, amount: request.amount }],
+          description: request.description
+        })
+      });
+    } catch {
+      console.warn("[tevi-payment] cashout provider request failed", {
+        requestId: request.requestId,
+        reasonCode: "PROVIDER_UNAVAILABLE"
+      });
+      return {
+        ok: false,
+        reasonCode: "PROVIDER_UNAVAILABLE",
+        statusCode: 503
+      };
+    }
+
+    if (response.status === 409) {
+      console.warn("[tevi-payment] cashout idempotency conflict", {
+        requestId: request.requestId,
+        providerStatusCode: 409,
+        reasonCode: "IDEMPOTENCY_PAYLOAD_MISMATCH"
+      });
+      return {
+        ok: false,
+        reasonCode: "IDEMPOTENCY_PAYLOAD_MISMATCH",
+        statusCode: 409,
+        providerStatusCode: 409,
+        idempotencyConflict: true
+      };
+    }
+
+    if (!response.ok) {
+      return this.mapCashoutProviderStatus(response.status, request.requestId);
+    }
+
+    return { ok: true };
+  }
+
+  private buildCashoutUrl(): string {
+    return new URL(this.config.cashoutPath, this.config.apiBase).toString();
+  }
+
+  private mapCashoutProviderStatus(status: number, requestId: string): CashoutDispatchResult {
+    if (status === 401 || status === 403) {
+      console.warn("[tevi-payment] cashout provider rejected request", {
+        requestId,
+        providerStatusCode: status,
+        reasonCode: "PROVIDER_REJECTED"
+      });
+      return {
+        ok: false,
+        reasonCode: "PROVIDER_REJECTED",
+        statusCode: 401,
+        providerStatusCode: status
+      };
+    }
+
+    console.warn("[tevi-payment] cashout provider unavailable", {
+      requestId,
+      providerStatusCode: status,
+      reasonCode: "PROVIDER_UNAVAILABLE"
+    });
+    return {
+      ok: false,
+      reasonCode: "PROVIDER_UNAVAILABLE",
+      statusCode: 503,
+      providerStatusCode: status
     };
   }
 

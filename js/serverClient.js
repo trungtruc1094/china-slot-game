@@ -207,6 +207,43 @@
         return topupSignatureFailure("signature-rejected", false, requestId);
     }
 
+    function cashoutFailure(reason, retryable, requestId) {
+        return {
+            ok: false,
+            status: retryable ? "retryable-failure" : "failed",
+            reason: reason,
+            retryable: !!retryable,
+            requestId: requestId || null
+        };
+    }
+
+    function cashoutReauth(reason) {
+        return { ok: false, status: "re-authentication-required", reason: reason, retryable: true, requestId: null };
+    }
+
+    function cashoutBlocked(reason, requestId) {
+        return { ok: false, status: "blocked", reason: reason, retryable: false, requestId: requestId || null };
+    }
+
+    function mapCashoutError(httpStatus, code, requestId) {
+        if (!httpStatus) {
+            return cashoutFailure("backend-unavailable", true, requestId);
+        }
+        if (httpStatus === 401 || code === "TEVI_AUTH_REQUIRED" || code === "TEVI_REAUTH_REQUIRED" || code === "TEVI_TOKEN_INVALID") {
+            return cashoutReauth("tevi-auth-required");
+        }
+        if (httpStatus === 409 && code === "INSUFFICIENT_BALANCE") {
+            return { ok: false, status: "insufficient-balance", reason: "insufficient-balance", retryable: false, requestId: requestId || null };
+        }
+        if (httpStatus === 403 || code === "TEVI_WRONG_APP" || code === "TEVI_ANONYMOUS_BLOCKED" || code === "TEVI_USER_INACTIVE") {
+            return cashoutBlocked("tevi-forbidden", requestId);
+        }
+        if (httpStatus >= 500 || httpStatus === 429) {
+            return cashoutFailure("backend-unavailable", true, requestId);
+        }
+        return cashoutFailure("cashout-rejected", false, requestId);
+    }
+
     function createBackendClient(options) {
         var settings = options || {};
         var mode = resolveMode(settings);
@@ -405,6 +442,74 @@
             return { ok: true, depositToken: depositToken, requestId: requestId };
         }
 
+        async function requestCashout(amount) {
+            if (mode !== "production") {
+                return cashoutFailure("not-production-mode", false);
+            }
+            if (!isTeviSessionMode()) {
+                return cashoutBlocked("tevi-mode-required");
+            }
+            if (!isPositiveInteger(amount)) {
+                return cashoutFailure("invalid-amount", false);
+            }
+            if (!fetchImpl) {
+                return cashoutFailure("backend-unavailable", true);
+            }
+
+            var tokenResult;
+            try {
+                tokenResult = await teviClient.getUserAppToken();
+            } catch (_error) {
+                return cashoutReauth("token-request-failed");
+            }
+            if (!tokenResult || !tokenResult.ok || !tokenResult.runtimeToken) {
+                return cashoutReauth(tokenResult && tokenResult.reason ? tokenResult.reason : "re-authentication-required");
+            }
+
+            var requestId = createRequestId();
+            var controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+            var abortTimer = controller ? setTimeout(function () { controller.abort(); }, topupRequestTimeoutMs) : null;
+            var response;
+            try {
+                response = await fetchImpl(apiBaseUrl + "/api/v1/payments/cashout-requests", {
+                    method: "POST",
+                    headers: {
+                        "content-type": "application/json",
+                        "x-request-id": requestId,
+                        "authorization": "Bearer " + tokenResult.runtimeToken
+                    },
+                    body: JSON.stringify({ amount: amount }),
+                    signal: controller ? controller.signal : undefined
+                });
+            } catch (_error) {
+                return cashoutFailure("backend-unavailable", true, requestId);
+            } finally {
+                if (abortTimer) clearTimeout(abortTimer);
+            }
+
+            var envelope;
+            try {
+                envelope = await response.json();
+            } catch (_error) {
+                return cashoutFailure("invalid-response", true, requestId);
+            }
+
+            if (!response.ok || (envelope && envelope.error)) {
+                var code = envelope && envelope.error && envelope.error.code;
+                return mapCashoutError(response.status, code, requestId);
+            }
+
+            var data = envelope && envelope.data;
+            return {
+                ok: true,
+                cashoutRequestId: data && data.cashout_request_id,
+                cashoutStatus: data && data.status,
+                amount: data && data.amount,
+                balanceAfter: data && data.balance_after,
+                requestId: requestId
+            };
+        }
+
         return {
             mode: mode,
             apiBaseUrl: apiBaseUrl,
@@ -414,7 +519,8 @@
             refreshSession: refreshSession,
             spin: spin,
             setRetry: setRetry,
-            requestTopupSignature: requestTopupSignature
+            requestTopupSignature: requestTopupSignature,
+            requestCashout: requestCashout
         };
     }
 

@@ -18,6 +18,7 @@ interface ServerClientApi {
     startSession: () => Promise<{ sessionId: string; playerId: string; balance?: { points: number } } | null>;
     spin: (request: { clientSpinId: string; wager: { lineBet: number; selectedWays: number; totalWager: number } }) => Promise<NormalizedSpinResult | SpinRetryState>;
     requestTopupSignature: (amount: number) => Promise<TopupSignatureResult>;
+    requestCashout: (amount: number) => Promise<CashoutResult>;
     mode: "production" | "demo";
     status: string;
   };
@@ -34,6 +35,10 @@ interface ServerClientApi {
 
 type TopupSignatureResult =
   | { ok: true; depositToken: string; requestId: string }
+  | { ok: false; status: string; reason: string; retryable: boolean; requestId: string | null };
+
+type CashoutResult =
+  | { ok: true; cashoutRequestId?: string; cashoutStatus?: string; amount?: number; balanceAfter?: number; requestId: string }
   | { ok: false; status: string; reason: string; retryable: boolean; requestId: string | null };
 
 interface TopupGame {
@@ -1353,5 +1358,62 @@ describe("slot game Tevi deposit flow", () => {
     expect(game.topupModal).toBeNull();
     expect(closeCalls).toBe(1);
     expect(game.topupStatusMessage("credited")).toContain("Stars balance is updated");
+  });
+
+  it("requests cashout with Tevi bearer and parses dispatched envelope", async () => {
+    const fetchCalls: Array<{ url: string; init: { headers: Record<string, string>; body: string } }> = [];
+    const backendClient = loadServerClient().createBackendClient({
+      mode: "production",
+      apiBaseUrl: "http://127.0.0.1:3000",
+      identity: { provider: "guest", subject: "browser-test" },
+      teviClient: {
+        isTeviMode: () => true,
+        getUserAppToken: async () => ({ ok: true, runtimeToken: "runtime-token", status: "ready" })
+      },
+      fetch: async (url, init) => {
+        fetchCalls.push({ url, init });
+        return new Response(JSON.stringify({
+          data: {
+            cashout_request_id: "cashout_req_1",
+            status: "dispatched",
+            amount: 100,
+            balance_after: 900
+          },
+          error: null,
+          requestId: "req_cashout_browser"
+        }), { status: 201, headers: { "content-type": "application/json" } });
+      }
+    });
+
+    const result = await backendClient.requestCashout(100);
+    expect(result).toMatchObject({
+      ok: true,
+      cashoutStatus: "dispatched",
+      balanceAfter: 900
+    });
+    expect(fetchCalls[0]?.url).toContain("/api/v1/payments/cashout-requests");
+    expect(fetchCalls[0]?.init.headers.authorization).toBe("Bearer runtime-token");
+  });
+
+  it("maps insufficient cashout balance to a client status", async () => {
+    const backendClient = loadServerClient().createBackendClient({
+      mode: "production",
+      apiBaseUrl: "http://127.0.0.1:3000",
+      identity: { provider: "guest", subject: "browser-test" },
+      teviClient: {
+        isTeviMode: () => true,
+        getUserAppToken: async () => ({ ok: true, runtimeToken: "runtime-token", status: "ready" })
+      },
+      fetch: async () => new Response(JSON.stringify({
+        error: { code: "INSUFFICIENT_BALANCE", message: "too much" },
+        data: null,
+        requestId: "req_cashout_fail"
+      }), { status: 409, headers: { "content-type": "application/json" } })
+    });
+
+    await expect(backendClient.requestCashout(500)).resolves.toMatchObject({
+      ok: false,
+      status: "insufficient-balance"
+    });
   });
 });

@@ -218,6 +218,10 @@ class SlotGame extends Phaser.Scene{
         this.topupReference = null;
         this.topupModal = null;
         this.topupAmount = 0;
+        this.cashoutState = "idle";
+        this.cashoutPending = false;
+        this.cashoutModal = null;
+        this.cashoutAmount = 0;
    
         // 5) add sounds 
         this.box_click_clip = this.sound.add('box_click_clip');
@@ -234,6 +238,7 @@ class SlotGame extends Phaser.Scene{
         this.initializeTeviMiniAppShell();
         this.initializeBackendSessionBalance();
         this.initializeTeviDepositEntry();
+        this.initializeTeviCashoutEntry();
 
         // 7) state machine
         this.stateMachine = new StateMachine();
@@ -806,6 +811,244 @@ class SlotGame extends Phaser.Scene{
             if (valid.length > 0) return valid;   // fall back to defaults when all configured presets are invalid
         }
         return defaults;
+    }
+
+    // ----- Tevi Star cashout (Story 8.8): backend debit + provider dispatch -----
+
+    isCashoutAvailable()
+    {
+        return !!(this.teviClient && this.teviClient.isTeviMode && this.teviClient.isTeviMode()
+            && this.serverClient && typeof this.serverClient.requestCashout === "function");
+    }
+
+    resolveWithdrawableBalance()
+    {
+        return Number(this.slotPlayer && this.slotPlayer.coins) || 0;
+    }
+
+    resolveCashoutFeePercent()
+    {
+        var teviConfig = (typeof window !== "undefined" && window.CHINA_SLOT_TEVI_CONFIG) || {};
+        var cashoutConfig = teviConfig.cashout || {};
+        var fee = Number(cashoutConfig.feePercent);
+        return isFinite(fee) && fee >= 0 && fee <= 100 ? fee : 1;
+    }
+
+    calculateCashoutReceive(amount)
+    {
+        if (!this.isValidCashoutAmount(amount)) return null;
+        var feePercent = this.resolveCashoutFeePercent();
+        return Math.floor(amount * (100 - feePercent) / 100);
+    }
+
+    isValidCashoutAmount(amount)
+    {
+        var withdrawable = this.resolveWithdrawableBalance();
+        return typeof amount === "number" && isFinite(amount) && Math.floor(amount) === amount
+            && amount > 0 && amount <= withdrawable;
+    }
+
+    resolveCashoutPresets()
+    {
+        var defaults = [100, 200, 500, 1000, 2000];
+        var withdrawable = this.resolveWithdrawableBalance();
+        var teviConfig = (typeof window !== "undefined" && window.CHINA_SLOT_TEVI_CONFIG) || {};
+        var cashoutConfig = teviConfig.cashout || {};
+        if (Array.isArray(cashoutConfig.presets)) {
+            var valid = cashoutConfig.presets.filter((value) => this.isValidCashoutAmount(value));
+            if (valid.length > 0) return valid;
+        }
+        return defaults.filter((value) => value <= withdrawable);
+    }
+
+    initializeTeviCashoutEntry()
+    {
+        if (!this.isCashoutAvailable()) return null;
+        if (typeof SceneButton === "undefined") return null;
+
+        var layout = (slotConfig.layout && slotConfig.layout.controls && slotConfig.layout.controls.cashout)
+            || { x: -540, y: -420, scale: 1 };
+        var scale = layout.scale != null ? layout.scale : 1;
+
+        this.cashoutButton = new SceneButton(this, 'panel_totalbet', 'panel_totalbet', false);
+        this.cashoutButton.create(layout.x, layout.y, 0.5, 0.5);
+        this.cashoutButton.button.setScale(scale);
+        this.cashoutButton.setDepth(15);
+        this.cashoutButton.addClickEvent(() => { this.openCashoutModal(); }, this);
+
+        this.cashoutButtonText = this.add.bitmapText(this.cashoutButton.posX, this.cashoutButton.posY - 4, 'gameFont_1', 'CASH OUT', 40, 1).setOrigin(0.5);
+        this.cashoutButtonText.setScale(scale);
+        this.cashoutButtonText.tint = 0xFFFFFF;
+        this.cashoutButtonText.depth = 16;
+        this.updateCashoutEntryEnabled();
+        return this.cashoutButton;
+    }
+
+    updateCashoutEntryEnabled()
+    {
+        if (!this.cashoutButton) return;
+        var enabled = this.resolveWithdrawableBalance() > 0 && !this.cashoutPending;
+        this.cashoutButton.setInteractable(enabled);
+        if (this.cashoutButton.button) this.cashoutButton.button.alpha = enabled ? 1 : 0.5;
+    }
+
+    openCashoutModal()
+    {
+        if (!this.isCashoutAvailable()) return null;
+        if (this.cashoutModal) return this.cashoutModal;
+        if (!this.guiController || !this.guiController.showPopUp) return null;
+        if (typeof createCashoutPUHandler === "undefined") return null;
+
+        var presets = this.resolveCashoutPresets();
+        this.cashoutAmount = presets.length > 0 ? presets[0] : 0;
+        this.cashoutStep = presets.length > 0 ? presets[0] : 100;
+        this.setCashoutState("idle");
+
+        var modal = this.guiController.showPopUp(createCashoutPUHandler);
+        this.cashoutModal = modal;
+
+        modal.minusButton.addClickEvent(() => { this.adjustCashoutAmount(-this.cashoutStep); }, this);
+        modal.plusButton.addClickEvent(() => { this.adjustCashoutAmount(this.cashoutStep); }, this);
+        modal.okButton.addClickEvent(() => { this.submitCashout(this.cashoutAmount); }, this);
+        modal.exitButton.addClickEvent(() => { this.closeCashoutModal(); }, this);
+
+        this.renderCashoutModalAmount();
+        this.renderCashoutStatus();
+        return modal;
+    }
+
+    closeCashoutModal()
+    {
+        if (this.cashoutModal && this.guiController) {
+            this.guiController.closePopUp(this.cashoutModal);
+        }
+        this.cashoutModal = null;
+    }
+
+    adjustCashoutAmount(delta)
+    {
+        if (this.cashoutPending) return;
+        var next = (Number(this.cashoutAmount) || 0) + delta;
+        var max = this.resolveWithdrawableBalance();
+        if (next < 0) next = 0;
+        if (next > max) next = max;
+        this.cashoutAmount = next;
+        this.renderCashoutModalAmount();
+        this.updateCashoutConfirmEnabled();
+    }
+
+    renderCashoutModalAmount()
+    {
+        if (!this.cashoutModal) return;
+        if (this.cashoutModal.amountText) {
+            this.cashoutModal.amountText.text = String(this.cashoutAmount || 0) + " ★";
+        }
+        if (this.cashoutModal.receiveText) {
+            var receive = this.calculateCashoutReceive(this.cashoutAmount);
+            this.cashoutModal.receiveText.text = receive == null
+                ? "Receive: —"
+                : "Receive: " + receive + " ★";
+        }
+    }
+
+    renderCashoutStatus()
+    {
+        if (this.cashoutModal && this.cashoutModal.messageText) {
+            this.cashoutModal.messageText.text = this.cashoutStatusMessage(this.cashoutState);
+        }
+        this.updateCashoutConfirmEnabled();
+    }
+
+    updateCashoutConfirmEnabled()
+    {
+        if (!this.cashoutModal || !this.cashoutModal.okButton) return;
+        var enabled = !this.cashoutPending && this.isValidCashoutAmount(this.cashoutAmount);
+        this.cashoutModal.okButton.setInteractable(enabled);
+        if (this.cashoutModal.okButton.button) this.cashoutModal.okButton.button.alpha = enabled ? 1 : 0.5;
+    }
+
+    submitCashout(amount)
+    {
+        if (!this.isCashoutAvailable()) return null;
+        if (this.cashoutPending) return null;
+        if (!this.isValidCashoutAmount(amount)) {
+            this.setCashoutState("invalid-amount");
+            return null;
+        }
+
+        this.cashoutPending = true;
+        try {
+            this.setCashoutState("preparing");
+        } catch (_error) {
+            this.cashoutPending = false;
+            this.setCashoutState("retryable-failure");
+            return null;
+        }
+
+        return this.serverClient.requestCashout(amount).then((result) => {
+            this.cashoutPending = false;
+            if (!result || !result.ok) {
+                this.setCashoutState(result && result.status ? result.status : "retryable-failure");
+                return null;
+            }
+
+            if (result.balanceAfter != null && this.slotPlayer) {
+                this.slotPlayer.setCoinsCount(result.balanceAfter);
+            }
+            this.updateCashoutEntryEnabled();
+
+            if (result.cashoutStatus === "dispatched") {
+                this.setCashoutState("dispatched");
+                this.scheduleSceneDelay(1500, () => {
+                    if (this.cashoutModal && this.cashoutState === "dispatched") {
+                        this.closeCashoutModal();
+                        this.setCashoutState("idle");
+                    }
+                });
+            } else if (result.cashoutStatus === "failed_retryable") {
+                this.setCashoutState("failed-retryable");
+            } else {
+                this.setCashoutState("dispatched");
+            }
+            return result;
+        }).catch(() => {
+            this.cashoutPending = false;
+            this.setCashoutState("retryable-failure");
+            return null;
+        });
+    }
+
+    setCashoutState(state)
+    {
+        this.cashoutState = state;
+        this.renderCashoutStatus();
+        this.updateCashoutEntryEnabled();
+    }
+
+    cashoutStatusMessage(status)
+    {
+        switch (status) {
+            case "idle":
+                return "1% withdrawal fee applies.";
+            case "preparing":
+                return "Submitting cash out request.";
+            case "invalid-amount":
+                return "This amount is higher than your available Stars.";
+            case "insufficient-balance":
+                return "This amount is higher than your available Stars.";
+            case "dispatched":
+                return "Cash out request received.";
+            case "failed-retryable":
+                return "Cash out is being processed. Support may follow up if needed.";
+            case "re-authentication-required":
+                return "Sign in to Tevi again to cash out Stars.";
+            case "blocked":
+                return "Cash out is unavailable right now.";
+            case "retryable-failure":
+                return "Cash out did not complete. Tap Cash Out to try again.";
+            default:
+                return "Cash out could not be completed.";
+        }
     }
 
     // Phaser deposit entry button, shown only inside an explicit Tevi sandbox session.
