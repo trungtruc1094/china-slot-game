@@ -49,6 +49,8 @@ interface TopupGame {
   submitTopup: (amount: number) => Promise<unknown> | null;
   topupStatusMessage: (status: string) => string;
   scheduleSceneDelay?: (ms: number, callback: () => void) => void;
+  closeDepositModal?: () => void;
+  scheduleDepositModalClose?: (delayMs?: number) => void;
 }
 
 interface SlotGameCtor {
@@ -79,6 +81,8 @@ interface SlotGameCtor {
     topupStatusMessage: (status: string) => string;
     renderTopupStatus: () => void;
     updateTopupConfirmEnabled: () => void;
+    closeDepositModal: () => void;
+    scheduleDepositModalClose: (delayMs?: number) => void;
   };
 }
 
