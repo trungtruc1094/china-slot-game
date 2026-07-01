@@ -1166,6 +1166,8 @@ describe("slot game Tevi deposit flow", () => {
       startPostDepositBalanceRefresh: SlotGame.prototype.startPostDepositBalanceRefresh,
       pollPostDepositBalance: SlotGame.prototype.pollPostDepositBalance,
       scheduleSceneDelay: SlotGame.prototype.scheduleSceneDelay,
+      closeDepositModal: SlotGame.prototype.closeDepositModal,
+      scheduleDepositModalClose: SlotGame.prototype.scheduleDepositModalClose,
       topupStatusMessage: SlotGame.prototype.topupStatusMessage,
       renderTopupStatus: SlotGame.prototype.renderTopupStatus,
       updateTopupConfirmEnabled: SlotGame.prototype.updateTopupConfirmEnabled,
@@ -1311,6 +1313,8 @@ describe("slot game Tevi deposit flow", () => {
     const SlotGame = loadSlotGame();
     const balanceCalls: number[] = [];
     let refreshCalls = 0;
+    let closeCalls = 0;
+    const modal = { messageText: { text: "" }, okButton: { setInteractable: () => undefined, button: { alpha: 1 } } };
     const game = bindTopupGame(SlotGame, {
       teviClient: {
         isTeviMode: () => true,
@@ -1325,6 +1329,10 @@ describe("slot game Tevi deposit flow", () => {
           return { balance: { points: refreshCalls >= 2 ? 1050 : 1000 } };
         }
       },
+      topupModal: modal,
+      guiController: {
+        closePopUp: () => { closeCalls += 1; }
+      },
       slotPlayer: { coins: 1000, setCoinsCount: (points: number) => balanceCalls.push(points), addCoins: () => {} },
       // Run each poll tick immediately so the test is deterministic.
       scheduleSceneDelay: (_ms: number, callback: () => void) => { callback(); }
@@ -1337,7 +1345,9 @@ describe("slot game Tevi deposit flow", () => {
 
     expect(refreshCalls).toBeGreaterThanOrEqual(2);
     expect(balanceCalls).toEqual([1050]);
-    expect(game.topupState).toBe("credited");
+    expect(game.topupState).toBe("idle");
+    expect(game.topupModal).toBeNull();
+    expect(closeCalls).toBe(1);
     expect(game.topupStatusMessage("credited")).toContain("Stars balance is updated");
   });
 });

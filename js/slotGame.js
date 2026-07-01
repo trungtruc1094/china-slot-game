@@ -731,7 +731,10 @@ class SlotGame extends Phaser.Scene{
                     this.slotControls.changeCreditCoinsHandler(points);
                 }
                 this.backendSpinStatus = "ready";
-                if (this.topupState === "webhook-pending") this.setTopupState("credited");
+                if (this.topupState === "webhook-pending") {
+                    this.setTopupState("credited");
+                    this.scheduleDepositModalClose();
+                }
                 return;
             }
 
@@ -858,10 +861,26 @@ class SlotGame extends Phaser.Scene{
 
     closeDepositModal()
     {
+        this.depositModalCloseToken = (this.depositModalCloseToken || 0) + 1;
         if (this.topupModal && this.guiController) {
             this.guiController.closePopUp(this.topupModal);
         }
         this.topupModal = null;
+    }
+
+    // Brief success message, then dismiss the deposit modal so the player can spin again.
+    scheduleDepositModalClose(delayMs)
+    {
+        if (!this.topupModal) return;
+        var delay = Number.isFinite(delayMs) ? delayMs : 1500;
+        this.depositModalCloseToken = (this.depositModalCloseToken || 0) + 1;
+        var token = this.depositModalCloseToken;
+        this.scheduleSceneDelay(delay, () => {
+            if (token !== this.depositModalCloseToken) return;
+            if (!this.topupModal || this.topupState !== "credited") return;
+            this.closeDepositModal();
+            this.setTopupState("idle");
+        });
     }
 
     adjustTopupAmount(delta)
