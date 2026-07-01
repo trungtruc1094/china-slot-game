@@ -487,7 +487,9 @@ class SlotGame extends Phaser.Scene{
             if (this.slotControls && typeof this.slotControls.changeCreditCoinsHandler === "function") {
                 this.slotControls.changeCreditCoinsHandler(points);
             }
-            this.updateCashoutEntryEnabled();
+            if (typeof this.updateCashoutEntryEnabled === "function") {
+                this.updateCashoutEntryEnabled();
+            }
             this.backendSpinStatus = "ready";
         }).catch((error) => {
             if (!this.isTerminalSessionReauth(error) && attempt + 1 < maxAttempts) {
