@@ -113,7 +113,7 @@ var slotConfig3x5 = {
                 roof: { x: 0, y: -610, scale: 0.76 },
                 balk: { x: 0, y: -405, scale: 0.86 },
                 jackpottitle: { x: 0, y: -470, scale: 1.12 },
-                upstairs: { x: 0, y: 830, scale: 0.86 },
+                upstairs: { x: 0, y: 890, scale: 0.90 },
                 columnleft: { x: -590, y: 10, scale: 0.86 },
                 columnright: { x: 590, y: 10, scale: 0.86 },
                 lanternsleft: { x: -430, y: -610, scale: 0.78 },
@@ -132,10 +132,10 @@ var slotConfig3x5 = {
                 maxBet: { x: -255, y: 895, scale: 1.12 },
                 autoSpin: { x: 255, y: 895, scale: 1.12 },
                 spin: { x: 0, y: 865, scale: 1.16 },
-                menu: { x: 440, y: -520, scale: 0.9 },
-                settings: { x: 440, y: -390, scale: 0.9 },
-                rules: { x: 440, y: -260, scale: 0.9 },
-                info: { x: 440, y: -130, scale: 0.9 },
+                menu: { x: 440, y: -460, scale: 0.9 },
+                settings: { x: 440, y: -330, scale: 0.9 },
+                rules: { x: 440, y: -200, scale: 0.9 },
+                info: { x: 440, y: -70, scale: 0.9 },
                 deposit: { x: 0, y: 450, scale: 0.86 }
             },
             text: {
