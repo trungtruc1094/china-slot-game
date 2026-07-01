@@ -100,6 +100,10 @@ function createTopupPUHandler(popup)
     // confirm (deposit) and exit — label centered on the button and sized to fit
     popup.addButton('okButton','middle_button', 'middle_button_hover', false, 0, 140 + yOffset);
     popup['okButton'].clickEvent.add(()=>{popup.scene.soundController.playClip('button_click', false);}, popup);
+    popup.okText = popup.scene.add.bitmapText(0, 136 + yOffset, 'gameFont_1', 'DEPOSIT', 34, 1).setOrigin(0.5);
+    popup.okText.tint = 0xFFFFFF;
+    popup.add(popup.okText);
+
     popup.addButton('exitButton','exit_button', 'exit_button_hover', false, 235, -190 + yOffset);
     popup['exitButton'].clickEvent.add(()=>{popup.scene.soundController.playClip('button_click', false);}, popup);
 }

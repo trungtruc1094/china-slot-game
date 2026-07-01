@@ -876,7 +876,7 @@ class SlotGame extends Phaser.Scene{
         this.cashoutButton.setDepth(15);
         this.cashoutButton.addClickEvent(() => { this.openCashoutModal(); }, this);
 
-        this.cashoutButtonText = this.add.bitmapText(this.cashoutButton.posX, this.cashoutButton.posY - 4, 'gameFont_1', 'CASH OUT', 40, 1).setOrigin(0.5);
+        this.cashoutButtonText = this.add.bitmapText(this.cashoutButton.posX, this.cashoutButton.posY - 2, 'gameFont_1', 'CASH OUT', 32, 1).setOrigin(0.5);
         this.cashoutButtonText.setScale(scale);
         this.cashoutButtonText.tint = 0xFFFFFF;
         this.cashoutButtonText.depth = 16;
@@ -1073,7 +1073,7 @@ class SlotGame extends Phaser.Scene{
 
         // Label centered on the panel, scaled with it so text and background stay aligned,
         // sized below the panel width to leave padding around the text.
-        this.depositButtonText = this.add.bitmapText(this.depositButton.posX, this.depositButton.posY - 4, 'gameFont_1', 'DEPOSIT', 48, 1).setOrigin(0.5);
+        this.depositButtonText = this.add.bitmapText(this.depositButton.posX, this.depositButton.posY - 2, 'gameFont_1', 'DEPOSIT', 38, 1).setOrigin(0.5);
         this.depositButtonText.setScale(scale);
         this.depositButtonText.tint = 0xFFFFFF;
         this.depositButtonText.depth = 16;
