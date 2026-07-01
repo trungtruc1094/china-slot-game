@@ -688,19 +688,27 @@ class SlotGame extends Phaser.Scene{
         this.balanceRefreshToken = (this.balanceRefreshToken || 0) + 1;
         var token = this.balanceRefreshToken;
 
-        // Establish the baseline from a server read, not the client HUD: a stale/zero/NaN
-        // slotPlayer.coins would otherwise let the very first poll treat the pre-credit
-        // balance as "credited" (8.12 review false-positive). Only after a finite server
-        // baseline is known do we start watching for the credited increase.
+        // Capture the baseline synchronously from the last server-confirmed client value.
+        // slotPlayer.coins is always server-sourced (we never mutate it client-side), so it
+        // reflects the pre-deposit balance. The Tevi SDK only resolves its topup promise
+        // AFTER the payment is confirmed, which means the webhook may already have credited
+        // the wallet by the time we get here. Using a refreshSession() call for the baseline
+        // would race with that webhook: if it wins, baseline = post-credit and the poll
+        // condition (points > baseline) can never fire (8.12 race fix).
+        var syncBaseline = this.slotPlayer ? Number(this.slotPlayer.coins) : NaN;
+        if (Number.isFinite(syncBaseline)) {
+            this.pollPostDepositBalance(0, syncBaseline, token);
+            return;
+        }
+
+        // Fallback: balance not yet loaded on the client — do a server read for the baseline.
         this.serverClient.refreshSession().then((session) => {
             if (token !== this.balanceRefreshToken) return;
             var baseline = (session && session.balance) ? Number(session.balance.points) : NaN;
             this.pollPostDepositBalance(0, baseline, token);
         }).catch(() => {
             if (token !== this.balanceRefreshToken) return;
-            // Could not read a baseline; fall back to the last known client value.
-            var baseline = this.slotPlayer ? Number(this.slotPlayer.coins) : NaN;
-            this.pollPostDepositBalance(0, baseline, token);
+            this.pollPostDepositBalance(0, NaN, token);
         });
     }
 
