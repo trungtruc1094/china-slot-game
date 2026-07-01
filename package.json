@@ -11,7 +11,8 @@
     "lint": "npm run build -w @china-slot-game/game-math && npm run lint --workspaces --if-present",
     "test": "npm run build -w @china-slot-game/game-math && npm run test --workspaces",
     "test:coverage": "npm run build -w @china-slot-game/game-math && vitest run --coverage --no-file-parallelism",
-    "typecheck": "npm run build -w @china-slot-game/game-math && npm run typecheck --workspaces"
+    "typecheck": "npm run build -w @china-slot-game/game-math && npm run typecheck --workspaces",
+    "tevi:send-test-webhook": "node scripts/send-test-tevi-webhook.mjs"
   },
   "devDependencies": {
     "@types/node": "24.10.1",
