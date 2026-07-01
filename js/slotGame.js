@@ -487,6 +487,7 @@ class SlotGame extends Phaser.Scene{
             if (this.slotControls && typeof this.slotControls.changeCreditCoinsHandler === "function") {
                 this.slotControls.changeCreditCoinsHandler(points);
             }
+            this.updateCashoutEntryEnabled();
             this.backendSpinStatus = "ready";
         }).catch((error) => {
             if (!this.isTerminalSessionReauth(error) && attempt + 1 < maxAttempts) {
@@ -880,6 +881,7 @@ class SlotGame extends Phaser.Scene{
         this.cashoutButtonText.setScale(scale);
         this.cashoutButtonText.tint = 0xFFFFFF;
         this.cashoutButtonText.depth = 16;
+        this.slotPlayer.addChangeCoinsEvent(this.updateCashoutEntryEnabled, this);
         this.updateCashoutEntryEnabled();
         return this.cashoutButton;
     }
