@@ -88,6 +88,14 @@ interface SlotGameCtor {
     updateTopupConfirmEnabled: () => void;
     closeDepositModal: () => void;
     scheduleDepositModalClose: (delayMs?: number) => void;
+    handleCashoutResult: (result: CashoutResult) => void;
+    finishCommittedCashout: (apiStatus: string) => void;
+    mapCashoutApiStatus: (apiStatus: string) => string | null;
+    isCommittedCashoutApiStatus: (apiStatus: string) => boolean;
+    cashoutStatusMessage: (status: string) => string;
+    closeCashoutModal: () => void;
+    updateCashoutEntryEnabled: () => void;
+    setCashoutState: (state: string) => void;
   };
 }
 
@@ -1415,5 +1423,87 @@ describe("slot game Tevi deposit flow", () => {
       ok: false,
       status: "insufficient-balance"
     });
+  });
+
+  it("closes the cashout modal and shows acknowledgment when API status is failed_retryable", () => {
+    const SlotGame = loadSlotGame();
+    const messages: Array<{ title: string; body: string }> = [];
+    const closeCalls: string[] = [];
+    const balances: number[] = [];
+    const game = {
+      cashoutPending: true,
+      cashoutModal: { id: "cashout-modal" },
+      cashoutState: "preparing",
+      slotPlayer: { setCoinsCount: (points: number) => balances.push(points) },
+      guiController: {
+        showMessage: (title: string, body: string) => {
+          messages.push({ title, body });
+          return "cashout-message";
+        },
+        closePopUp: (id: string) => closeCalls.push(id)
+      },
+      handleCashoutResult: SlotGame.prototype.handleCashoutResult,
+      finishCommittedCashout: SlotGame.prototype.finishCommittedCashout,
+      mapCashoutApiStatus: SlotGame.prototype.mapCashoutApiStatus,
+      isCommittedCashoutApiStatus: SlotGame.prototype.isCommittedCashoutApiStatus,
+      cashoutStatusMessage: SlotGame.prototype.cashoutStatusMessage,
+      closeCashoutModal: function (this: { cashoutModal: unknown; guiController: { closePopUp: (id: string) => void } }) {
+        if (this.cashoutModal && this.guiController) {
+          this.guiController.closePopUp("cashout-modal");
+        }
+        this.cashoutModal = null;
+      },
+      updateCashoutEntryEnabled: () => {},
+      setCashoutState: function (this: { cashoutState: string }, state: string) {
+        this.cashoutState = state;
+      }
+    };
+
+    SlotGame.prototype.handleCashoutResult.call(game, {
+      ok: true,
+      cashoutStatus: "failed_retryable",
+      balanceAfter: 0,
+      requestId: "req_cashout_retryable"
+    });
+
+    expect(game.cashoutPending).toBe(false);
+    expect(balances).toEqual([0]);
+    expect(game.cashoutModal).toBeNull();
+    expect(game.cashoutState).toBe("idle");
+    expect(messages).toEqual([{
+      title: "Cash out submitted",
+      body: "Your Stars balance is updated. Payout is being processed on Tevi."
+    }]);
+    expect(closeCalls).toEqual(["cashout-modal"]);
+  });
+
+  it("keeps the cashout modal open when the API returns a retryable failure", () => {
+    const SlotGame = loadSlotGame();
+    const closeCalls: string[] = [];
+    const game = {
+      cashoutPending: true,
+      cashoutModal: { id: "cashout-modal" },
+      cashoutState: "preparing",
+      slotPlayer: { setCoinsCount: () => {} },
+      handleCashoutResult: SlotGame.prototype.handleCashoutResult,
+      updateCashoutEntryEnabled: () => {},
+      setCashoutState: function (this: { cashoutState: string }, state: string) {
+        this.cashoutState = state;
+      },
+      closeCashoutModal: () => closeCalls.push("cashout-modal")
+    };
+
+    SlotGame.prototype.handleCashoutResult.call(game, {
+      ok: false,
+      status: "retryable-failure",
+      reason: "backend-unavailable",
+      retryable: true,
+      requestId: "req_cashout_fail"
+    });
+
+    expect(game.cashoutPending).toBe(false);
+    expect(game.cashoutModal).toEqual({ id: "cashout-modal" });
+    expect(game.cashoutState).toBe("retryable-failure");
+    expect(closeCalls).toEqual([]);
   });
 });

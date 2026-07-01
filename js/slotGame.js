@@ -929,6 +929,56 @@ class SlotGame extends Phaser.Scene{
         this.cashoutModal = null;
     }
 
+    mapCashoutApiStatus(apiStatus)
+    {
+        if (apiStatus === "dispatched") return "dispatched";
+        if (apiStatus === "failed_retryable") return "failed-retryable";
+        return null;
+    }
+
+    isCommittedCashoutApiStatus(apiStatus)
+    {
+        return apiStatus === "dispatched" || apiStatus === "failed_retryable";
+    }
+
+    // Tevi debits the game wallet on API commit (dispatched / failed_retryable). user_withdraw webhooks
+    // reconcile provider payout later without mutating the wallet again (playbook §5).
+    finishCommittedCashout(apiStatus)
+    {
+        var clientState = this.mapCashoutApiStatus(apiStatus);
+        if (!clientState) return;
+        var title = apiStatus === "dispatched" ? "Cash out sent" : "Cash out submitted";
+        var body = this.cashoutStatusMessage(clientState);
+        this.closeCashoutModal();
+        this.setCashoutState("idle");
+        if (this.guiController && this.guiController.showMessage) {
+            var popup = this.guiController.showMessage(title, body, this, () => {
+                this.guiController.closePopUp(popup);
+            });
+        }
+    }
+
+    handleCashoutResult(result)
+    {
+        this.cashoutPending = false;
+        if (!result || !result.ok) {
+            this.setCashoutState(result && result.status ? result.status : "retryable-failure");
+            return;
+        }
+
+        if (result.balanceAfter != null && this.slotPlayer) {
+            this.slotPlayer.setCoinsCount(result.balanceAfter);
+        }
+        this.updateCashoutEntryEnabled();
+
+        if (this.isCommittedCashoutApiStatus(result.cashoutStatus)) {
+            this.finishCommittedCashout(result.cashoutStatus);
+            return;
+        }
+
+        this.setCashoutState("retryable-failure");
+    }
+
     adjustCashoutAmount(delta)
     {
         if (this.cashoutPending) return;
@@ -990,30 +1040,7 @@ class SlotGame extends Phaser.Scene{
         }
 
         return this.serverClient.requestCashout(amount).then((result) => {
-            this.cashoutPending = false;
-            if (!result || !result.ok) {
-                this.setCashoutState(result && result.status ? result.status : "retryable-failure");
-                return null;
-            }
-
-            if (result.balanceAfter != null && this.slotPlayer) {
-                this.slotPlayer.setCoinsCount(result.balanceAfter);
-            }
-            this.updateCashoutEntryEnabled();
-
-            if (result.cashoutStatus === "dispatched") {
-                this.setCashoutState("dispatched");
-                this.scheduleSceneDelay(1500, () => {
-                    if (this.cashoutModal && this.cashoutState === "dispatched") {
-                        this.closeCashoutModal();
-                        this.setCashoutState("idle");
-                    }
-                });
-            } else if (result.cashoutStatus === "failed_retryable") {
-                this.setCashoutState("failed-retryable");
-            } else {
-                this.setCashoutState("dispatched");
-            }
+            this.handleCashoutResult(result);
             return result;
         }).catch(() => {
             this.cashoutPending = false;
@@ -1043,7 +1070,7 @@ class SlotGame extends Phaser.Scene{
             case "dispatched":
                 return "Cash out request received.";
             case "failed-retryable":
-                return "Cash out is being processed. Support may follow up if needed.";
+                return "Your Stars balance is updated. Payout is being processed on Tevi.";
             case "re-authentication-required":
                 return "Sign in to Tevi again to cash out Stars.";
             case "blocked":

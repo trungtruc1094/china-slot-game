@@ -8,6 +8,7 @@ import { TeviPaymentClient } from "./domain/tevi-payment-client.js";
 import { TeviTokenService } from "./domain/tevi-token-service.js";
 import { TopupService } from "./domain/topup-service.js";
 import { TeviWebhookService } from "./domain/tevi-webhook-service.js";
+import { TeviWebhookCashoutReconciliation } from "./domain/tevi-webhook-cashout-reconciliation.js";
 
 const env = loadEnv();
 let productionDependencies: Awaited<ReturnType<typeof createProductionDependencies>> | undefined;
@@ -75,7 +76,15 @@ const app = createApp(env.teviAuth.enabled
             teviWebhookService: new TeviWebhookService({
               idempotencyRepository: productionDependencies.providerTopUpIdempotencyRepository,
               creditPort: productionDependencies.teviWebhookCreditRepository,
-              playerLookup: productionDependencies.playerSessionRepository
+              playerLookup: productionDependencies.playerSessionRepository,
+              ...(productionDependencies.cashoutRequestRepository
+                ? {
+                    cashoutReconciliation: new TeviWebhookCashoutReconciliation(
+                      productionDependencies.providerTopUpIdempotencyRepository,
+                      productionDependencies.cashoutRequestRepository
+                    )
+                  }
+                : {})
             })
           }
         : {})

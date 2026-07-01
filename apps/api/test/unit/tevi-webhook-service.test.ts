@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TeviWebhookService } from "../../src/domain/tevi-webhook-service.js";
 import {
+  FakeCashoutReconciliationPort,
   FakeCreditPort,
   FakeIdempotencyRepository,
   FakePlayerLookup,
-  teviTopupPayload
+  createCashoutReconciliation,
+  teviTopupPayload,
+  teviWithdrawPayload
 } from "../helpers/tevi-webhook-fakes.js";
 
 let repository: FakeIdempotencyRepository;
@@ -52,11 +55,32 @@ describe("TeviWebhookService", () => {
     expect(repository.byEvent.get("evt_001")?.status).toBe("failed");
   });
 
-  it("ignores non-user_topup events (e.g. user_withdraw belongs to Story 8.8)", async () => {
-    const payload = { id: "evt_withdraw", event: "user_withdraw", data: { user: "633505726", amount: 10, metadata: { user_id: 633505726, type: "refund" } } };
-    const result = await service.process({ payload, requestId: "req_1" });
+  it("ignores user_withdraw when cashout reconciliation is not wired", async () => {
+    const result = await service.process({ payload: teviWithdrawPayload(), requestId: "req_1" });
     expect(result.status).toBe("ignored");
     expect(result.reasonCode).toBe("event_not_in_scope:user_withdraw");
+    expect(creditPort.credits).toHaveLength(0);
+  });
+
+  it("reconciles user_withdraw when cashout reconciliation is wired", async () => {
+    const cashoutPort = new FakeCashoutReconciliationPort();
+    const reconcilingService = new TeviWebhookService({
+      idempotencyRepository: repository,
+      creditPort,
+      playerLookup,
+      cashoutReconciliation: createCashoutReconciliation(repository, cashoutPort)
+    });
+
+    const result = await reconcilingService.process({ payload: teviWithdrawPayload(), requestId: "req_withdraw" });
+    expect(result).toEqual({ status: "reconciled", reasonCode: "cashout_reconciled", providerEventId: "evt_withdraw" });
+    expect(cashoutPort.calls).toEqual([{
+      providerEventId: "evt_withdraw",
+      playerId: "player_known",
+      teviSubject: "633505726",
+      amount: 100,
+      correlationId: "req_withdraw"
+    }]);
+    expect(repository.byEvent.get("evt_withdraw")?.status).toBe("completed");
     expect(creditPort.credits).toHaveLength(0);
   });
 

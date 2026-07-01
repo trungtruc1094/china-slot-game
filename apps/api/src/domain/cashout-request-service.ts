@@ -69,6 +69,16 @@ export interface CashoutRequestRepository {
       dispatchedAt: Date | null;
     }
   ): Promise<void>;
+  reconcileUserWithdraw(input: {
+    playerId: string;
+    teviSubject: string;
+    amount: number;
+    providerEventId: string;
+    correlationId: string;
+  }): Promise<{
+    status: "reconciled" | "already_dispatched" | "no_match";
+    cashoutRequestId: string | null;
+  }>;
 }
 
 export type CashoutRequestResult = CashoutRequestSuccess | CashoutRequestFailure;

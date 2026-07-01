@@ -14,6 +14,8 @@ import type {
   TeviWebhookCreditResult,
   TeviWebhookPlayerLookup
 } from "../../src/domain/tevi-webhook-service.js";
+import type { CashoutWithdrawReconciliationPort } from "../../src/domain/tevi-webhook-cashout-reconciliation.js";
+import { TeviWebhookCashoutReconciliation } from "../../src/domain/tevi-webhook-cashout-reconciliation.js";
 
 // In-memory idempotency repo mirroring the Postgres uniqueness + status semantics for fast service/route tests.
 export class FakeIdempotencyRepository implements ProviderTopUpIdempotencyRepository {
@@ -133,4 +135,51 @@ export function teviTopupPayload(overrides: { id?: string; user?: string; amount
       metadata: { app_id: "app_1", user_id: Number(user), type: "deposit" }
     }
   };
+}
+
+export function teviWithdrawPayload(overrides: { id?: string; user?: string; amount?: number } = {}): Record<string, unknown> {
+  const user = overrides.user ?? "633505726";
+  return {
+    id: overrides.id ?? "evt_withdraw",
+    event: "user_withdraw",
+    space_id: "space_1",
+    created_at: "2026-06-30T00:00:00.000Z",
+    data: {
+      user,
+      amount: overrides.amount ?? 100,
+      metadata: { app_id: "app_1", user_id: Number(user), type: "refund" }
+    }
+  };
+}
+
+export class FakeCashoutReconciliationPort implements CashoutWithdrawReconciliationPort {
+  public calls: Array<{
+    playerId: string;
+    teviSubject: string;
+    amount: number;
+    providerEventId: string;
+    correlationId: string;
+  }> = [];
+  public nextResult: {
+    status: "reconciled" | "already_dispatched" | "no_match";
+    cashoutRequestId: string | null;
+  } = { status: "reconciled", cashoutRequestId: "cashout_test_1" };
+
+  public async reconcileUserWithdraw(input: {
+    playerId: string;
+    teviSubject: string;
+    amount: number;
+    providerEventId: string;
+    correlationId: string;
+  }) {
+    this.calls.push(input);
+    return this.nextResult;
+  }
+}
+
+export function createCashoutReconciliation(
+  repository: FakeIdempotencyRepository,
+  cashoutPort: FakeCashoutReconciliationPort
+): TeviWebhookCashoutReconciliation {
+  return new TeviWebhookCashoutReconciliation(repository, cashoutPort);
 }

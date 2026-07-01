@@ -3,15 +3,16 @@ import type {
   ProviderTopUpIdempotencyRecord,
   ProviderTopUpIdempotencyRepository
 } from "./provider-top-up-idempotency-repository.js";
+import type { TeviWebhookCashoutReconciliation } from "./tevi-webhook-cashout-reconciliation.js";
 
 export const teviProviderName = "tevi";
 export const teviTopupEvent = "user_topup";
+export const teviWithdrawEvent = "user_withdraw";
 
-// The webhook coordinator never trusts a provider-supplied balance, never auto-creates players, and credits
-// 1 Tevi Star = 1 in-game credit (TEVI-FR-7). It verifies-before-effects (signature is checked in the route),
-// normalizes the event + idempotency key, resolves the player, and performs idempotent atomic crediting.
+// Deposit credits the wallet via user_topup (type deposit). Cashout debits on API commit; user_withdraw
+// (type refund) reconciles provider payout without mutating the wallet again.
 
-export type TeviWebhookProcessStatus = "credited" | "replayed" | "ignored" | "failed" | "duplicate";
+export type TeviWebhookProcessStatus = "credited" | "reconciled" | "replayed" | "ignored" | "failed" | "duplicate";
 
 export interface TeviWebhookProcessResult {
   status: TeviWebhookProcessStatus;
@@ -23,7 +24,6 @@ export interface TeviWebhookServicePort {
   process(input: { payload: unknown; requestId: string }): Promise<TeviWebhookProcessResult>;
 }
 
-// Read-only player lookup the webhook path depends on (PlayerSessionRepository implements this).
 export interface TeviWebhookPlayerLookup {
   findPlayerByProviderSubject(provider: string, subject: string): Promise<PlayerRecord | null>;
 }
@@ -36,13 +36,12 @@ export interface TeviWebhookCreditInput {
 }
 
 export interface TeviWebhookCreditResult {
-  credited: boolean; // a new credit transaction was written and the record marked completed
-  alreadyCompleted: boolean; // the idempotency record was already completed — prior result preserved, no mutation
+  credited: boolean;
+  alreadyCompleted: boolean;
   balanceAfter: number;
   transactionId: string | null;
 }
 
-// Atomic credit-on-completion: wallet credit + wallet_transactions row + idempotency completion commit together.
 export interface TeviWebhookCreditPort {
   creditTopupAtomically(input: TeviWebhookCreditInput): Promise<TeviWebhookCreditResult>;
 }
@@ -51,10 +50,19 @@ export interface TeviWebhookServiceDeps {
   idempotencyRepository: ProviderTopUpIdempotencyRepository;
   creditPort: TeviWebhookCreditPort;
   playerLookup: TeviWebhookPlayerLookup;
+  cashoutReconciliation?: TeviWebhookCashoutReconciliation;
 }
 
 interface ParsedTopup {
   kind: "topup";
+  providerEventId: string;
+  event: string;
+  teviSubject: string;
+  amount: number;
+}
+
+interface ParsedWithdraw {
+  kind: "withdraw";
   providerEventId: string;
   event: string;
   teviSubject: string;
@@ -75,7 +83,7 @@ interface ParsedInvalid {
   reasonCode: string;
 }
 
-type ParsedWebhook = ParsedTopup | ParsedIgnored | ParsedInvalid;
+type ParsedWebhook = ParsedTopup | ParsedWithdraw | ParsedIgnored | ParsedInvalid;
 
 export class TeviWebhookService implements TeviWebhookServicePort {
   public constructor(private readonly deps: TeviWebhookServiceDeps) {}
@@ -87,16 +95,20 @@ export class TeviWebhookService implements TeviWebhookServicePort {
       return this.recordNonCrediting(parsed.providerEventId, parsed.event, "ignored", parsed.reasonCode, input.requestId);
     }
     if (parsed.kind === "invalid") {
-      // Token-safe shape diagnostics so a real payload that doesn't match the documented shape can be diagnosed
-      // on the first live delivery (playbook §8) — key names + value TYPES only, never any values.
       logWebhookShape(input.requestId, parsed.providerEventId, parsed.event, parsed.reasonCode, input.payload);
       return this.recordNonCrediting(parsed.providerEventId, parsed.event, "failed", parsed.reasonCode, input.requestId);
     }
+    if (parsed.kind === "withdraw") {
+      return this.processWithdraw(parsed, input.requestId);
+    }
 
-    // Resolve player BEFORE reserving so an unknown user never reserves a creditable record.
+    return this.processTopup(parsed, input.requestId);
+  }
+
+  private async processTopup(parsed: ParsedTopup, requestId: string): Promise<TeviWebhookProcessResult> {
     const player = await this.deps.playerLookup.findPlayerByProviderSubject(teviProviderName, parsed.teviSubject);
     if (!player) {
-      return this.recordNonCrediting(parsed.providerEventId, parsed.event, "failed", "unknown_user", input.requestId);
+      return this.recordNonCrediting(parsed.providerEventId, parsed.event, "failed", "unknown_user", requestId);
     }
 
     const normalizedIdempotencyKey = buildIdempotencyKey(parsed.event, parsed.providerEventId);
@@ -118,46 +130,72 @@ export class TeviWebhookService implements TeviWebhookServicePort {
 
     if (!reservation.created) {
       const existing = reservation.record;
-
-      // Same idempotency key but a DIFFERENT provider event id ⇒ conflicting delivery, quarantine without mutation.
       if (reservation.duplicateReason === "idempotency_key" && existing.providerEventId !== parsed.providerEventId) {
-        return this.quarantineConflict(parsed.providerEventId, parsed.event, "idempotency_key_conflict", existing, input.requestId);
+        return this.quarantineConflict(parsed.providerEventId, parsed.event, "idempotency_key_conflict", existing, requestId);
       }
 
-      // Same provider event id but a DIFFERENT player or amount ⇒ conflicting payload, quarantine without mutation.
       const payloadMatches = existing.playerId === player.playerId && existing.pointAmount === parsed.amount;
       if (!payloadMatches) {
-        return this.quarantineConflict(parsed.providerEventId, parsed.event, "conflicting_payload", existing, input.requestId);
+        return this.quarantineConflict(parsed.providerEventId, parsed.event, "conflicting_payload", existing, requestId);
       }
 
-      // Matching payload that already reached a terminal non-credit state ⇒ preserve it, do not re-credit.
       if (existing.status === "failed" || existing.status === "ignored" || existing.status === "duplicate") {
-        logWebhook("event already terminal", input.requestId, parsed.providerEventId, parsed.event, existing.status);
+        logWebhook("event already terminal", requestId, parsed.providerEventId, parsed.event, existing.status);
         return { status: existing.status, reasonCode: "already_terminal", providerEventId: parsed.providerEventId };
       }
-      // status "completed" or "pending" with a matching payload falls through to the atomic credit path,
-      // which is idempotent: it returns the prior result for "completed" and credits exactly once for "pending".
     }
 
     const creditResult = await this.deps.creditPort.creditTopupAtomically({
       providerEventId: parsed.providerEventId,
       playerId: player.playerId,
       amount: parsed.amount,
-      correlationId: input.requestId
+      correlationId: requestId
     });
 
     if (creditResult.alreadyCompleted) {
-      logWebhook("replay preserved (no double credit)", input.requestId, parsed.providerEventId, parsed.event, "replayed");
+      logWebhook("replay preserved (no double credit)", requestId, parsed.providerEventId, parsed.event, "replayed");
       return { status: "replayed", reasonCode: "already_completed", providerEventId: parsed.providerEventId };
     }
 
     if (!creditResult.credited) {
-      logWebhook("credit skipped on non-pending record", input.requestId, parsed.providerEventId, parsed.event, "failed");
+      logWebhook("credit skipped on non-pending record", requestId, parsed.providerEventId, parsed.event, "failed");
       return { status: "failed", reasonCode: "record_not_creditable", providerEventId: parsed.providerEventId };
     }
 
-    logWebhook("wallet credited", input.requestId, parsed.providerEventId, parsed.event, "credited");
+    logWebhook("wallet credited", requestId, parsed.providerEventId, parsed.event, "credited");
     return { status: "credited", reasonCode: "credited", providerEventId: parsed.providerEventId };
+  }
+
+  private async processWithdraw(parsed: ParsedWithdraw, requestId: string): Promise<TeviWebhookProcessResult> {
+    if (!this.deps.cashoutReconciliation) {
+      return this.recordNonCrediting(
+        parsed.providerEventId,
+        parsed.event,
+        "ignored",
+        `event_not_in_scope:${parsed.event}`,
+        requestId
+      );
+    }
+
+    const player = await this.deps.playerLookup.findPlayerByProviderSubject(teviProviderName, parsed.teviSubject);
+    if (!player) {
+      return this.recordNonCrediting(parsed.providerEventId, parsed.event, "failed", "unknown_user", requestId);
+    }
+
+    const result = await this.deps.cashoutReconciliation.reconcileUserWithdraw({
+      providerEventId: parsed.providerEventId,
+      playerId: player.playerId,
+      teviSubject: parsed.teviSubject,
+      amount: parsed.amount,
+      correlationId: requestId
+    });
+
+    logWebhook(`cashout ${result.status}`, requestId, parsed.providerEventId, parsed.event, result.reasonCode);
+    return {
+      status: result.status,
+      reasonCode: result.reasonCode,
+      providerEventId: parsed.providerEventId
+    };
   }
 
   private async recordNonCrediting(
@@ -169,7 +207,6 @@ export class TeviWebhookService implements TeviWebhookServicePort {
   ): Promise<TeviWebhookProcessResult> {
     logWebhook(`event ${status}`, requestId, providerEventId, event, reasonCode);
 
-    // Without a provider event id there is no durable dedup key, so we cannot record idempotently — just report.
     if (!providerEventId) {
       return { status, reasonCode, providerEventId: null };
     }
@@ -197,9 +234,6 @@ export class TeviWebhookService implements TeviWebhookServicePort {
     existing: ProviderTopUpIdempotencyRecord,
     requestId: string
   ): Promise<TeviWebhookProcessResult> {
-    // Never demote an already-completed credit: a conflicting redelivery of a credited event must NOT overwrite
-    // the record's status to "duplicate" (the wallet credit + transaction row already committed). Report the
-    // conflict against the existing event id without mutating the completed record.
     if (existing.status === "completed") {
       logWebhook("conflicting delivery against a completed credit (preserved)", requestId, providerEventId, event, reasonCode);
       return { status: "duplicate", reasonCode, providerEventId };
@@ -217,8 +251,6 @@ export class TeviWebhookService implements TeviWebhookServicePort {
 }
 
 function buildIdempotencyKey(event: string, providerEventId: string): string {
-  // Deterministic key from stable provider fields. The DB additionally enforces UNIQUE(provider, event_id)
-  // and UNIQUE(provider, normalized_idempotency_key); for Tevi the event id is the documented dedup field.
   return `tevi:${event}:${providerEventId}`;
 }
 
@@ -231,8 +263,7 @@ function parseWebhook(payload: unknown): ParsedWebhook {
   const event = typeof body.event === "string" ? body.event : "unknown";
   const providerEventId = typeof body.id === "string" && body.id.trim().length > 0 ? body.id.trim() : null;
 
-  if (event !== teviTopupEvent) {
-    // user_withdraw (cashout, Story 8.8) and every other catalogue event are out of scope — record ignored.
+  if (event !== teviTopupEvent && event !== teviWithdrawEvent) {
     return { kind: "ignored", providerEventId, event, reasonCode: `event_not_in_scope:${event}` };
   }
 
@@ -250,16 +281,16 @@ function parseWebhook(payload: unknown): ParsedWebhook {
     return { kind: "invalid", providerEventId, event, reasonCode: "missing_metadata" };
   }
 
-  if (metadata.type !== "deposit") {
-    // user_withdraw carries type "refund"; a non-deposit user_topup is unexpected — do not credit.
-    return { kind: "ignored", providerEventId, event, reasonCode: `metadata_type_not_deposit:${stringifyType(metadata.type)}` };
+  const expectedType = event === teviTopupEvent ? "deposit" : "refund";
+  if (metadata.type !== expectedType) {
+    return {
+      kind: "ignored",
+      providerEventId,
+      event,
+      reasonCode: `metadata_type_not_${expectedType}:${stringifyType(metadata.type)}`
+    };
   }
 
-  // Tevi's DOC example carries the user id at BOTH data.user (string) and data.metadata.user_id (number), but a
-  // real delivery may include only one (or place it at data.user_id). Gather every plausible location, accept
-  // whichever is present, and only flag user_mismatch when two PRESENT candidates actually disagree. The string
-  // form is preferred for the subject (a JSON number can lose precision above 2^53). The earlier "both required"
-  // cross-check rejected real payloads with reasonCode "missing_user" — see the first-live-event finding (8.6).
   const subjectCandidates = [data.user, data.user_id, metadata.user_id]
     .map(coerceSubject)
     .filter((subject): subject is string => subject !== null);
@@ -277,11 +308,13 @@ function parseWebhook(payload: unknown): ParsedWebhook {
     return { kind: "invalid", providerEventId, event, reasonCode: "invalid_amount" };
   }
 
-  return { kind: "topup", providerEventId, event, teviSubject, amount };
+  if (event === teviTopupEvent) {
+    return { kind: "topup", providerEventId, event, teviSubject, amount };
+  }
+
+  return { kind: "withdraw", providerEventId, event, teviSubject, amount };
 }
 
-// Tevi sends the same user id as a quoted string (data.user) and an unquoted number (metadata.user_id).
-// Normalize both to the string subject set by the Tevi auth adapter.
 function coerceSubject(value: unknown): string | null {
   if (typeof value === "string") {
     const trimmed = value.trim();
@@ -298,7 +331,6 @@ function stringifyType(value: unknown): string {
 }
 
 function logWebhook(message: string, requestId: string, providerEventId: string | null, event: string, reasonCode: string): void {
-  // Token-safe: only key names / reason codes / internal ids. Never the secret, signature, or raw payload dump.
   console.info(`[tevi-webhook] ${message}`, {
     requestId,
     event,
@@ -308,8 +340,6 @@ function logWebhook(message: string, requestId: string, providerEventId: string 
 }
 
 function logWebhookShape(requestId: string, providerEventId: string | null, event: string, reasonCode: string, payload: unknown): void {
-  // Emits key NAMES and value TYPES only (e.g. { data: { user: "string", metadata: { type: "string" } } }) so the
-  // real provider payload structure can be diagnosed without leaking ids/secrets/values (playbook §8).
   console.info("[tevi-webhook] payload shape on parse failure", {
     requestId,
     event,
@@ -339,6 +369,5 @@ function describePayloadShape(value: unknown, depth = 3): unknown {
     }
     return shape;
   }
-  // Primitive: report the TYPE only (string | number | boolean), never the value.
   return typeof value;
 }

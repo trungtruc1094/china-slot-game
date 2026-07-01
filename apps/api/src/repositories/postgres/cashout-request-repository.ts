@@ -9,6 +9,7 @@ import {
   type CashoutRequestRepository,
   type CashoutRequestStatus
 } from "../../domain/cashout-request-service.js";
+import type { CashoutWithdrawReconciliationPort } from "../../domain/tevi-webhook-cashout-reconciliation.js";
 import { ApiHttpError } from "../../middleware/error-handler.js";
 
 interface CashoutRow {
@@ -28,7 +29,7 @@ interface WalletBalanceRow {
 
 const starterBalance = 1000;
 
-export class PostgresCashoutRequestRepository implements CashoutRequestRepository {
+export class PostgresCashoutRequestRepository implements CashoutRequestRepository, CashoutWithdrawReconciliationPort {
   public constructor(
     private readonly pool: Pool,
     private readonly clock: Clock = { now: () => new Date() }
@@ -199,6 +200,72 @@ export class PostgresCashoutRequestRepository implements CashoutRequestRepositor
         outcome.dispatchedAt
       ]
     );
+  }
+
+  public async reconcileUserWithdraw(input: {
+    playerId: string;
+    teviSubject: string;
+    amount: number;
+    providerEventId: string;
+    correlationId: string;
+  }): Promise<{
+    status: "reconciled" | "already_dispatched" | "no_match";
+    cashoutRequestId: string | null;
+  }> {
+    return withTransaction(this.pool, async (client) => {
+      const pending = await client.query<{ id: string; status: CashoutRequestStatus }>(
+        `SELECT id, status
+         FROM cashout_requests
+         WHERE player_id = $1
+           AND tevi_subject = $2
+           AND amount = $3
+           AND status IN ('pending', 'failed_retryable')
+         ORDER BY created_at DESC, id DESC
+         LIMIT 1
+         FOR UPDATE`,
+        [input.playerId, input.teviSubject, input.amount]
+      );
+      const row = pending.rows[0];
+      if (row) {
+        const now = this.clock.now();
+        await client.query(
+          `UPDATE cashout_requests
+           SET status = 'dispatched',
+               failure_reason = NULL,
+               provider_metadata_json = provider_metadata_json || $2::jsonb,
+               updated_at = $3,
+               dispatched_at = COALESCE(dispatched_at, $3)
+           WHERE id = $1`,
+          [
+            row.id,
+            JSON.stringify({
+              webhookProviderEventId: input.providerEventId,
+              webhookCorrelationId: input.correlationId
+            }),
+            now
+          ]
+        );
+        return { status: "reconciled", cashoutRequestId: row.id };
+      }
+
+      const dispatched = await client.query<{ id: string }>(
+        `SELECT id
+         FROM cashout_requests
+         WHERE player_id = $1
+           AND tevi_subject = $2
+           AND amount = $3
+           AND status = 'dispatched'
+         ORDER BY created_at DESC, id DESC
+         LIMIT 1`,
+        [input.playerId, input.teviSubject, input.amount]
+      );
+      const dispatchedRow = dispatched.rows[0];
+      if (dispatchedRow) {
+        return { status: "already_dispatched", cashoutRequestId: dispatchedRow.id };
+      }
+
+      return { status: "no_match", cashoutRequestId: null };
+    });
   }
 }
 

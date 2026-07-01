@@ -100,6 +100,60 @@ describePostgres("PostgresCashoutRequestRepository", () => {
     const cashoutRows = await requirePool().query(`SELECT count(*)::int AS count FROM cashout_requests`);
     expect(cashoutRows.rows[0]?.count).toBe(0);
   });
+
+  it("reconciles a failed_retryable cashout row to dispatched from user_withdraw webhook input", async () => {
+    const clock = new MutableClock();
+    const repository = new PostgresCashoutRequestRepository(requirePool(), clock);
+    const walletRepository = new PostgresWalletRepository(requirePool(), clock);
+    await createPlayer("player-reconcile");
+    await walletRepository.applyTransaction({
+      playerId: "player-reconcile",
+      type: "credit",
+      amount: 2427,
+      actor: "test",
+      source: "test_setup"
+    });
+
+    const committed = await repository.commitCashoutDebit({
+      playerId: "player-reconcile",
+      teviSubject: "tevi-user-reconcile",
+      amount: 2427,
+      requestId: "req_pg_cashout_reconcile",
+      payloadFingerprint: fingerprintCashoutPayload("tevi-user-reconcile", 2427),
+      createdAt: clock.now()
+    });
+
+    await repository.recordDispatchOutcome(committed.cashoutRequestId, {
+      status: "failed_retryable",
+      failureReason: "PROVIDER_UNAVAILABLE",
+      providerStatusCode: 400,
+      providerMetadata: {},
+      dispatchedAt: null
+    });
+
+    const reconciled = await repository.reconcileUserWithdraw({
+      playerId: "player-reconcile",
+      teviSubject: "tevi-user-reconcile",
+      amount: 2427,
+      providerEventId: "evt_withdraw_pg",
+      correlationId: "req_webhook_pg"
+    });
+
+    expect(reconciled).toEqual({
+      status: "reconciled",
+      cashoutRequestId: committed.cashoutRequestId
+    });
+
+    const row = await requirePool().query<{ status: string; provider_metadata_json: Record<string, unknown> }>(
+      `SELECT status, provider_metadata_json FROM cashout_requests WHERE id = $1`,
+      [committed.cashoutRequestId]
+    );
+    expect(row.rows[0]?.status).toBe("dispatched");
+    expect(row.rows[0]?.provider_metadata_json).toMatchObject({
+      webhookProviderEventId: "evt_withdraw_pg",
+      webhookCorrelationId: "req_webhook_pg"
+    });
+  });
 });
 
 describePostgres("CashoutRequestService with Postgres", () => {
