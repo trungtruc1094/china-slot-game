@@ -328,7 +328,9 @@ describe("TeviReceiptService", () => {
 
   it("delegates search and getRecord to the repository", async () => {
     const repository = new InMemoryReceiptRepository();
-    const service = new TeviReceiptService(repository, { sendMessage: vi.fn() });
+    const service = new TeviReceiptService(repository, {
+      sendMessage: vi.fn(async () => ({ ok: true as const, providerMessageId: "msg_search" }))
+    });
     await service.dispatchTopupReceipt({
       ...dispatchInput,
       providerEventId: "evt_search"

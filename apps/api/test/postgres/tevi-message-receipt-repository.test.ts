@@ -57,6 +57,8 @@ describePostgres("PostgresTeviMessageReceiptRepository", () => {
     const repository = new PostgresTeviMessageReceiptRepository(requirePool(), clock);
     const input = baseInput();
 
+    await createPlayer("player_1");
+
     const created = await repository.createOrGet(input);
     expect(created.created).toBe(true);
     expect(created.record).toMatchObject({
@@ -128,4 +130,12 @@ function assertSafeTestDatabaseUrl(databaseUrl: string): void {
   if (databaseName !== "china_slot_test" && !databaseName.endsWith("_test") && !databaseName.startsWith("test_")) {
     throw new Error("PostgreSQL integration tests require a dedicated test database name ending with _test or starting with test_.");
   }
+}
+
+async function createPlayer(playerId: string): Promise<void> {
+  const now = new Date("2026-07-02T08:00:00.000Z");
+  await requirePool().query(
+    `INSERT INTO players (id, display_name, created_at, updated_at) VALUES ($1, $2, $3, $3)`,
+    [playerId, playerId, now]
+  );
 }
