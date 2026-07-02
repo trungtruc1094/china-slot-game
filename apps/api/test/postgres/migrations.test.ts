@@ -32,16 +32,16 @@ describePostgres("PostgreSQL migrations", () => {
 
     const firstUp = await runner.migrateUp();
     expect(firstUp.pending).toEqual([]);
-    expect(firstUp.applied).toEqual(["0001", "0002", "0003", "0004", "0005", "0006", "0007", "0008", "0009", "0010", "0011", "0012", "0013"]);
+    expect(firstUp.applied).toEqual(["0001", "0002", "0003", "0004", "0005", "0006", "0007", "0008", "0009", "0010", "0011", "0012", "0013", "0014"]);
     await expect(runner.assertReady()).resolves.toBeUndefined();
 
     const down = await runner.migrateDown();
     expect(down.applied).toEqual([]);
-    expect(down.pending).toEqual(["0001", "0002", "0003", "0004", "0005", "0006", "0007", "0008", "0009", "0010", "0011", "0012", "0013"]);
+    expect(down.pending).toEqual(["0001", "0002", "0003", "0004", "0005", "0006", "0007", "0008", "0009", "0010", "0011", "0012", "0013", "0014"]);
 
     const secondUp = await runner.migrateUp();
     expect(secondUp.pending).toEqual([]);
-    expect(secondUp.applied).toEqual(["0001", "0002", "0003", "0004", "0005", "0006", "0007", "0008", "0009", "0010", "0011", "0012", "0013"]);
+    expect(secondUp.applied).toEqual(["0001", "0002", "0003", "0004", "0005", "0006", "0007", "0008", "0009", "0010", "0011", "0012", "0013", "0014"]);
   });
 
   it("surfaces failed migrations and blocks schema readiness", async () => {
