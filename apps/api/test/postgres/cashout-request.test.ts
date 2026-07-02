@@ -155,6 +155,65 @@ describePostgres("PostgresCashoutRequestRepository", () => {
       webhookCorrelationId: "req_webhook_pg"
     });
   });
+
+  it("searches and loads cashout detail records for admin reconciliation", async () => {
+    const clock = new MutableClock();
+    const repository = new PostgresCashoutRequestRepository(requirePool(), clock);
+    const walletRepository = new PostgresWalletRepository(requirePool(), clock);
+    await createPlayer("player-search");
+    await walletRepository.applyTransaction({
+      playerId: "player-search",
+      type: "credit",
+      amount: 400,
+      actor: "test",
+      source: "test_setup"
+    });
+
+    const committed = await repository.commitCashoutDebit({
+      playerId: "player-search",
+      teviSubject: "tevi-user-search",
+      amount: 150,
+      requestId: "req_pg_search_1",
+      payloadFingerprint: fingerprintCashoutPayload("tevi-user-search", 150),
+      createdAt: clock.now()
+    });
+
+    await repository.recordDispatchOutcome(committed.cashoutRequestId, {
+      status: "failed_retryable",
+      failureReason: "PROVIDER_UNAVAILABLE",
+      providerStatusCode: 503,
+      providerMetadata: { retrySource: "admin_reconciliation" },
+      dispatchedAt: null
+    });
+
+    const detail = await repository.findDetailById(committed.cashoutRequestId);
+    expect(detail).toMatchObject({
+      playerId: "player-search",
+      status: "failed_retryable",
+      reconciliationState: "retry_required",
+      walletTransactionId: committed.walletTransactionId,
+      requestId: "req_pg_search_1",
+      dispatchAttemptCount: 1
+    });
+    expect(detail?.providerResponseSummary).toMatchObject({
+      failureReason: "PROVIDER_UNAVAILABLE",
+      retrySource: "admin_reconciliation"
+    });
+
+    const search = await repository.searchCashoutRequests({
+      playerId: "player-search",
+      status: "failed_retryable",
+      reconciliationState: "retry_required",
+      requestId: "req_pg_search_1",
+      from: new Date("2026-06-29T00:00:00.000Z"),
+      to: new Date("2026-06-30T00:00:00.000Z"),
+      limit: 10,
+      offset: 0
+    });
+
+    expect(search.total).toBe(1);
+    expect(search.records[0]?.cashoutRequestId).toBe(committed.cashoutRequestId);
+  });
 });
 
 describePostgres("CashoutRequestService with Postgres", () => {
