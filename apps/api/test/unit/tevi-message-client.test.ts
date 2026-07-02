@@ -60,4 +60,100 @@ describe("TeviMessageClient", () => {
     expect(JSON.stringify(warnSpy.mock.calls)).not.toContain("provider-api-key");
     warnSpy.mockRestore();
   });
+
+  it("maps 403 responses to provider rejection", async () => {
+    const client = new TeviMessageClient(config, {
+      fetchImpl: vi.fn(async () => new Response("forbidden", { status: 403 }))
+    });
+
+    await expect(client.sendMessage({
+      teviSubject: "1168097029",
+      text: "hello",
+      requestId: "req_forbidden"
+    })).resolves.toMatchObject({
+      ok: false,
+      reasonCode: "PROVIDER_REJECTED",
+      statusCode: 401,
+      providerStatusCode: 403
+    });
+  });
+
+  it("maps provider network failures and non-auth HTTP errors", async () => {
+    const unavailableClient = new TeviMessageClient(config, {
+      fetchImpl: vi.fn(async () => { throw new Error("network down"); })
+    });
+    await expect(unavailableClient.sendMessage({
+      teviSubject: "1168097029",
+      text: "hello",
+      requestId: "req_network"
+    })).resolves.toMatchObject({
+      ok: false,
+      reasonCode: "PROVIDER_UNAVAILABLE",
+      statusCode: 503
+    });
+
+    const outageClient = new TeviMessageClient(config, {
+      fetchImpl: vi.fn(async () => new Response("busy", { status: 503 }))
+    });
+    await expect(outageClient.sendMessage({
+      teviSubject: "1168097029",
+      text: "hello",
+      requestId: "req_outage"
+    })).resolves.toMatchObject({
+      ok: false,
+      reasonCode: "PROVIDER_UNAVAILABLE",
+      statusCode: 503,
+      providerStatusCode: 503
+    });
+  });
+
+  it("rejects malformed JSON and explicit provider failure payloads", async () => {
+    const invalidJsonClient = new TeviMessageClient(config, {
+      fetchImpl: vi.fn(async () => new Response("not-json", { status: 200 }))
+    });
+    await expect(invalidJsonClient.sendMessage({
+      teviSubject: "1168097029",
+      text: "hello",
+      requestId: "req_invalid_json"
+    })).resolves.toMatchObject({
+      ok: false,
+      reasonCode: "PROVIDER_RESPONSE_INVALID",
+      statusCode: 502
+    });
+
+    const rejectedClient = new TeviMessageClient(config, {
+      fetchImpl: vi.fn(async () => new Response(JSON.stringify({
+        success: false,
+        error_code: "MSG_001"
+      }), { status: 200, headers: { "content-type": "application/json" } }))
+    });
+    await expect(rejectedClient.sendMessage({
+      teviSubject: "1168097029",
+      text: "hello",
+      requestId: "req_rejected"
+    })).resolves.toMatchObject({
+      ok: false,
+      reasonCode: "PROVIDER_REJECTED",
+      statusCode: 502,
+      providerStatusCode: 200
+    });
+  });
+
+  it("accepts alternate provider message id shapes", async () => {
+    const client = new TeviMessageClient(config, {
+      fetchImpl: vi.fn(async () => new Response(JSON.stringify({
+        success: true,
+        message_id: "msg_top"
+      }), { status: 200, headers: { "content-type": "application/json" } }))
+    });
+
+    await expect(client.sendMessage({
+      teviSubject: "1168097029",
+      text: "hello",
+      requestId: "req_alt_id"
+    })).resolves.toEqual({
+      ok: true,
+      providerMessageId: "msg_top"
+    });
+  });
 });

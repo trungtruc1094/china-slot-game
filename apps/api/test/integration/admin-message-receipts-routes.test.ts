@@ -132,4 +132,56 @@ describe("admin message receipt routes", () => {
     expect(body.data?.status).toBe("sent");
     expect(receiptService.retryCalls).toEqual(["receipt_test_1"]);
   });
+
+  it("returns 404 when receipt detail is missing", async () => {
+    receiptService = new FakeReceiptService({ records: [], total: 0 }, null);
+    server.close();
+    server = createServer(createApp({
+      teviReceiptService: receiptService,
+      adminAuditRepository: new InMemoryAdminAuditRepository()
+    }));
+    await new Promise<void>((resolve) => {
+      server.listen(0, "127.0.0.1", resolve);
+    });
+    baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+
+    const response = await fetch(`${baseUrl}/api/admin/message-receipts/receipt_missing`, {
+      headers: {
+        "x-admin-role": "support",
+        "x-admin-actor": "support_user"
+      }
+    });
+
+    expect(response.status).toBe(404);
+  });
+
+  it("surfaces retry failures from the receipt service", async () => {
+    receiptService = new FakeReceiptService(undefined, sampleRecord, {
+      ok: false,
+      code: "RECEIPT_RETRY_DISPATCH_FAILED",
+      reasonCode: "PROVIDER_UNAVAILABLE",
+      statusCode: 503,
+      providerStatusCode: 503
+    });
+    server.close();
+    server = createServer(createApp({
+      teviReceiptService: receiptService,
+      adminAuditRepository: new InMemoryAdminAuditRepository()
+    }));
+    await new Promise<void>((resolve) => {
+      server.listen(0, "127.0.0.1", resolve);
+    });
+    baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+
+    const response = await fetch(`${baseUrl}/api/admin/message-receipts/receipt_test_1/retry`, {
+      method: "POST",
+      headers: {
+        "x-admin-role": "operator",
+        "x-admin-actor": "operator_user",
+        "x-request-id": "req_admin_retry_fail"
+      }
+    });
+
+    expect(response.status).toBe(503);
+  });
 });
