@@ -19,6 +19,7 @@ import { PostgresSpinService } from "../repositories/postgres/spin-service.js";
 import { PostgresWalletRepository } from "../repositories/postgres/wallet-repository.js";
 import { PostgresCashoutRequestRepository } from "../repositories/postgres/cashout-request-repository.js";
 import { PostgresTeviWebhookCreditRepository } from "../repositories/postgres/tevi-webhook-credit-repository.js";
+import { PostgresTeviMessageReceiptRepository } from "../repositories/postgres/tevi-message-receipt-repository.js";
 
 export interface ProductionDependencies {
   appDependencies: AppDependencies;
@@ -29,6 +30,7 @@ export interface ProductionDependencies {
   topupSignatureIssuanceRepository: PostgresTopupSignatureIssuanceRepository;
   playerSessionRepository: PostgresPlayerSessionRepository;
   teviWebhookCreditRepository: PostgresTeviWebhookCreditRepository;
+  teviMessageReceiptRepository: PostgresTeviMessageReceiptRepository;
   cashoutRequestRepository: PostgresCashoutRequestRepository;
 }
 
@@ -59,6 +61,7 @@ export async function createProductionDependencies(env: ApiEnv): Promise<Product
     const providerTopUpIdempotencyRepository = new PostgresProviderTopUpIdempotencyRepository(pool, clock);
     const topupSignatureIssuanceRepository = new PostgresTopupSignatureIssuanceRepository(pool);
     const teviWebhookCreditRepository = new PostgresTeviWebhookCreditRepository(pool, clock);
+    const teviMessageReceiptRepository = new PostgresTeviMessageReceiptRepository(pool, clock);
     const cashoutRequestRepository = new PostgresCashoutRequestRepository(pool, clock);
 
     await configRepository.getActiveRecord();
@@ -107,6 +110,7 @@ export async function createProductionDependencies(env: ApiEnv): Promise<Product
       topupSignatureIssuanceRepository,
       playerSessionRepository,
       teviWebhookCreditRepository,
+      teviMessageReceiptRepository,
       cashoutRequestRepository
     };
   } catch (error) {

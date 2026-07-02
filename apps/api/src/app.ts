@@ -15,6 +15,7 @@ import { createAdminMetricsRouter } from "./routes/admin-metrics.routes.js";
 import { createAdminOperatorLimitsRouter } from "./routes/admin-operator-limits.routes.js";
 import { createAdminSpinLedgerRouter } from "./routes/admin-spin-ledger.routes.js";
 import { createAdminCashoutRequestsRouter, type CashoutReconciliationServicePort } from "./routes/admin-cashout-requests.routes.js";
+import { createAdminMessageReceiptsRouter } from "./routes/admin-message-receipts.routes.js";
 import { createSessionsRouter } from "./routes/sessions.routes.js";
 import { createSpinsRouter } from "./routes/spins.routes.js";
 import { createTeviSessionRouter } from "./routes/tevi-session.routes.js";
@@ -40,6 +41,7 @@ import { InMemoryRequestTraceRepository, type RequestTraceRepository } from "./d
 import { seedActiveConfigForDeployment } from "./config/seed-active-config.js";
 import type { TeviAuthVerifier } from "./domain/tevi-auth-adapter.js";
 import type { TeviTokenServicePort } from "./domain/tevi-token-service.js";
+import type { TeviReceiptServicePort } from "./domain/tevi-receipt-service.js";
 
 export interface AppDependencies {
   clock?: Clock;
@@ -63,6 +65,7 @@ export interface AppDependencies {
   topupService?: TopupServicePort;
   cashoutService?: CashoutRequestServicePort;
   cashoutReconciliationService?: CashoutReconciliationServicePort;
+  teviReceiptService?: TeviReceiptServicePort;
   teviWebhookService?: TeviWebhookServicePort;
   teviWebhookSecret?: string;
   readinessCheck?: () => Promise<Record<string, "ready">>;
@@ -144,6 +147,9 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use("/api", createAdminSpinLedgerRouter(spinService, adminAuditRepository));
   if (dependencies.cashoutReconciliationService) {
     app.use("/api", createAdminCashoutRequestsRouter(dependencies.cashoutReconciliationService, adminAuditRepository));
+  }
+  if (dependencies.teviReceiptService) {
+    app.use("/api", createAdminMessageReceiptsRouter(dependencies.teviReceiptService, adminAuditRepository));
   }
   app.use("/api", createAdminMetricsRouter(metricsService));
   app.use("/api", createTeviWebhookRouter(

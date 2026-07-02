@@ -29,3 +29,8 @@
 ## Deferred from: code review of 8-9-reconcile-cashout-failures-safely (2026-07-02)
 
 - AC6 live Tevi sandbox simulated payout failure Check Round — requires human sandbox run with provider outage simulation and operator curl retry verification.
+
+## Deferred from: code review of 8-10-send-basic-tevi-top-up-and-cashout-receipts (2026-07-02)
+
+- AC6 live Tevi sandbox Message receipts Check Round — requires funded sandbox account and operator curl verification against live Tevi message API.
+- Dedicated Postgres integration test for receipt failure isolation at DB layer — service/integration unit coverage exists; full DB path deferred to sandbox Check Round.

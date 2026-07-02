@@ -504,6 +504,7 @@
                 ok: true,
                 cashoutRequestId: data && data.cashout_request_id,
                 cashoutStatus: data && data.status,
+                receiptStatus: data && data.receipt_status,
                 amount: data && data.amount,
                 balanceAfter: data && data.balance_after,
                 requestId: requestId

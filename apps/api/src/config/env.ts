@@ -53,6 +53,7 @@ export interface TeviPaymentEnabledEnv {
   apiBase: string;
   depositTokenPath: string;
   cashoutPath: string;
+  messagePath: string;
   apiKey: string;
   secretKey: string;
   billingChannelId: string;
@@ -152,6 +153,11 @@ function parseTeviPaymentEnv(source: NodeJS.ProcessEnv, nodeEnv: string): TeviPa
     throw new Error("TEVI_CASHOUT_PATH must start with /");
   }
 
+  const messagePath = source.TEVI_MESSAGE_PATH?.trim() || "/api/v1/conversations/messages/send";
+  if (!messagePath.startsWith("/")) {
+    throw new Error("TEVI_MESSAGE_PATH must start with /");
+  }
+
   const apiKey = source.TEVI_API_KEY?.trim();
   if (!apiKey) {
     throw new Error("TEVI_API_KEY is required when Tevi payment is enabled");
@@ -186,6 +192,7 @@ function parseTeviPaymentEnv(source: NodeJS.ProcessEnv, nodeEnv: string): TeviPa
     apiBase,
     depositTokenPath,
     cashoutPath,
+    messagePath,
     apiKey,
     secretKey,
     billingChannelId,

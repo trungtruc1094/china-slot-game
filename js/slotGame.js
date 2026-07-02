@@ -790,7 +790,7 @@ class SlotGame extends Phaser.Scene{
                     ? "Waiting for Tevi confirmation. Reference " + this.topupReference + "."
                     : "Waiting for Tevi confirmation.";
             case "credited":
-                return "Deposit confirmed. Your Stars balance is updated.";
+                return "Deposit confirmed. Your Stars balance is updated. A Tevi receipt message may arrive shortly.";
             case "canceled":
                 return "Deposit canceled.";
             case "re-authentication-required":
@@ -976,6 +976,7 @@ class SlotGame extends Phaser.Scene{
         this.updateCashoutEntryEnabled();
 
         if (this.isCommittedCashoutApiStatus(result.cashoutStatus)) {
+            this.lastCashoutReceiptStatus = result.receiptStatus || null;
             this.finishCommittedCashout(result.cashoutStatus, result.cashoutRequestId);
             return;
         }
@@ -1072,6 +1073,12 @@ class SlotGame extends Phaser.Scene{
             case "insufficient-balance":
                 return "This amount is higher than your available Stars.";
             case "dispatched":
+                if (this.lastCashoutReceiptStatus === "sent") {
+                    return "Cash out request received. Tevi receipt sent.";
+                }
+                if (this.lastCashoutReceiptStatus === "failed_retryable" || this.lastCashoutReceiptStatus === "pending") {
+                    return "Cash out request received. Receipt delivery is pending — your balance is already updated.";
+                }
                 return "Cash out request received.";
             case "failed-retryable":
                 return "Your Stars balance is updated. Payout is being processed on Tevi.";

@@ -4,6 +4,7 @@ import type {
   CashoutRequestRepository,
   CashoutRequestStatus
 } from "./cashout-request-service.js";
+import type { TeviReceiptServicePort } from "./tevi-receipt-service.js";
 import { ApiHttpError } from "../middleware/error-handler.js";
 
 export type CashoutReconciliationState =
@@ -77,6 +78,7 @@ export class CashoutReconciliationService {
   public constructor(
     private readonly repository: CashoutRequestRepository,
     private readonly dispatchClient: CashoutDispatchClientPort,
+    private readonly receiptService?: TeviReceiptServicePort,
     private readonly clock: Clock = systemClock
   ) {}
 
@@ -166,6 +168,17 @@ export class CashoutReconciliationService {
         failure.providerStatusCode = dispatchResult.providerStatusCode;
       }
       return failure;
+    }
+
+    if (this.receiptService) {
+      await this.receiptService.dispatchCashoutReceipt({
+        cashoutRequestId: updated.cashoutRequestId,
+        playerId: updated.playerId,
+        teviSubject: updated.teviSubject,
+        amount: updated.amount,
+        cashoutStatus: updated.status,
+        requestId: actorRequestId
+      });
     }
 
     return {

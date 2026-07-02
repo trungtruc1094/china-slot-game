@@ -249,6 +249,7 @@ describe("loadEnv", () => {
           apiBase: "https://developer-api.sbx.tevi.dev",
           depositTokenPath: "/api/v1/payments/deposit-token",
           cashoutPath: "/api/v1/payments/cashout",
+          messagePath: "/api/v1/conversations/messages/send",
           apiKey: "api-key",
           secretKey: "secret-key",
           billingChannelId: "2300210851",

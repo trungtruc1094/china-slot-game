@@ -51,6 +51,18 @@ export interface TeviWebhookServiceDeps {
   creditPort: TeviWebhookCreditPort;
   playerLookup: TeviWebhookPlayerLookup;
   cashoutReconciliation?: TeviWebhookCashoutReconciliation;
+  receiptService?: TeviReceiptDispatchPort;
+}
+
+export interface TeviReceiptDispatchPort {
+  dispatchTopupReceipt(input: {
+    providerEventId: string;
+    playerId: string;
+    teviSubject: string;
+    amount: number;
+    correlationId: string;
+    requestId: string;
+  }): Promise<string | null>;
 }
 
 interface ParsedTopup {
@@ -163,6 +175,18 @@ export class TeviWebhookService implements TeviWebhookServicePort {
     }
 
     logWebhook("wallet credited", requestId, parsed.providerEventId, parsed.event, "credited");
+
+    if (this.deps.receiptService) {
+      await this.deps.receiptService.dispatchTopupReceipt({
+        providerEventId: parsed.providerEventId,
+        playerId: player.playerId,
+        teviSubject: parsed.teviSubject,
+        amount: parsed.amount,
+        correlationId: requestId,
+        requestId
+      });
+    }
+
     return { status: "credited", reasonCode: "credited", providerEventId: parsed.providerEventId };
   }
 

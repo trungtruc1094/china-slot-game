@@ -77,7 +77,8 @@ export function createTeviCashoutRouter(
         amount: result.amount,
         balance_after: result.balanceAfter,
         idempotency_key: result.idempotencyKey,
-        wallet_transaction_id: result.walletTransactionId
+        wallet_transaction_id: result.walletTransactionId,
+        ...(result.receiptStatus ? { receipt_status: result.receiptStatus } : {})
       }, request.requestId));
     } catch (error) {
       if (error instanceof ZodError) {

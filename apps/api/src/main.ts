@@ -10,6 +10,8 @@ import { TeviTokenService } from "./domain/tevi-token-service.js";
 import { TopupService } from "./domain/topup-service.js";
 import { TeviWebhookService } from "./domain/tevi-webhook-service.js";
 import { TeviWebhookCashoutReconciliation } from "./domain/tevi-webhook-cashout-reconciliation.js";
+import { TeviMessageClient } from "./domain/tevi-message-client.js";
+import { TeviReceiptService } from "./domain/tevi-receipt-service.js";
 
 const env = loadEnv();
 let productionDependencies: Awaited<ReturnType<typeof createProductionDependencies>> | undefined;
@@ -27,6 +29,25 @@ try {
   process.exit(1);
 }
 const appDependencies = productionDependencies?.appDependencies ?? {};
+const teviPaymentClient = env.teviAuth.enabled && env.teviAuth.payment.enabled
+  ? new TeviPaymentClient({
+      apiBase: env.teviAuth.payment.apiBase,
+      depositTokenPath: env.teviAuth.payment.depositTokenPath,
+      cashoutPath: env.teviAuth.payment.cashoutPath,
+      apiKey: env.teviAuth.payment.apiKey,
+      secretKey: env.teviAuth.payment.secretKey
+    })
+  : undefined;
+const teviMessageClient = env.teviAuth.enabled && env.teviAuth.payment.enabled
+  ? new TeviMessageClient({
+      apiBase: env.teviAuth.payment.apiBase,
+      messagePath: env.teviAuth.payment.messagePath,
+      apiKey: env.teviAuth.payment.apiKey
+    })
+  : undefined;
+const teviReceiptService = teviMessageClient && productionDependencies?.teviMessageReceiptRepository
+  ? new TeviReceiptService(productionDependencies.teviMessageReceiptRepository, teviMessageClient)
+  : undefined;
 const app = createApp(env.teviAuth.enabled
   ? {
       ...appDependencies,
@@ -37,7 +58,7 @@ const app = createApp(env.teviAuth.enabled
             teviSessionAuthMode: env.teviAuth.tokenExchange.sessionAuthMode
           }
         : {}),
-      ...(env.teviAuth.payment.enabled && productionDependencies?.topupSignatureIssuanceRepository
+      ...(env.teviAuth.payment.enabled && productionDependencies?.topupSignatureIssuanceRepository && teviPaymentClient
         ? {
             topupService: new TopupService(
               {
@@ -46,39 +67,24 @@ const app = createApp(env.teviAuth.enabled
                 depositMinStars: env.teviAuth.payment.depositMinStars,
                 depositMaxStars: env.teviAuth.payment.depositMaxStars
               },
-              new TeviPaymentClient({
-                apiBase: env.teviAuth.payment.apiBase,
-                depositTokenPath: env.teviAuth.payment.depositTokenPath,
-                cashoutPath: env.teviAuth.payment.cashoutPath,
-                apiKey: env.teviAuth.payment.apiKey,
-                secretKey: env.teviAuth.payment.secretKey
-              }),
+              teviPaymentClient!,
               productionDependencies.topupSignatureIssuanceRepository
             )
           }
         : {}),
-      ...(env.teviAuth.payment.enabled && productionDependencies?.cashoutRequestRepository
+      ...(env.teviAuth.payment.enabled && productionDependencies?.cashoutRequestRepository && teviPaymentClient
         ? {
             cashoutService: new CashoutRequestService(
               productionDependencies.cashoutRequestRepository,
-              new TeviPaymentClient({
-                apiBase: env.teviAuth.payment.apiBase,
-                depositTokenPath: env.teviAuth.payment.depositTokenPath,
-                cashoutPath: env.teviAuth.payment.cashoutPath,
-                apiKey: env.teviAuth.payment.apiKey,
-                secretKey: env.teviAuth.payment.secretKey
-              })
+              teviPaymentClient,
+              teviReceiptService
             ),
             cashoutReconciliationService: new CashoutReconciliationService(
               productionDependencies.cashoutRequestRepository,
-              new TeviPaymentClient({
-                apiBase: env.teviAuth.payment.apiBase,
-                depositTokenPath: env.teviAuth.payment.depositTokenPath,
-                cashoutPath: env.teviAuth.payment.cashoutPath,
-                apiKey: env.teviAuth.payment.apiKey,
-                secretKey: env.teviAuth.payment.secretKey
-              })
-            )
+              teviPaymentClient,
+              teviReceiptService
+            ),
+            ...(teviReceiptService ? { teviReceiptService } : {})
           }
         : {}),
       ...(env.teviAuth.payment.enabled && env.teviAuth.payment.webhookSecret && productionDependencies?.teviWebhookCreditRepository
@@ -88,6 +94,7 @@ const app = createApp(env.teviAuth.enabled
               idempotencyRepository: productionDependencies.providerTopUpIdempotencyRepository,
               creditPort: productionDependencies.teviWebhookCreditRepository,
               playerLookup: productionDependencies.playerSessionRepository,
+              ...(teviReceiptService ? { receiptService: teviReceiptService } : {}),
               ...(productionDependencies.cashoutRequestRepository
                 ? {
                     cashoutReconciliation: new TeviWebhookCashoutReconciliation(

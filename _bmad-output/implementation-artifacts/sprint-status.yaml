@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-06-27T21:00:32+0700"
-last_updated: "2026-07-02T00:00:00+0700"
+last_updated: "2026-07-02T12:00:00+0700"
 project: "China Slot Game"
 project_key: NOKEY
 tracking_system: file-system
@@ -114,7 +114,7 @@ development_status:
   8-7-spin-with-server-owned-stars-wallet-and-ledger: done
   8-8-request-manual-tevi-stars-cashout: done
   8-9-reconcile-cashout-failures-safely: done
-  8-10-send-basic-tevi-top-up-and-cashout-receipts: backlog
+  8-10-send-basic-tevi-top-up-and-cashout-receipts: done
   8-11-verify-rtp-and-sandbox-money-path-check-rounds: backlog
   8-12-fix-tevi-mini-app-session-balance-load-race: done
   epic-8-retrospective: optional

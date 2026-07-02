@@ -6,6 +6,8 @@ import type {
 } from "./cashout-reconciliation-service.js";
 import type { Clock } from "./session-service.js";
 import type { TeviAuthContext } from "./tevi-auth-adapter.js";
+import type { TeviMessageReceiptStatus } from "./tevi-receipt-service.js";
+import type { TeviReceiptServicePort } from "./tevi-receipt-service.js";
 import { ApiHttpError } from "../middleware/error-handler.js";
 
 export type CashoutRequestStatus =
@@ -105,6 +107,7 @@ export interface CashoutRequestSuccess {
   balanceAfter: number;
   idempotencyKey: string;
   walletTransactionId: string;
+  receiptStatus?: TeviMessageReceiptStatus | null;
 }
 
 export interface CashoutRequestFailure {
@@ -135,6 +138,7 @@ export class CashoutRequestService {
   public constructor(
     private readonly repository: CashoutRequestRepository,
     private readonly dispatchClient: CashoutDispatchClientPort,
+    private readonly receiptService?: TeviReceiptServicePort,
     private readonly clock: Clock = systemClock
   ) {}
 
@@ -248,6 +252,15 @@ export class CashoutRequestService {
       };
     }
 
+    const receiptStatus = await this.maybeDispatchCashoutReceipt({
+      cashoutRequestId: committed.cashoutRequestId,
+      playerId: input.playerId,
+      teviSubject: input.teviAuth.subject,
+      amount: input.amount,
+      cashoutStatus: "dispatched",
+      requestId: input.requestId
+    });
+
     return {
       ok: true,
       cashoutRequestId: committed.cashoutRequestId,
@@ -255,8 +268,23 @@ export class CashoutRequestService {
       amount: input.amount,
       balanceAfter: committed.balanceAfter,
       idempotencyKey: committed.idempotencyKey,
-      walletTransactionId: committed.walletTransactionId
+      walletTransactionId: committed.walletTransactionId,
+      receiptStatus
     };
+  }
+
+  private async maybeDispatchCashoutReceipt(input: {
+    cashoutRequestId: string;
+    playerId: string;
+    teviSubject: string;
+    amount: number;
+    cashoutStatus: string;
+    requestId: string;
+  }): Promise<TeviMessageReceiptStatus | null> {
+    if (!this.receiptService) {
+      return null;
+    }
+    return this.receiptService.dispatchCashoutReceipt(input);
   }
 
   private async checkIdempotencyConflict(
