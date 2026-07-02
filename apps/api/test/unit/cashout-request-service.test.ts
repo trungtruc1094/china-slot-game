@@ -73,6 +73,14 @@ class InMemoryCashoutRepository implements CashoutRequestRepository {
   public async reconcileUserWithdraw(): Promise<{ status: "no_match"; cashoutRequestId: null }> {
     return { status: "no_match", cashoutRequestId: null };
   }
+
+  public async findDetailById(): Promise<null> {
+    return null;
+  }
+
+  public async searchCashoutRequests(): Promise<{ records: []; total: 0 }> {
+    return { records: [], total: 0 };
+  }
 }
 
 describe("CashoutRequestService", () => {

@@ -14,6 +14,7 @@ import { createAdminConfigRouter } from "./routes/admin-config.routes.js";
 import { createAdminMetricsRouter } from "./routes/admin-metrics.routes.js";
 import { createAdminOperatorLimitsRouter } from "./routes/admin-operator-limits.routes.js";
 import { createAdminSpinLedgerRouter } from "./routes/admin-spin-ledger.routes.js";
+import { createAdminCashoutRequestsRouter, type CashoutReconciliationServicePort } from "./routes/admin-cashout-requests.routes.js";
 import { createSessionsRouter } from "./routes/sessions.routes.js";
 import { createSpinsRouter } from "./routes/spins.routes.js";
 import { createTeviSessionRouter } from "./routes/tevi-session.routes.js";
@@ -61,6 +62,7 @@ export interface AppDependencies {
   teviSessionAuthMode?: "exchange" | "direct";
   topupService?: TopupServicePort;
   cashoutService?: CashoutRequestServicePort;
+  cashoutReconciliationService?: CashoutReconciliationServicePort;
   teviWebhookService?: TeviWebhookServicePort;
   teviWebhookSecret?: string;
   readinessCheck?: () => Promise<Record<string, "ready">>;
@@ -140,6 +142,9 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use("/api", createAdminConfigRouter(configRepository));
   app.use("/api", createAdminOperatorLimitsRouter(operatorLimitsRepository));
   app.use("/api", createAdminSpinLedgerRouter(spinService, adminAuditRepository));
+  if (dependencies.cashoutReconciliationService) {
+    app.use("/api", createAdminCashoutRequestsRouter(dependencies.cashoutReconciliationService, adminAuditRepository));
+  }
   app.use("/api", createAdminMetricsRouter(metricsService));
   app.use("/api", createTeviWebhookRouter(
     dependencies.teviWebhookService && dependencies.teviWebhookSecret

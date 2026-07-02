@@ -4,6 +4,7 @@ import { loadEnv } from "./config/env.js";
 import { createProductionDependencies, shouldUsePostgresPersistence } from "./composition/production-dependencies.js";
 import { JoseTeviAuthVerifier } from "./domain/tevi-auth-adapter.js";
 import { CashoutRequestService } from "./domain/cashout-request-service.js";
+import { CashoutReconciliationService } from "./domain/cashout-reconciliation-service.js";
 import { TeviPaymentClient } from "./domain/tevi-payment-client.js";
 import { TeviTokenService } from "./domain/tevi-token-service.js";
 import { TopupService } from "./domain/topup-service.js";
@@ -59,6 +60,16 @@ const app = createApp(env.teviAuth.enabled
       ...(env.teviAuth.payment.enabled && productionDependencies?.cashoutRequestRepository
         ? {
             cashoutService: new CashoutRequestService(
+              productionDependencies.cashoutRequestRepository,
+              new TeviPaymentClient({
+                apiBase: env.teviAuth.payment.apiBase,
+                depositTokenPath: env.teviAuth.payment.depositTokenPath,
+                cashoutPath: env.teviAuth.payment.cashoutPath,
+                apiKey: env.teviAuth.payment.apiKey,
+                secretKey: env.teviAuth.payment.secretKey
+              })
+            ),
+            cashoutReconciliationService: new CashoutReconciliationService(
               productionDependencies.cashoutRequestRepository,
               new TeviPaymentClient({
                 apiBase: env.teviAuth.payment.apiBase,

@@ -1,4 +1,9 @@
 import { createHash } from "node:crypto";
+import type {
+  CashoutRequestDetailRecord,
+  CashoutRequestSearchFilters,
+  CashoutRequestSearchResult
+} from "./cashout-reconciliation-service.js";
 import type { Clock } from "./session-service.js";
 import type { TeviAuthContext } from "./tevi-auth-adapter.js";
 import { ApiHttpError } from "../middleware/error-handler.js";
@@ -79,7 +84,16 @@ export interface CashoutRequestRepository {
     status: "reconciled" | "already_dispatched" | "no_match";
     cashoutRequestId: string | null;
   }>;
+  findDetailById(cashoutRequestId: string): Promise<CashoutRequestDetailRecord | null>;
+  searchCashoutRequests(filters: CashoutRequestSearchFilters): Promise<CashoutRequestSearchResult>;
 }
+
+export type {
+  CashoutReconciliationState,
+  CashoutRequestDetailRecord,
+  CashoutRequestSearchFilters,
+  CashoutRequestSearchResult
+} from "./cashout-reconciliation-service.js";
 
 export type CashoutRequestResult = CashoutRequestSuccess | CashoutRequestFailure;
 

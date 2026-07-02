@@ -943,9 +943,21 @@ class SlotGame extends Phaser.Scene{
 
     // Tevi debits the game wallet on API commit (dispatched / failed_retryable). user_withdraw webhooks
     // reconcile provider payout later without mutating the wallet again (playbook §5).
-    finishCommittedCashout(apiStatus)
+    finishCommittedCashout(apiStatus, cashoutRequestId)
     {
         if (!this.mapCashoutApiStatus(apiStatus)) return;
+        if (apiStatus === "failed_retryable" && cashoutRequestId && this.guiController && this.guiController.showMessage) {
+            this.guiController.showMessage(
+                "Cash out processing",
+                "Cash out request " + cashoutRequestId + " is processing on Tevi. Contact support with this ID if payout does not arrive.",
+                this,
+                () => {
+                    this.closeCashoutModal();
+                    this.setCashoutState("idle");
+                }
+            );
+            return;
+        }
         this.closeCashoutModal();
         this.setCashoutState("idle");
     }
@@ -964,7 +976,7 @@ class SlotGame extends Phaser.Scene{
         this.updateCashoutEntryEnabled();
 
         if (this.isCommittedCashoutApiStatus(result.cashoutStatus)) {
-            this.finishCommittedCashout(result.cashoutStatus);
+            this.finishCommittedCashout(result.cashoutStatus, result.cashoutRequestId);
             return;
         }
 

@@ -25,3 +25,7 @@
 - AC10 manual Tevi sandbox cashout Check Round — requires human sandbox run with funded provider account to verify live `POST /api/v1/payments/cashout` dispatch.
 - Epic 9 compliance/KYC/self-exclusion/host-float hard stops on cashout — stubbed pass-through in sandbox MVP; implement in Epic 9.
 - Operator reconciliation/retry UI for `failed_retryable` cashouts — Story 8.9.
+
+## Deferred from: code review of 8-9-reconcile-cashout-failures-safely (2026-07-02)
+
+- AC6 live Tevi sandbox simulated payout failure Check Round — requires human sandbox run with provider outage simulation and operator curl retry verification.

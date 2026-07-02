@@ -7,6 +7,7 @@ import {
   CashoutRequestService,
   fingerprintCashoutPayload
 } from "../../src/domain/cashout-request-service.js";
+import { CashoutReconciliationService } from "../../src/domain/cashout-reconciliation-service.js";
 import type { Clock } from "../../src/domain/session-service.js";
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL;
@@ -187,6 +188,67 @@ describePostgres("CashoutRequestService with Postgres", () => {
 
     expect(result).toMatchObject({ ok: true, status: "dispatched", balanceAfter: 1250 });
     expect(dispatch).toHaveBeenCalledTimes(1);
+  });
+});
+
+describePostgres("CashoutReconciliationService with Postgres", () => {
+  it("retries failed_retryable dispatch without creating a second wallet debit", async () => {
+    const clock = new MutableClock();
+    const repository = new PostgresCashoutRequestRepository(requirePool(), clock);
+    const walletRepository = new PostgresWalletRepository(requirePool(), clock);
+    await createPlayer("player-retry");
+    await walletRepository.applyTransaction({
+      playerId: "player-retry",
+      type: "credit",
+      amount: 500,
+      actor: "test",
+      source: "test_setup"
+    });
+
+    const requestService = new CashoutRequestService(repository, {
+      dispatchCashout: vi.fn(async () => ({
+        ok: false as const,
+        reasonCode: "PROVIDER_UNAVAILABLE",
+        statusCode: 503
+      }))
+    });
+
+    const created = await requestService.requestCashout({
+      playerId: "player-retry",
+      teviAuth: {
+        provider: "tevi",
+        subject: "tevi-user-retry",
+        displayName: "Player",
+        expiresAt: "2026-12-31T00:00:00.000Z"
+      },
+      amount: 120,
+      requestId: "req_pg_retry_1"
+    });
+    expect(created).toMatchObject({ ok: true, status: "failed_retryable", balanceAfter: 1380 });
+
+    const reconciliationService = new CashoutReconciliationService(repository, {
+      dispatchCashout: vi.fn(async () => ({ ok: true as const }))
+    });
+    const retried = await reconciliationService.retryDispatch(created.ok ? created.cashoutRequestId : "", "req_admin_retry_pg");
+    expect(retried).toMatchObject({ ok: true, status: "dispatched", dispatchAttemptCount: 2 });
+
+    const wallet = await requirePool().query<{ balance: string }>(
+      `SELECT balance FROM wallets WHERE player_id = $1`,
+      ["player-retry"]
+    );
+    expect(wallet.rows[0]?.balance).toBe("1380");
+
+    const cashoutRows = await requirePool().query<{ count: string }>(
+      `SELECT COUNT(*)::text AS count FROM cashout_requests WHERE player_id = $1`,
+      ["player-retry"]
+    );
+    expect(cashoutRows.rows[0]?.count).toBe("1");
+
+    const txnRows = await requirePool().query<{ count: string }>(
+      `SELECT COUNT(*)::text AS count FROM wallet_transactions WHERE player_id = $1 AND transaction_type = 'debit'`,
+      ["player-retry"]
+    );
+    expect(txnRows.rows[0]?.count).toBe("1");
   });
 });
 

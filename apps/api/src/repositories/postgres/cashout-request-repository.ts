@@ -9,6 +9,13 @@ import {
   type CashoutRequestRepository,
   type CashoutRequestStatus
 } from "../../domain/cashout-request-service.js";
+import {
+  deriveReconciliationState,
+  summarizeProviderResponse,
+  type CashoutRequestDetailRecord,
+  type CashoutRequestSearchFilters,
+  type CashoutRequestSearchResult
+} from "../../domain/cashout-reconciliation-service.js";
 import type { CashoutWithdrawReconciliationPort } from "../../domain/tevi-webhook-cashout-reconciliation.js";
 import { ApiHttpError } from "../../middleware/error-handler.js";
 
@@ -21,6 +28,18 @@ interface CashoutRow {
   idempotency_key: string;
   payload_fingerprint: string;
   status: CashoutRequestStatus;
+  dispatch_attempt_count: number;
+  failure_reason: string | null;
+  provider_status_code: number | null;
+  provider_metadata_json: Record<string, unknown>;
+  request_id: string;
+  created_at: Date;
+  updated_at: Date;
+  dispatched_at: Date | null;
+}
+
+interface CashoutDetailRow extends CashoutRow {
+  spin_id: string | null;
 }
 
 interface WalletBalanceRow {
@@ -28,6 +47,17 @@ interface WalletBalanceRow {
 }
 
 const starterBalance = 1000;
+
+const reconciliationStateSql = `
+  CASE
+    WHEN cr.provider_metadata_json ? 'webhookProviderEventId' THEN 'reconciled'
+    WHEN cr.status = 'pending' THEN 'awaiting_dispatch'
+    WHEN cr.status = 'dispatched' THEN 'provider_dispatched'
+    WHEN cr.status = 'failed_retryable' THEN 'retry_required'
+    WHEN cr.status IN ('failed_terminal', 'idempotency_conflict') THEN 'operator_review_required'
+    ELSE 'unknown'
+  END
+`;
 
 export class PostgresCashoutRequestRepository implements CashoutRequestRepository, CashoutWithdrawReconciliationPort {
   public constructor(
@@ -186,7 +216,7 @@ export class PostgresCashoutRequestRepository implements CashoutRequestRepositor
            dispatch_attempt_count = dispatch_attempt_count + 1,
            failure_reason = $3,
            provider_status_code = $4,
-           provider_metadata_json = $5,
+           provider_metadata_json = provider_metadata_json || $5::jsonb,
            updated_at = $6,
            dispatched_at = COALESCE($7, dispatched_at)
        WHERE id = $1`,
@@ -267,6 +297,85 @@ export class PostgresCashoutRequestRepository implements CashoutRequestRepositor
       return { status: "no_match", cashoutRequestId: null };
     });
   }
+
+  public async findDetailById(cashoutRequestId: string): Promise<CashoutRequestDetailRecord | null> {
+    const result = await this.pool.query<CashoutDetailRow>(
+      `SELECT cr.id, cr.player_id, cr.tevi_subject, cr.amount, cr.wallet_transaction_id,
+              cr.idempotency_key, cr.payload_fingerprint, cr.status, cr.dispatch_attempt_count,
+              cr.failure_reason, cr.provider_status_code, cr.provider_metadata_json, cr.request_id,
+              cr.created_at, cr.updated_at, cr.dispatched_at, wt.spin_id
+       FROM cashout_requests cr
+       JOIN wallet_transactions wt ON wt.id = cr.wallet_transaction_id
+       WHERE cr.id = $1`,
+      [cashoutRequestId]
+    );
+    const row = result.rows[0];
+    return row ? rowToDetailRecord(row) : null;
+  }
+
+  public async searchCashoutRequests(filters: CashoutRequestSearchFilters): Promise<CashoutRequestSearchResult> {
+    const conditions: string[] = [];
+    const params: unknown[] = [];
+
+    if (filters.playerId) {
+      params.push(filters.playerId);
+      conditions.push(`cr.player_id = $${params.length}`);
+    }
+    if (filters.cashoutRequestId) {
+      params.push(filters.cashoutRequestId);
+      conditions.push(`cr.id = $${params.length}`);
+    }
+    if (filters.requestId) {
+      params.push(filters.requestId);
+      conditions.push(`cr.request_id = $${params.length}`);
+    }
+    if (filters.status) {
+      params.push(filters.status);
+      conditions.push(`cr.status = $${params.length}`);
+    }
+    if (filters.from) {
+      params.push(filters.from);
+      conditions.push(`cr.created_at >= $${params.length}`);
+    }
+    if (filters.to) {
+      params.push(filters.to);
+      conditions.push(`cr.created_at <= $${params.length}`);
+    }
+    if (filters.reconciliationState) {
+      params.push(filters.reconciliationState);
+      conditions.push(`${reconciliationStateSql} = $${params.length}`);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const countResult = await this.pool.query<{ total: string }>(
+      `SELECT COUNT(*)::text AS total FROM cashout_requests cr ${whereClause}`,
+      params
+    );
+    const total = parseSafeInteger(countResult.rows[0]?.total ?? "0");
+
+    params.push(filters.limit);
+    const limitParam = `$${params.length}`;
+    params.push(filters.offset);
+    const offsetParam = `$${params.length}`;
+
+    const rows = await this.pool.query<CashoutDetailRow>(
+      `SELECT cr.id, cr.player_id, cr.tevi_subject, cr.amount, cr.wallet_transaction_id,
+              cr.idempotency_key, cr.payload_fingerprint, cr.status, cr.dispatch_attempt_count,
+              cr.failure_reason, cr.provider_status_code, cr.provider_metadata_json, cr.request_id,
+              cr.created_at, cr.updated_at, cr.dispatched_at, wt.spin_id
+       FROM cashout_requests cr
+       JOIN wallet_transactions wt ON wt.id = cr.wallet_transaction_id
+       ${whereClause}
+       ORDER BY cr.created_at DESC, cr.id DESC
+       LIMIT ${limitParam} OFFSET ${offsetParam}`,
+      params
+    );
+
+    return {
+      records: rows.rows.map(rowToDetailRecord),
+      total
+    };
+  }
 }
 
 function rowToCommitResult(
@@ -281,6 +390,34 @@ function rowToCommitResult(
     idempotencyKey: row.idempotency_key,
     payloadFingerprint: row.payload_fingerprint,
     alreadyExists
+  };
+}
+
+function rowToDetailRecord(row: CashoutDetailRow): CashoutRequestDetailRecord {
+  const providerMetadata = row.provider_metadata_json ?? {};
+  return {
+    cashoutRequestId: row.id,
+    playerId: row.player_id,
+    teviSubject: row.tevi_subject,
+    amount: parseSafeInteger(row.amount),
+    status: row.status,
+    reconciliationState: deriveReconciliationState(row.status, providerMetadata),
+    dispatchAttemptCount: row.dispatch_attempt_count,
+    failureReason: row.failure_reason,
+    providerStatusCode: row.provider_status_code,
+    providerResponseSummary: summarizeProviderResponse(
+      row.provider_status_code,
+      row.failure_reason,
+      providerMetadata
+    ),
+    idempotencyKey: row.idempotency_key,
+    payloadFingerprint: row.payload_fingerprint,
+    requestId: row.request_id,
+    walletTransactionId: row.wallet_transaction_id,
+    relatedSpinId: row.spin_id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    dispatchedAt: row.dispatched_at
   };
 }
 
